@@ -10,6 +10,12 @@ namespace Mottainai.Gameplay
         bool lastLeftBack, lastRightBack;
         public float worldVx, worldVz;
 
+        public void CopyFrom(RaftSim o)
+        {
+            x = o.x; z = o.z; heading = o.heading; vx = o.vx; vz = o.vz; yawRate = o.yawRate;
+            lastLeft = o.lastLeft; lastRight = o.lastRight; lastLeftBack = o.lastLeftBack; lastRightBack = o.lastRightBack;
+        }
+
         public float ForwardSpeed => vx * Mathf.Sin(heading) + vz * Mathf.Cos(heading);
         public float LastStroke(bool left) => left ? lastLeft : lastRight;
 

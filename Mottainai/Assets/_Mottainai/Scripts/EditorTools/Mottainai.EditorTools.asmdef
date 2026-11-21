@@ -1,1 +1,1 @@
-{ "name": "Mottainai.EditorTools", "rootNamespace": "Mottainai", "references": ["Mottainai.Core","Unity.RenderPipelines.Universal.Runtime","Unity.RenderPipelines.Core.Runtime","Unity.InputSystem"], "includePlatforms": ["Editor"], "autoReferenced": false }
+{ "name": "Mottainai.EditorTools", "rootNamespace": "Mottainai", "references": ["Mottainai.Core","Mottainai.Gameplay","Unity.RenderPipelines.Universal.Runtime","Unity.RenderPipelines.Core.Runtime","Unity.InputSystem"], "includePlatforms": ["Editor"], "autoReferenced": false }

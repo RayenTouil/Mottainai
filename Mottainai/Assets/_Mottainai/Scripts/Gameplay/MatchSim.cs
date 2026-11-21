@@ -119,17 +119,7 @@ namespace Mottainai.Gameplay
                         e.yaw = c * 90f;
                         break;
                     case EntityKind.Obstacle:
-                        if (e.sub == (byte)ObstacleType.Shark)
-                        {
-                            float omega = T.sharkSpeed / Mathf.Max(0.1f, T.sharkAmplitude);
-                            float cyc = 3f + T.sharkTelegraph + 5f;
-                            float local = Mathf.Repeat(c + e.phase, cyc);
-                            e.flags = (byte)(local < 3f ? 0 : local < 3f + T.sharkTelegraph ? 1 : 2);
-                            float s = Mathf.Sin(omega * c + e.phase);
-                            e.x = e.baseX + T.sharkAmplitude * s;
-                            e.yaw = Mathf.Cos(omega * c + e.phase) >= 0f ? 90f : -90f;
-                            e.y = e.flags == 2 ? 0f : -0.4f;
-                        }
+                        if (e.sub == (byte)ObstacleType.Shark) SharkPose(ref e, c, T);
                         else if (e.sub == (byte)ObstacleType.Iceberg || e.sub == (byte)ObstacleType.Wreck || e.sub == (byte)ObstacleType.Log)
                         {
                             e.y = 0.05f * Mathf.Sin(c * 1.3f + e.phase);
@@ -137,6 +127,18 @@ namespace Mottainai.Gameplay
                         break;
                 }
             }
+        }
+
+        /// Deterministic shark patrol: submerged 3 s, fin telegraph, then active (dangerous) 5 s.
+        public static void SharkPose(ref SimEntity e, float clock, TuningData T)
+        {
+            float omega = T.sharkSpeed / Mathf.Max(0.1f, T.sharkAmplitude);
+            float cyc = 3f + T.sharkTelegraph + 5f;
+            float local = Mathf.Repeat(clock + e.phase, cyc);
+            e.flags = (byte)(local < 3f ? 0 : local < 3f + T.sharkTelegraph ? 1 : 2);
+            e.x = e.baseX + T.sharkAmplitude * Mathf.Sin(omega * clock + e.phase);
+            e.yaw = Mathf.Cos(omega * clock + e.phase) >= 0f ? 90f : -90f;
+            e.y = e.flags == 2 ? 0f : -0.4f;
         }
 
         void RecordHistory()
