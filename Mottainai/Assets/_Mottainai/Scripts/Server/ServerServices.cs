@@ -211,14 +211,27 @@ namespace Mottainai.Server
         public static List<string> LocalIPv4()
         {
             var list = new List<string>();
+            var virt = new List<string>();
             try
             {
                 foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
-                        if (ua.Address.AddressFamily == AddressFamily.InterNetwork)
-                            list.Add($"{ua.Address}  ({ni.Name})");
+                    var props = ni.GetIPProperties();
+                    bool hasGateway = false;
+                    foreach (var g in props.GatewayAddresses)
+                        if (g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any)) hasGateway = true;
+                    string desc = (ni.Description + " " + ni.Name).ToLowerInvariant();
+                    bool isVirtual = desc.Contains("virtualbox") || desc.Contains("vmware") || desc.Contains("hyper-v") || desc.Contains("vethernet")
+                                     || desc.Contains("host-only") || desc.Contains("wsl") || desc.Contains("bluetooth") || desc.Contains("docker");
+                    foreach (var ua in props.UnicastAddresses)
+                    {
+                        if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                        var ip = ua.Address.ToString();
+                        if (ip.StartsWith("169.254.")) continue; // APIPA, unreachable
+                        if (hasGateway && !isVirtual) list.Add($"{ip}  ({ni.Name}, LAN)");
+                        else virt.Add($"{ip}  ({ni.Name}, {(isVirtual ? "virtual - not for phones" : "no gateway")})");
+                    }
                 }
             }
             catch (Exception e) { Debug.LogWarning("[Net] interface enumeration failed: " + e.Message); }
@@ -231,6 +244,7 @@ namespace Mottainai.Server
                 }
                 catch { }
             }
+            list.AddRange(virt);
             return list;
         }
 

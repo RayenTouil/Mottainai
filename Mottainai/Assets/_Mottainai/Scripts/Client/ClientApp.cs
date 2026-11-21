@@ -50,7 +50,7 @@ namespace Mottainai.Client
             gameObject.AddComponent<PerfGovernor>();
             input = gameObject.AddComponent<GestureInput>();
             playerName = PlayerPrefs.GetString("name", "Player" + Random.Range(10, 99));
-            serverHost = PlayerPrefs.GetString("server", Application.isEditor ? "127.0.0.1" : "192.168.1.100");
+            serverHost = PlayerPrefs.GetString("server", Application.isEditor ? "127.0.0.1" : "");
             token = PlayerPrefs.GetString("token", "");
             hostInEditor = Application.isEditor && AppHooks.ServerAvailable && PlayerPrefs.GetInt("hostInEditor", 1) == 1;
             NetworkInfo.Provider.Refresh();
