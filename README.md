@@ -6,7 +6,7 @@ _Mottainai_ (もったいない) is a Japanese word for the regret felt when som
 
 **Mottainai** is a 3D endless runner for kids aged 7 to 12. The player runs across a three-lane road through four worlds and picks up the waste scattered along the way. They have to dodge obstacles and gear up before touching hazardous waste. Every run ends at the **Eco Sorting Center**, where the player sorts what they collected and sees the environmental impact of their run.
 
-Built for the **Green Hackathon 2026**, part of the _Swedish-Tunisian Games and Innovation Days_ (theme: waste management and recycling).dfhdfh
+Built for the **Green Hackathon 2026**, part of the _Swedish-Tunisian Games and Innovation Days_ (theme: waste management and recycling).
 
 ---
 
