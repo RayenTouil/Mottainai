@@ -243,6 +243,9 @@ namespace Mottainai.Client
                     Part(body, Capsule, Lit(new Color(0.45f, 0.5f, 0.58f)), new Vector3(0, -0.05f, 0), new Vector3(0.9f, 1.1f, 0.9f), new Vector3(90, 0, 0));
                     Part(body, Cone, Lit(new Color(0.45f, 0.5f, 0.58f)), new Vector3(0, -0.05f, -1.0f), new Vector3(0.8f, 0.7f, 0.3f), new Vector3(-90, 0, 0));
                     Part(body, Sphere, Lit(Color.white), new Vector3(0, -0.2f, 0.5f), new Vector3(0.6f, 0.2f, 0.4f));
+                    Part(body, Sphere, Lit(new Color(1f, 0.15f, 0.1f), 1.2f), new Vector3(0.28f, 0.12f, 0.75f), Vector3.one * 0.1f);
+                    Part(body, Sphere, Lit(new Color(1f, 0.15f, 0.1f), 1.2f), new Vector3(-0.28f, 0.12f, 0.75f), Vector3.one * 0.1f);
+                    Part(body, Cube, Lit(Color.white, 0.4f), new Vector3(0, -0.12f, 0.95f), new Vector3(0.45f, 0.05f, 0.06f));
                     var fin = Part(root, Cone, Lit(new Color(0.35f, 0.4f, 0.48f)), new Vector3(0, 0.25f, 0), new Vector3(0.12f, 0.75f, 0.6f), default, "fin");
                     fin.transform.SetAsLastSibling();
                     break;

@@ -137,12 +137,14 @@ namespace Mottainai.Gameplay
         public static void SharkPose(ref SimEntity e, float clock, TuningData T)
         {
             float omega = T.sharkSpeed / Mathf.Max(0.1f, T.sharkAmplitude);
-            float cyc = 3f + T.sharkTelegraph + 5f;
+            // cycle: circling (fin only, harmless) -> telegraph (splashing fin, harmless) -> attack (body up, dangerous)
+            const float circle = 2f, attack = 4.5f;
+            float cyc = circle + T.sharkTelegraph + attack;
             float local = Mathf.Repeat(clock + e.phase, cyc);
-            e.flags = (byte)(local < 3f ? 0 : local < 3f + T.sharkTelegraph ? 1 : 2);
+            e.flags = (byte)(local < circle ? 0 : local < circle + T.sharkTelegraph ? 1 : 2);
             e.x = e.baseX + T.sharkAmplitude * Mathf.Sin(omega * clock + e.phase);
             e.yaw = Mathf.Cos(omega * clock + e.phase) >= 0f ? 90f : -90f;
-            e.y = e.flags == 2 ? 0f : -0.4f;
+            e.y = e.flags == 2 ? 0.15f + 0.08f * Mathf.Sin(clock * 6f + e.phase) : -0.35f;
         }
 
         void RecordHistory()

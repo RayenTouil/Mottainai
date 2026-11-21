@@ -12,7 +12,7 @@ static class Program
         int tick = args.Length > 1 ? int.Parse(args[1]) : 60;
         var t = new TuningData();
         int crashes = 0, stuck = 0;
-        double sumT = 0, sumScore = 0, sumDist = 0, sumPow = 0;
+        double sumT = 0, sumScore = 0, sumDist = 0, sumPow = 0, sumSharks = 0;
         for (int seed = 1; seed <= runs; seed++)
         {
             var sim = new MatchSim(seed * 7919, t, new Coop2MinMode(t)) { TickRate = tick };
@@ -29,6 +29,8 @@ static class Program
                 sim.Events.Clear();
             }
             var r = sim.Results;
+            int sharks = 0; for (int i = 0; i < sim.Count; i++) if (sim.E[i].kind == EntityKind.Obstacle && sim.E[i].sub == (byte)ObstacleType.Shark) sharks++;
+            sumSharks += sharks;
             if (r.reason == EndReason.Crashed) crashes++;
             if (r.distance < 250f) stuck++;
             sumT += r.duration; sumScore += r.total; sumDist += r.distance; sumPow += pow;
@@ -44,7 +46,7 @@ static class Program
                 Console.WriteLine(sb.ToString());
             }
         }
-        Console.WriteLine($"tick {tick} Hz | crashes {crashes}/{runs} | short runs (<250 m) {stuck} | avg time {sumT / runs:F1}s dist {sumDist / runs:F0}m score {sumScore / runs:F0} pickups {sumPow / runs:F1}");
+        Console.WriteLine($"tick {tick} Hz | crashes {crashes}/{runs} | short runs (<250 m) {stuck} | avg time {sumT / runs:F1}s dist {sumDist / runs:F0}m score {sumScore / runs:F0} pickups {sumPow / runs:F1} sharks/course {sumSharks / runs:F1}");
         return crashes * 10 > runs ? 1 : 0;
     }
 }

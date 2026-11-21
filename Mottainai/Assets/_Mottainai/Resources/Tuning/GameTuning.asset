@@ -53,10 +53,10 @@ MonoBehaviour:
     shieldMinTime: 20
     shieldDuration: 6
     shieldBlinkTime: 1.5
-    sharkSpeed: 2
+    sharkSpeed: 3.5
     sharkAmplitude: 6
     sharkTelegraph: 1.5
-    sharkMinDistance: 100
+    sharkMinDistance: 60
     wasteWeights:
     - 30
     - 15

@@ -310,8 +310,10 @@ namespace Mottainai.Client
                 t.localRotation = Quaternion.Euler(0f, yaw, 0f);
                 if (EntityCode.Kind(s.code) == EntityKind.Obstacle && EntityCode.Sub(s.code) == (byte)ObstacleType.Shark)
                 {
-                    if (s.body != null) s.body.gameObject.SetActive(s.flags == 2);
-                    if (s.fin != null) s.fin.gameObject.SetActive(s.flags >= 1);
+                    if (s.body != null && s.body.gameObject.activeSelf != (s.flags == 2)) s.body.gameObject.SetActive(s.flags == 2);
+                    if (s.fin != null && !s.fin.gameObject.activeSelf) s.fin.gameObject.SetActive(true); // fin always visible
+                    if (s.flags == 1 && Random.value < Time.deltaTime * 7f) fx.Splash(p + Vector3.up * 0.3f, false); // attack warning
+                    if (s.flags == 2 && Random.value < Time.deltaTime * 4f) fx.Splash(p, false);
                 }
             }
             UpdateFlyers(Time.deltaTime);
@@ -432,9 +434,8 @@ namespace Mottainai.Client
                 if (kind == EntityKind.Obstacle)
                 {
                     bool shark = sub == (byte)ObstacleType.Shark;
-                    if (shark && s.flags == 0) continue;
-                    float r = ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] * 0.7f;
-                    fxMap.Ring(p.x, p.z, r, shark ? (s.flags == 2 ? 0.8f : 0.45f) : 1f);
+                                        float r = ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] * 0.7f;
+                    fxMap.Ring(p.x, p.z, shark && s.flags != 2 ? 0.35f : r, shark ? (s.flags == 2 ? 0.85f : 0.45f) : 1f);
                 }
                 else if (kind == EntityKind.Waste)
                     fxMap.Disc(p.x, p.z, sub == (byte)WasteType.Toxic ? 4.5f : 3f, 1f, 1);

@@ -35,7 +35,7 @@ namespace Mottainai.Gameplay
                 while (nextObs < cz1)
                 {
                     float oz = nextObs;
-                    var type = PickObstacle(rng, oz >= t.sharkMinDistance);
+                    var type = PickObstacle(rng, oz >= t.sharkMinDistance, t.obstacleWeights);
                     float r = ObstacleCatalog.Radius[(int)type], hl = ObstacleCatalog.HalfLen[(int)type];
                     float ext = r + hl;
                     float ox = 0f;
@@ -164,9 +164,9 @@ namespace Mottainai.Gameplay
             return max - cursor >= width;
         }
 
-        static ObstacleType PickObstacle(System.Random rng, bool allowShark)
+        static ObstacleType PickObstacle(System.Random rng, bool allowShark, float[] tuned)
         {
-            var w = ObstacleCatalog.Weights;
+            var w = tuned != null && tuned.Length == ObstacleCatalog.Weights.Length ? tuned : ObstacleCatalog.Weights;
             ObstacleType t;
             do t = (ObstacleType)PickWeighted(rng, w); while (!allowShark && t == ObstacleType.Shark);
             return t;

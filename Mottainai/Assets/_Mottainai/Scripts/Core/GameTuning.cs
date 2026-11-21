@@ -24,7 +24,9 @@ namespace Mottainai
         public int wasteClusterMin = 3, wasteClusterMax = 5;
         public float shieldSpacing = 150f, shieldMinTime = 20f, shieldDuration = 6f, shieldBlinkTime = 1.5f;
         public float magnetDuration = 8f, magnetRadiusScale = 1.8f, turboDuration = 6f, turboImpulseScale = 1.35f, turboMaxSpeedBonus = 1.5f;
-        public float sharkSpeed = 2f, sharkAmplitude = 6f, sharkTelegraph = 1.5f, sharkMinDistance = 100f;
+        public float sharkSpeed = 3.5f, sharkAmplitude = 6f, sharkTelegraph = 1.5f, sharkMinDistance = 60f;
+        // Rock, BigRock, Iceberg, Wreck, Log, Shark
+        public float[] obstacleWeights = { 30, 14, 14, 12, 20, 24 };
         [Header("Score")]
         public float[] wasteWeights = { 30, 15, 15, 12, 13, 3, 12 };
         public int[] wasteScores = { 10, 10, 15, 5, 20, 100, -30 };

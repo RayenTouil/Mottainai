@@ -18,7 +18,7 @@ run_server.bat -tick 120      # 5G SA mode: 120 Hz snapshots, 8 ms interpolation
 Full command line: `MottainaiServer.exe -server -port 7777 -http 8080 -tick 60 -log [-batchmode -nographics]`.
 On start it prints every IPv4 address in big text (window + `ServerData/server_status.txt` next to the exe). Type one of them on the phone login screen.
 Session/telemetry/lab logs: `Mottainai/Builds/Server/Windows/ServerData/logs/session_*.csv`, `lab_results.csv`.
-Tuning override: edit `ServerData/tuning.json` (served to clients in the Content Pack), restart.
+Tuning override: create `ServerData/tuning_override.json` with only the fields to change, e.g. `{"sharkSpeed":4,"obstacleWeights":[30,14,14,12,20,30]}`, restart (effective values: `ServerData/tuning_current.json`; served to clients in the Content Pack).
 
 ## 3. Ports
 | Port | Proto | Use |

@@ -47,9 +47,10 @@ namespace Mottainai.Server
             string root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ServerData"));
             Directory.CreateDirectory(root);
             log = new SessionLog(root);
-            var tuningOverride = Path.Combine(root, "tuning.json");
-            if (File.Exists(tuningOverride)) GameTuning.ApplyJson(File.ReadAllText(tuningOverride));
-            else File.WriteAllText(tuningOverride, GameTuning.ToJson());
+            // Optional hand-written override (only the fields you put in it). Effective values are dumped for reference.
+            var tuningOverride = Path.Combine(root, "tuning_override.json");
+            if (File.Exists(tuningOverride)) { GameTuning.ApplyJson(File.ReadAllText(tuningOverride)); Debug.Log("[Server] applied " + tuningOverride); }
+            File.WriteAllText(Path.Combine(root, "tuning_current.json"), GameTuning.ToJson());
 
             Room.TickRate = Mathf.Clamp(a.tick, 10, 120);
             rooms = new RoomManager(log);
