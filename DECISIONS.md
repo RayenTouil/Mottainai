@@ -59,3 +59,4 @@
 - P1 models: Metal = metal_can | metal_can_broken, Toxic = toxic_propane_tank | battery (random per entity); toxic model keeps the hazard billboard; shark model keeps the primitive fin (always-visible telegraph).
 - P1 models: raft model replaces torus hull/rope/floor (Content Pack raft skin only applies to the torus hull); paddle auto-oriented blade-down at import.
 - P1 models: glTFast 6.21.0 added for metal_can.glb (only GLB-only model). bear_trap.fbx imported but unmapped (no ObstacleType for it; needs server sim + protocol change).
+- I1 test plan: 1 phone on this PC -> 1 human + 2 bots (LEFT PADDLER, then COLLECTOR); pass = 3 full matches in a row on 5G SA.

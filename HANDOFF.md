@@ -8,8 +8,8 @@ Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler log
 ## Done (P1 models, early)
 - CC0 models in Resources/Models + glTFast + ModelImportRules + VisualFactory mapping (primitive fallback). Open Unity once to import, check raft/paddle/shark orientation.
 ## In progress
-- C1/C2 build: Unity editor must be CLOSED -> build_android.bat -> install_phone.bat (phones on 5G SA, Wi-Fi OFF).
+- C1/C2 build: Unity editor must be CLOSED -> build_android.bat -> install_phone.bat (1 phone only: R5CY30BPV8B, 5G SA, Wi-Fi OFF).
 ## Exact next step
-- Close Unity editor, run build_android.bat, plug phones, install_phone.bat, Quick Play on both phones (I1).
+- I1 (1 phone): Quick Play, 1 human + 2 bots. Human = LEFT PADDLER, then COLLECTOR. Pass = 3 full matches in a row over 5G SA. Then Network Lab on Wi-Fi + 5G SA -> /api/telemetry.csv.
 ## Resume commands
 - `git pull --rebase --autostash` ; `deploy_server.bat` ; `build_android.bat` ; `install_phone.bat`
