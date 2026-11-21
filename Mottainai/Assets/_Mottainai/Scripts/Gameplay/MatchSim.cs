@@ -153,8 +153,10 @@ namespace Mottainai.Gameplay
             raftHistZ[Tick % HistoryTicks] = Teams[0].raft.z;
         }
 
+        /// ticksBack 0 = live state (the history slot for the current tick may not be recorded yet during Step).
         public Vector2 HistoricEntity(int i, int ticksBack)
         {
+            if (ticksBack <= 0) return new Vector2(E[i].x, E[i].z);
             ticksBack = Mathf.Clamp(ticksBack, 0, (int)Mathf.Min(HistoryTicks - 1, Tick));
             int slot = (int)((Tick - (uint)ticksBack) % HistoryTicks) * Count;
             return new Vector2(histX[slot + i], histZ[slot + i]);
@@ -162,6 +164,7 @@ namespace Mottainai.Gameplay
 
         public Vector2 HistoricRaft(int ticksBack)
         {
+            if (ticksBack <= 0) return new Vector2(Teams[0].raft.x, Teams[0].raft.z);
             ticksBack = Mathf.Clamp(ticksBack, 0, (int)Mathf.Min(HistoryTicks - 1, Tick));
             uint s = (Tick - (uint)ticksBack) % HistoryTicks;
             return new Vector2(raftHistX[s], raftHistZ[s]);

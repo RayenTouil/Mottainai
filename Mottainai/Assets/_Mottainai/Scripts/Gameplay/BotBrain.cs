@@ -15,7 +15,11 @@ namespace Mottainai.Gameplay
             new Policy(L, R), new Policy(R, L), new Policy(L | B, 0), new Policy(R | B, 0)
         };
 
+        public readonly float[] DebugCosts = new float[15];
+        public byte DebugAct;
         float nextAct, nextNet;
+        float progressCheckAt, lastProgressZ;
+        int stallLevel; // grows while the raft makes no progress: escapes "hold position forever" local minima
         readonly RaftSim probe = new RaftSim();
         const float Horizon = 3.2f, StepDt = 1f / 30f;
 
@@ -25,6 +29,12 @@ namespace Mottainai.Gameplay
             float now = m.Time;
             bool lb = team.IsBot(Role.LeftPaddler), rb = team.IsBot(Role.RightPaddler);
 
+            if (now >= progressCheckAt)
+            {
+                stallLevel = team.raft.z - lastProgressZ < 3f && progressCheckAt > 0f ? Mathf.Min(stallLevel + 1, 6) : 0;
+                lastProgressZ = team.raft.z;
+                progressCheckAt = now + 2f;
+            }
             if ((lb || rb) && now >= nextAct)
             {
                 float interval = t.botStrokeInterval;
@@ -34,12 +44,16 @@ namespace Mottainai.Gameplay
                 {
                     var p = Policies[i];
                     float cost = Evaluate(m, team.raft, p, interval, team.turboActive ? t.turboImpulseScale : 1f);
+                    if (stallLevel > 0 && ((p.first | p.rest) & B) != 0) cost += stallLevel * 12f;
+                    if (stallLevel > 0 && p.first == 0 && p.rest == 0) cost += stallLevel * 6f;
+                    DebugCosts[i] = cost;
                     if (cost < bestAll) { bestAll = cost; pAll = p; }
                     bool feasible = (lb || ((p.first | p.rest) & L) == 0) && (rb || ((p.first | p.rest) & R) == 0);
                     if (feasible && cost < bestFeasible) { bestFeasible = cost; pFeasible = p; }
                 }
 
                 byte act = pFeasible.first;
+                DebugAct = act;
                 // cooperate with a human partner: sync with their stroke when the ideal plan wants both
                 if (!(lb && rb) && (pAll.first & (L | R)) == (L | R))
                 {
@@ -93,7 +107,7 @@ namespace Mottainai.Gameplay
                 if (!e.alive || e.kind != EntityKind.Obstacle || e.sub == (byte)ObstacleType.Shark) continue;
                 float reach = e.radius + e.halfLen + t.raftRadius + 0.8f;
                 float overlap = reach - Mathf.Abs(probe.x - e.x);
-                if (overlap > 0f) cost += overlap * 18f * (1.1f - (e.z - probe.z) / 16f);
+                if (overlap > 0f) cost += overlap * 18f / (1f + stallLevel * 1.5f) * (1.1f - (e.z - probe.z) / 16f);
             }
             // reward floating waste near where we end up (collector range)
             int s = m.LowerBound(probe.z - 5f);
