@@ -17,6 +17,7 @@ namespace Mottainai.Server
         public bool ready;
         public uint snapSeq;
         public float interpMs, lastSeen, disconnectedAt;
+        public bool silentBot; // seat temporarily played by a bot because no input for > 1 s
         public bool Connected => clientId != NoClient;
     }
 
@@ -103,6 +104,7 @@ namespace Mottainai.Server
 
         public void OnMemberBack(Session s)
         {
+            s.silentBot = false;
             if (Running && s.role != Role.None)
             {
                 sim.SetBot(0, s.role, false);
@@ -355,6 +357,14 @@ namespace Mottainai.Server
             List<string> dead = null;
             foreach (var room in rooms.Values)
             {
+                if (room.Running)
+                    foreach (var m in room.members)
+                    {
+                        if (!m.Connected || m.role == Role.None) continue;
+                        bool silent = now - m.lastSeen > 1f;
+                        if (silent && !m.silentBot) { m.silentBot = true; room.sim.SetBot(0, m.role, true); }
+                        else if (!silent && m.silentBot) { m.silentBot = false; room.sim.SetBot(0, m.role, false); }
+                    }
                 room.Tick(dt, log);
                 bool anyConnected = room.members.Any(m => m.Connected);
                 if (anyConnected) room.emptySince = -1f;

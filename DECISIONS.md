@@ -1,0 +1,31 @@
+# Decisions (one line each)
+
+- Editor: Unity 6000.3.29f1 LTS (installed; 6000.6 is not LTS). Build scripts read ProjectVersion.txt to locate it; `UNITY_EXE` overrides.
+- Package id `com.supcom.mottainai` per spec (previously `com.greenhack.mottainai`; phones will see a new app).
+- NGO 2.14.0 + Transport 2.7.4 (versions bundled with this editor). No NetworkObjects/prefabs: all traffic is NGO unnamed custom messages (1-byte type header), so "generated netcode prefabs" = none needed.
+- Host loopback: in editor host mode, server<->local-client messages are delivered in-process by `NetBus` (no double delivery, no transport).
+- One server process hosts many rooms (4-letter codes); snapshots are sent per room member, so rooms are isolated.
+- Snapshots: per tick, entities in [-15 m, +60 m] around the raft, 10 bytes each (quantized pos/yaw/bob), split in chunks of 96 entities (<1.1 KB) on UnreliableSequenced; chunk 0 carries raft state + 4x4 flow-field samples. Own chunking instead of transport fragmentation so a lost packet only loses part of a frame.
+- Inputs: unreliable-sequenced heartbeat every tick (seq + client interp delay); strokes/throws are Reliable messages.
+- Raft physics is a custom kinematic model (velocity relative to water + flow field, forward/lateral drag, yaw kick with damping) — deterministic, no PhysX.
+- Sync boost: second stroke within 0.25 s with same direction gets x1.3 impulse and damps yaw 70% so the raft goes straight.
+- Lag compensation rewinds waste/raft positions by min(RTT/2 + client interpolation delay, 150 ms) using a 16-tick history ring (RTT from Unity Transport).
+- Adaptive interpolation: render tick = max-filtered clock offset − max(1 tick, p95 snapshot lateness); shown in Net HUD.
+- Bots: paddlers run a 3.2 s look-ahead planner over 15 stroke patterns on a copy of the raft sim (0/20 crashes, ~660 m avg in BotSimulation); with one human paddler the bot syncs with the human's strokes.
+- Shark: 9.5 s cycle = 3 s submerged (harmless) + 1.5 s fin telegraph (harmless) + 5 s active patrol (±6 m @ 2 m/s).
+- Free-lane guarantee: each 40 m chunk has a planned lane (3x raft width) with no static obstacles; validated per chunk, offending obstacles removed. Sharks may cross it (dynamic hazard).
+- Dedicated Server module not installed for 6000.3 → Windows server = standard player built with `MOTTAINAI_SERVER_BUILD` (forces server mode; `-client` flag turns it back into a client for smoke tests). With the module installed, `BuildServerWindows/Linux` automatically use the Server subtarget. Linux build fails fast with a message if Linux module missing.
+- Server code lives in the `Mottainai.Server` assembly excluded from Android/iOS (equivalent to `#if UNITY_SERVER`); registered through `AppHooks` via reflection (Unity skipped its init attribute in player builds).
+- App start moved to `Start()` because NGO registers its message types in an AfterSceneLoad callback.
+- HTTP: Mono `HttpListener` on `http://*:8080/` (works without admin on Windows with Mono); falls back to `+` then `localhost` with a warning.
+- Content Pack: tuning.json + server.json + two 2048² RGBA water normal maps + 1024² raft skin = 36 MB, generated procedurally by the server (Kenney textures not downloadable, see below), MD5-cached on device, "FORCE RE-DOWNLOAD" toggle.
+- Kenney/Quaternius CC0 kits: kenney.nl returns 403 / JS donation flow to scripted downloads → `VisualFactory` primitives are used (models dropped in `Resources/Models/<waste_plastic|obstacle_rock|...>` are picked up automatically).
+- SFX procedurally synthesized (fallback); CC0 clips in `Resources/Audio/<splash|catch|...>` override automatically.
+- Shaders: own URP HLSL Toon (lit, SRP-batcher, instancing), Transparent (fresnel bubble/net), Water (vertex sine + 2 scrolling normal maps from the pack + dirt tint near waste) — placed in `Resources/Shaders` so they are always in builds.
+- TMP Essentials are extracted synchronously by SetupProject (AssetDatabase.ImportPackage is async and lost in batchmode).
+- Android permissions (READ_PHONE_STATE, ACCESS/CHANGE_NETWORK_STATE, VIBRATE) injected by an `IPostGenerateGradleAndroidProject` patcher; cleartext HTTP allowed (`insecureHttpOption`), min API 26, IL2CPP ARM64.
+- 5G detection + latency slice + haptics in a plain `.java` plugin (`Plugins/Android/NetInfoPlugin.java`) behind `INetworkInfoProvider`; iOS/desktop use `DefaultNetworkInfoProvider`.
+- Network Lab echo uses an extra UDP port 7778 (Lab runs before/without a game connection).
+- In-game RTT is measured with app-level ping/pong (includes frame quantization ~1 frame each side); Network Lab measures raw UDP RTT.
+- Render scale starts at 1.0 and the PerfGovernor drops it to 0.8 after 3 s below 45 FPS; MSAA 2x, HDR and shadows off.
+- Battle-mode hooks: `IGameMode`, `ModeConfig`, `TeamState` list, `HealthComponent`, per-team `ScoreService`; course spawner is team-independent.
