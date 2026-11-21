@@ -1,1 +1,1 @@
-{ "compilerOptions": { "target": "ES2022", "module": "ES2022", "moduleResolution": "Bundler", "strict": true, "noEmit": true, "lib": ["ES2022"], "types": ["@cloudflare/workers-types"], "allowImportingTsExtensions": true }, "include": ["src", "tools"] }
+{ "compilerOptions": { "target": "ES2022", "module": "ES2022", "moduleResolution": "Bundler", "strict": true, "noEmit": true, "lib": ["ES2022"], "types": ["@cloudflare/workers-types"], "allowImportingTsExtensions": true, "resolveJsonModule": true }, "include": ["src"] }

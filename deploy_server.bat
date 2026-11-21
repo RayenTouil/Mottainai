@@ -3,6 +3,7 @@ rem Deploy the Cloudflare Worker and write its URL into the Unity client config.
 setlocal
 cd /d "%~dp0server" || exit /b 1
 call npm i || exit /b 1
+call node tools\genpack.mjs || exit /b 1
 call npx wrangler deploy > "%TEMP%\mottainai_deploy.log" 2>&1
 set ERR=%ERRORLEVEL%
 type "%TEMP%\mottainai_deploy.log"

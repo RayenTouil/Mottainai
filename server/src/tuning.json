@@ -1,0 +1,21 @@
+{
+  "riverWidth": 24, "raftWidth": 2.4, "raftRadius": 1.3, "currentSpeed": 2.5,
+  "strokeImpulse": 1.6, "backStrokeFactor": 0.6, "yawKickDeg": 28, "yawDamping": 3,
+  "maxSpeed": 7, "waterDrag": 0.6, "lateralDrag": 2.0, "syncWindow": 0.25, "syncBoost": 1.3,
+  "strokeCooldown": 0.18, "minStrokePower": 0.4, "maxStrokePower": 1, "maxHeadingDeg": 75,
+  "netTravel": 0.25, "netRange": 7, "netCooldown": 0.6, "netRadius": 1.0, "hitRadiusScale": 1.2,
+  "matchDuration": 120, "countdown": 3, "hitsToGameOver": 1,
+  "chunkLength": 40, "courseLength": 650, "expectedAvgSpeed": 5.4,
+  "obstacleSpacingStart": 25, "obstacleSpacingEnd": 12, "obstacleRampTime": 105, "freeLaneFactor": 3,
+  "wasteClusterSpacing": 7, "wasteNearObstacleChance": 0.3, "wasteClusterMin": 3, "wasteClusterMax": 5,
+  "shieldSpacing": 150, "shieldMinTime": 20, "shieldDuration": 6, "shieldBlinkTime": 1.5,
+  "magnetDuration": 8, "magnetRadiusScale": 1.8, "turboDuration": 6, "turboImpulseScale": 1.35, "turboMaxSpeedBonus": 1.5,
+  "sharkSpeed": 2, "sharkAmplitude": 6, "sharkTelegraph": 1.5, "sharkMinDistance": 60,
+  "obstacleWeights": [30, 14, 14, 12, 20, 24],
+  "wasteWeights": [30, 15, 15, 12, 13, 3, 12],
+  "wasteScores": [10, 10, 15, 5, 20, 100, -30],
+  "comboCount": 3, "comboWindow": 3, "comboMultiplier": 1.5,
+  "snapshotAhead": 60, "snapshotBehind": 15, "lagCompCapMs": 150,
+  "botStrokeInterval": 0.5, "botAccuracy": 0.7, "botSyncChance": 0.8,
+  "starScores": [250, 700, 1300]
+}

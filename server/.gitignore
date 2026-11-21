@@ -1,2 +1,5 @@
 node_modules/
 .wrangler/
+public/pack/*.bin
+public/pack/tuning.json
+public/pack/manifest.json
