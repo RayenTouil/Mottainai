@@ -40,6 +40,7 @@ namespace Mottainai.Client
         // net hud
         GameObject netHudPanel;
         TextMeshProUGUI netHudText;
+        readonly Image[] qualityBars = new Image[4];
         float netHudTimer;
         // results / lab
         TextMeshProUGUI resultsText, labText, labPhase;
@@ -445,8 +446,14 @@ namespace Mottainai.Client
         {
             var bg = UIKit.Image(netCanvas.transform, new Color(0, 0, 0, 0.5f), null, "NetHud");
             bg.raycastTarget = false;
-            UIKit.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(16, 16), new Vector2(480, 300));
-            netHudText = UIKit.Text(bg.transform, "", 22, new Color(0.75f, 1f, 0.8f), TextAlignmentOptions.TopLeft);
+            UIKit.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(16, 16), new Vector2(520, 372));
+            for (int i = 0; i < 4; i++)
+            {
+                qualityBars[i] = UIKit.Image(bg.transform, new Color(1f, 1f, 1f, 0.2f), null, "Q" + i);
+                qualityBars[i].raycastTarget = false;
+                UIKit.Place(qualityBars[i].rectTransform, new Vector2(1, 1), new Vector2(0, 1), new Vector2(-78 + i * 15, -14 - (24 - 6 * i)), new Vector2(11, 12 + 6 * i));
+            }
+            netHudText = UIKit.Text(bg.transform, "", 21, new Color(0.75f, 1f, 0.8f), TextAlignmentOptions.TopLeft);
             netHudText.richText = true;
             UIKit.Stretch(netHudText.rectTransform, 16, 10, 10, 10);
             netHudPanel = bg.gameObject;
@@ -590,7 +597,20 @@ namespace Mottainai.Client
                 sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps\n");
                 sb.Append($"Packets {s.Pps:F0}/s   Loss {s.LossPct:F1}%\n");
                 sb.Append($"Interp buffer {(world != null ? world.InterpMs : 0):F0} ms (jitter p95 {(world != null ? world.JitterMs : 0):F0})\n");
-                sb.Append($"FPS {s.Fps:F0}   rx {s.TotalDownMB:F1} MB\n");
+                float frameMs = 1000f / Mathf.Max(1f, s.Fps);
+                float worldMs = s.RttAvg * 0.5f + (world != null ? world.InterpMs : 0f) + frameMs;
+                sb.Append($"FPS {s.Fps:F0} ({frameMs:F1} ms/frame)   rx {s.TotalDownMB:F1} MB\n");
+                sb.Append($"<color=#FFE38A>Latency budget</color>  my paddle>screen <b>{frameMs:F0} ms</b> (predicted)\n");
+                sb.Append($"team/world>screen <b>{worldMs:F0} ms</b> = RTT/2 + interp + frame\n");
+                int q = 4;
+                if (s.RttP95 > 30f) q--;
+                if (s.RttP95 > 60f) q--;
+                if (s.Jitter > 8f) q--;
+                if (s.LossPct > 1f) q--;
+                if (s.LossPct > 5f) q--;
+                q = Mathf.Clamp(q, 0, 4);
+                var qc = q >= 4 ? new Color(0.25f, 1f, 0.5f) : q == 3 ? new Color(0.7f, 1f, 0.35f) : q == 2 ? new Color(1f, 0.85f, 0.3f) : q == 1 ? new Color(1f, 0.55f, 0.2f) : new Color(1f, 0.3f, 0.25f);
+                for (int i = 0; i < 4; i++) qualityBars[i].color = i < q ? qc : new Color(1f, 1f, 1f, 0.2f);
                 sb.Append("<size=20><color=#AAB>3-finger tap / H to hide</color></size>");
                 netHudText.text = sb.ToString();
             }
