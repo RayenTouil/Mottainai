@@ -19,6 +19,7 @@ namespace Mottainai.Client
         WorldView world;
         GestureInput input;
         Sfx sfx;
+        MusicPlayer musicPlayer;
         NetworkLab lab;
         UiScreen screen;
 
@@ -48,6 +49,7 @@ namespace Mottainai.Client
             net = new NetClient();
             lab = new NetworkLab();
             sfx = gameObject.AddComponent<Sfx>();
+            musicPlayer = gameObject.AddComponent<MusicPlayer>();
             gameObject.AddComponent<PerfGovernor>();
             input = gameObject.AddComponent<GestureInput>();
             // match the display (120 Hz phones -> lower touch-to-photon latency); PerfGovernor protects low-end devices
@@ -340,7 +342,7 @@ namespace Mottainai.Client
                         var type = (WasteType)(e.extra & 0x7F);
                         bool combo = (e.extra & 0x80) != 0;
                         var pos = world.EntityPosition(e.entity, new Vector3(e.x, 0.2f, e.z));
-                        world.Hide(e.entity);
+                        world.Collect(e.entity);
                         Color c = WasteCatalog.Colors[(int)type];
                         world.fx.Burst(pos, c, type == WasteType.Valuable ? 26 : 12, 2f);
                         if (type == WasteType.Toxic) { Popup(pos, $"TOXIC -{Mathf.Abs(GameTuning.Current.wasteScores[(int)WasteType.Toxic])}", c, 1.1f); sfx.Play(Sfx.Id.Toxic); }
@@ -362,10 +364,11 @@ namespace Mottainai.Client
                         sfx.Play(Sfx.Id.Hit);
                         NetworkInfo.Provider.Vibrate(120);
                         break;
-                    case EvType.ShieldOn: world.Hide(e.entity); Big("SHIELD!", new Color(0.4f, 0.9f, 1f), 0.8f); sfx.Play(Sfx.Id.Shield); break;
+                    case EvType.ShieldOn: world.Collect(e.entity); Big("SHIELD!", new Color(0.4f, 0.9f, 1f), 0.8f); sfx.Play(Sfx.Id.Shield); break;
                     case EvType.ShieldOff: Toast("Shield off"); break;
                     case EvType.GameOver:
                         var reason = (EndReason)e.value;
+                        if (reason == EndReason.TimeUp) raft.Cheer();
                         Big(reason == EndReason.TimeUp ? "TIME UP!" : reason == EndReason.Crashed ? "GAME OVER" : "MATCH ENDED", Color.white, 2f);
                         break;
                     case EvType.BotTakeover: Toast($"Bot took over {RoleInfo.Name(e.role)}"); break;

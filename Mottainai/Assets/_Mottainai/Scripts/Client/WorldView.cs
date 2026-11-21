@@ -134,6 +134,7 @@ namespace Mottainai.Client
 
         public void ResetWorld()
         {
+            FlushFlyers();
             for (int i = active.Count - 1; i >= 0; i--) Despawn(active[i]);
             active.Clear();
             raftCount = 0; raftHead = 0;
@@ -227,6 +228,55 @@ namespace Mottainai.Client
             active.RemoveAt(active.Count - 1);
         }
 
+        /// Caught waste / picked shields fly into the raft (arc + shrink + spin) before returning to the pool.
+        public void Collect(ushort id)
+        {
+            if (id >= MaxIds || !slots[id].active) return;
+            var s = slots[id];
+            var go = s.go;
+            s.active = false;
+            s.go = null;
+            int last = active[active.Count - 1];
+            active[s.listIndex] = last;
+            slots[last].listIndex = s.listIndex;
+            active.RemoveAt(active.Count - 1);
+            flyers.Add(new Flyer { go = go, code = s.code, from = go.transform.position, scale = go.transform.localScale });
+        }
+
+        class Flyer { public GameObject go; public byte code; public Vector3 from, scale; public float t; }
+        readonly List<Flyer> flyers = new List<Flyer>(16);
+
+        void UpdateFlyers(float dt)
+        {
+            if (flyers.Count == 0) return;
+            var target = raftView.transform.position + Vector3.up * 0.7f;
+            for (int i = flyers.Count - 1; i >= 0; i--)
+            {
+                var f = flyers[i];
+                f.t += dt / 0.45f;
+                var tr = f.go.transform;
+                if (f.t >= 1f)
+                {
+                    tr.localScale = f.scale;
+                    f.go.SetActive(false);
+                    pool[f.code].Push(f.go);
+                    flyers.RemoveAt(i);
+                    continue;
+                }
+                float k = f.t;
+                var mid = (f.from + target) * 0.5f + Vector3.up * 2.2f;
+                tr.position = Vector3.Lerp(Vector3.Lerp(f.from, mid, k), Vector3.Lerp(mid, target, k), k);
+                tr.localScale = f.scale * Mathf.Lerp(1.15f, 0.25f, k * k);
+                tr.Rotate(0f, 720f * dt, 360f * dt, Space.Self);
+            }
+        }
+
+        void FlushFlyers()
+        {
+            foreach (var f in flyers) { f.go.transform.localScale = f.scale; f.go.SetActive(false); pool[f.code].Push(f.go); }
+            flyers.Clear();
+        }
+
         /// Immediately hide an entity (caught by net).
         public void ApplyContent(ContentService c) { water.ApplyContent(c); raftView.ApplyContent(c); }
 
@@ -262,6 +312,7 @@ namespace Mottainai.Client
                     if (s.fin != null) s.fin.gameObject.SetActive(s.flags >= 1);
                 }
             }
+            UpdateFlyers(Time.deltaTime);
             UpdateCamera();
             UpdateWaterFx();
             water.Follow(RaftPos);

@@ -36,6 +36,7 @@ namespace Mottainai.Client
             crew[1] = Crew(t, new Vector3(-0.72f, 0.35f, -0.35f), new Color(0.2f, 0.6f, 1f), out leftPaddle, -1);
             crew[2] = Crew(t, new Vector3(0.72f, 0.35f, -0.35f), new Color(0.95f, 0.3f, 0.45f), out rightPaddle, 1);
             crew[3] = Crew(t, new Vector3(0f, 0.35f, 0.85f), new Color(0.3f, 0.8f, 0.35f), out collectorArm, 0);
+            for (int i = 1; i <= 3; i++) crewBase[i] = crew[i].localPosition;
 
             highlight = VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(1f, 0.85f, 0.2f), 1f), Vector3.zero, new Vector3(0.5f, 0.02f, 0.5f), default, "you").transform;
             highlight.gameObject.SetActive(false);
@@ -135,8 +136,27 @@ namespace Mottainai.Client
 
         static float StrokeCurve(float t) => t < 0.15f ? t / 0.15f : Mathf.Max(0f, 1f - (t - 0.15f) / 0.3f);
 
+        readonly Vector3[] crewBase = new Vector3[4];
+        float idleT, cheerT;
+
+        /// Whole crew jumps for joy (end of match).
+        public void Cheer() => cheerT = 2.6f;
+
         void Update()
         {
+            float dt = Time.deltaTime;
+            idleT += dt;
+            cheerT = Mathf.Max(0f, cheerT - dt);
+            for (int i = 1; i <= 3; i++)
+            {
+                var c = crew[i];
+                if (c == null) continue;
+                float ph = i * 1.7f;
+                float jump = cheerT > 0f ? Mathf.Abs(Mathf.Sin((idleT + ph) * 7f)) * 0.35f * Mathf.Clamp01(cheerT) : 0f;
+                float lean = i == 1 && leftAnim >= 0f ? StrokeCurve(leftAnim) : i == 2 && rightAnim >= 0f ? StrokeCurve(rightAnim) : i == 3 && armAnim >= 0f ? StrokeCurve(armAnim) * 0.6f : 0f;
+                c.localPosition = crewBase[i] + Vector3.up * (Mathf.Sin(idleT * 2.2f + ph) * 0.025f + jump);
+                c.localRotation = Quaternion.Euler(Mathf.Sin(idleT * 1.6f + ph) * 3f + lean * 18f, 0f, Mathf.Sin(idleT * 1.3f + ph) * 4f);
+            }
             Animate(leftPaddle, ref leftAnim, leftBack, 1f);
             Animate(rightPaddle, ref rightAnim, rightBack, 1f);
             if (armAnim >= 0f)

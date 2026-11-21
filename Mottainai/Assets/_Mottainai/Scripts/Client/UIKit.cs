@@ -18,6 +18,8 @@ namespace Mottainai.Client
         public static readonly Color Muted = new Color(0.35f, 0.42f, 0.46f);
         public static readonly Color TextLight = new Color(0.95f, 0.98f, 0.96f);
 
+        static Sprite _star;
+        public static Sprite Star => _star != null ? _star : (_star = MakeStar(128));
         static Sprite _rounded, _circle;
         public static Sprite Rounded => _rounded != null ? _rounded : (_rounded = MakeRounded(64, 18));
         public static Sprite Circle => _circle != null ? _circle : (_circle = MakeCircle(128));
@@ -37,6 +39,39 @@ namespace Mottainai.Client
             tex.SetPixels32(px);
             tex.Apply(false, true);
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+        }
+
+        static Sprite MakeStar(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[size * size];
+            var poly = new Vector2[10];
+            for (int i = 0; i < 10; i++)
+            {
+                float a = Mathf.PI * 0.5f + i * Mathf.PI / 5f;
+                float r = (i % 2 == 0 ? 0.48f : 0.2f) * size;
+                poly[i] = new Vector2(size * 0.5f + Mathf.Cos(a) * r, size * 0.52f + Mathf.Sin(a) * r);
+            }
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    int hits = 0;
+                    for (int sy = 0; sy < 3; sy++)
+                        for (int sx = 0; sx < 3; sx++)
+                            if (Inside(poly, new Vector2(x + (sx + 0.5f) / 3f, y + (sy + 0.5f) / 3f))) hits++;
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(hits * 255 / 9));
+                }
+            tex.SetPixels32(px);
+            tex.Apply(false, true);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        static bool Inside(Vector2[] poly, Vector2 p)
+        {
+            bool c = false;
+            for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
+                if (((poly[i].y > p.y) != (poly[j].y > p.y)) && (p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x)) c = !c;
+            return c;
         }
 
         static Sprite MakeCircle(int size)

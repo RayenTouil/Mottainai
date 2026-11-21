@@ -32,6 +32,8 @@ namespace Mottainai
         [Header("Net sim")]
         public float snapshotAhead = 60f, snapshotBehind = 15f, lagCompCapMs = 150f;
         public float botStrokeInterval = 0.5f, botAccuracy = 0.85f;
+        [Header("Results")]
+        public int[] starScores = { 250, 700, 1300 };
     }
 
     [CreateAssetMenu(menuName = "Mottainai/Game Tuning")]

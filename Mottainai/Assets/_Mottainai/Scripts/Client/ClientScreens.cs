@@ -43,6 +43,10 @@ namespace Mottainai.Client
         float netHudTimer;
         // results / lab
         TextMeshProUGUI resultsText, labText, labPhase;
+        TextMeshProUGUI resultsHead, resultsTotal, resultsRecord;
+        readonly Image[] stars = new Image[3];
+        float resultsShownAt;
+        int resultsTarget, starsEarned, starsShown;
         RectTransform labFill;
         readonly StringBuilder sb = new StringBuilder(512);
 
@@ -261,11 +265,27 @@ namespace Mottainai.Client
 
         void BuildResults()
         {
-            var p = Panel(UiScreen.Results, new Color(0.05f, 0.16f, 0.2f, 0.97f));
+            var p = Panel(UiScreen.Results, new Color(0.03f, 0.12f, 0.16f, 0.82f));
             var card = UIKit.Image(p.transform, UIKit.Panel);
             UIKit.Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 60), new Vector2(1700, 860));
+            resultsHead = UIKit.Text(card.transform, "", 50, Color.white, TextAlignmentOptions.TopLeft);
+            resultsHead.fontStyle = FontStyles.Bold;
+            UIKit.Place(resultsHead.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, -30), new Vector2(1100, 70));
+            resultsTotal = UIKit.Text(card.transform, "", 100, Color.white, TextAlignmentOptions.TopLeft);
+            resultsTotal.fontStyle = FontStyles.Bold;
+            resultsTotal.textWrappingMode = TextWrappingModes.NoWrap;
+            UIKit.Place(resultsTotal.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, -95), new Vector2(1100, 130));
+            for (int i = 0; i < 3; i++)
+            {
+                stars[i] = UIKit.Image(card.transform, new Color(1f, 1f, 1f, 0.15f), UIKit.Star, "Star" + i);
+                stars[i].raycastTarget = false;
+                UIKit.Place(stars[i].rectTransform, new Vector2(1, 1), new Vector2(0.5f, 0.5f), new Vector2(-370 + i * 135, -95 - (i == 1 ? 18 : 0)), new Vector2(i == 1 ? 150 : 125, i == 1 ? 150 : 125));
+            }
+            resultsRecord = UIKit.Text(card.transform, "", 34, new Color(1f, 0.85f, 0.3f), TextAlignmentOptions.Top);
+            resultsRecord.fontStyle = FontStyles.Bold;
+            UIKit.Place(resultsRecord.rectTransform, new Vector2(1, 1), new Vector2(0.5f, 1), new Vector2(-235, -185), new Vector2(560, 50));
             resultsText = UIKit.Text(card.transform, "", 34, UIKit.TextLight, TextAlignmentOptions.TopLeft);
-            UIKit.Stretch(resultsText.rectTransform, 50, 30, 50, 30);
+            UIKit.Stretch(resultsText.rectTransform, 50, 250, 50, 30);
             resultsText.richText = true;
             var row = UIKit.Rect("Buttons", p.transform);
             UIKit.Place(row, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(1500, 110));
@@ -280,10 +300,26 @@ namespace Mottainai.Client
             var r = results;
             var s = net.stats;
             var ni = NetworkInfo.Provider;
+            resultsHead.text = r.reason == EndReason.Crashed ? "<color=#FF7A5C>GAME OVER - you hit an obstacle!</color>" : r.reason == EndReason.TimeUp ? "<color=#7CFC9A>TIME UP - great paddling!</color>" : "Match ended";
+            resultsTarget = r.total;
+            resultsShownAt = Time.unscaledTime;
+            starsShown = 0;
+            var thresholds = GameTuning.Current.starScores;
+            starsEarned = 0;
+            for (int i = 0; i < 3 && thresholds != null && i < thresholds.Length; i++) if (r.total >= thresholds[i]) starsEarned = i + 1;
+            for (int i = 0; i < 3; i++) { stars[i].color = new Color(1f, 1f, 1f, 0.15f); stars[i].rectTransform.localScale = Vector3.one; }
+            int best = PlayerPrefs.GetInt("best_total", 0);
+            if (r.total > best && r.total > 0)
+            {
+                PlayerPrefs.SetInt("best_total", r.total);
+                PlayerPrefs.Save();
+                resultsRecord.text = best > 0 ? $"NEW PERSONAL BEST! (was {best})" : "FIRST RECORD SET!";
+            }
+            else resultsRecord.text = $"Personal best: {best}";
+            resultsTotal.text = "TOTAL 0";
+
             sb.Clear();
-            string head = r.reason == EndReason.Crashed ? "<color=#FF7A5C>GAME OVER - you hit an obstacle!</color>" : r.reason == EndReason.TimeUp ? "<color=#7CFC9A>TIME UP - great paddling!</color>" : "Match ended";
-            sb.Append("<size=56><b>").Append(head).Append("</b></size>\n");
-            sb.Append($"<size=72><b>TOTAL {r.total}</b></size>    <size=34>catches {r.catchScore}   <color=#D62828>toxic penalty -{r.toxicPenalty}</color></size>\n\n");
+            sb.Append($"<size=34>catches <b>{r.catchScore}</b>   <color=#FF6B6B>toxic penalty -{r.toxicPenalty}</color></size>\n\n");
             for (int i = 0; i < NetConst.WasteTypeCount; i++)
             {
                 sb.Append($"<color={UIKit.Hex(WasteCatalog.Colors[i])}>• {WasteCatalog.Names[i]}: {r.counts[i]}</color>   ");
@@ -295,6 +331,26 @@ namespace Mottainai.Client
             sb.Append($"<size=30><b>NETWORK</b>  {ni.NetworkType} (slice {ni.SliceStatus})   RTT avg {avgRtt:F0} ms  p95 max {s.maxP95:F0} ms  jitter {s.Jitter:F1} ms   " +
                       $"loss {(s.nLoss > 0 ? s.sumLoss / s.nLoss : 0):F1}%   downlink avg {(s.nDown > 0 ? s.sumDown / s.nDown : 0):F0} kbps   received {s.TotalDownMB:F1} MB</size>");
             resultsText.text = sb.ToString();
+        }
+
+        void UpdateResults()
+        {
+            float t = Time.unscaledTime - resultsShownAt;
+            float k = Mathf.Clamp01(t / 1.3f);
+            float eased = 1f - (1f - k) * (1f - k) * (1f - k);
+            resultsTotal.text = $"TOTAL {Mathf.RoundToInt(resultsTarget * eased)}";
+            for (int i = 0; i < 3; i++)
+            {
+                float appear = 1.4f + i * 0.4f;
+                var rt = stars[i].rectTransform;
+                if (i < starsEarned && t >= appear)
+                {
+                    float pt = t - appear;
+                    rt.localScale = Vector3.one * (pt < 0.25f ? Mathf.Lerp(1.8f, 1f, pt / 0.25f) : 1f + Mathf.Sin(Time.unscaledTime * 3f + i) * 0.03f);
+                    stars[i].color = new Color(1f, 0.82f, 0.22f, 1f);
+                    if (starsShown <= i) { starsShown = i + 1; sfx.Play(i == 2 ? Sfx.Id.Valuable : Sfx.Id.Combo, 0.8f); }
+                }
+            }
         }
 
         void BuildLab()
@@ -413,6 +469,7 @@ namespace Mottainai.Client
             hudCanvas.gameObject.SetActive(s == UiScreen.Game);
             if (world != null && s != UiScreen.Game && s != UiScreen.Results) { world.Attract = true; world.AimAssist = false; }
             if (s != UiScreen.Game) input.active = false;
+            if (musicPlayer != null) musicPlayer.SetMode(s == UiScreen.Game ? MusicPlayer.Mode.Game : s == UiScreen.Results ? MusicPlayer.Mode.Results : MusicPlayer.Mode.Menu);
         }
 
         void SetStatus(string text)
@@ -490,6 +547,7 @@ namespace Mottainai.Client
                 hintPanel.SetActive(Time.time < hintUntil);
             }
 
+            if (screen == UiScreen.Results && results != null) UpdateResults();
             if (screen == UiScreen.Game || screen == UiScreen.Results)
             {
                 float left = bigUntil - Time.time;
