@@ -34,7 +34,7 @@ namespace Mottainai.EditorTools
             CreateBootstrapScene();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("[BuildTools] SetupProject done (no Netcode prefabs needed: world state is custom-serialized).");
+            Debug.Log("[BuildTools] SetupProject done.");
         }
 
         static void ImportTmpEssentials()
@@ -218,44 +218,6 @@ namespace Mottainai.EditorTools
             SetupProject();
             EditorUserBuildSettings.buildAppBundle = false;
             Build(BuildTarget.Android, BuildTargetGroup.Android, "../Builds/Mottainai.apk", BuildOptions.AutoRunPlayer, 0, null);
-        }
-
-        static bool ServerModule(string engineFolder, string variationPrefix)
-        {
-            var dir = Path.Combine(EditorApplication.applicationContentsPath, "PlaybackEngines", engineFolder, "Variations");
-            return Directory.Exists(dir) && Directory.GetDirectories(dir).Any(d => Path.GetFileName(d).StartsWith(variationPrefix));
-        }
-
-        [MenuItem("Mottainai/Build/Server (Windows)")]
-        public static void BuildServerWindows()
-        {
-            SetupProject();
-            bool dedicated = ServerModule("WindowsStandaloneSupport", "win64_server");
-            if (!dedicated) Debug.LogWarning("[BuildTools] Dedicated Server module not installed: building Windows player with MOTTAINAI_SERVER_BUILD (server mode forced, runs headless with -batchmode -nographics).");
-            Build(BuildTarget.StandaloneWindows64, BuildTargetGroup.Standalone, Arg("-out", "Builds/Server/Windows/MottainaiServer.exe"), BuildOptions.None,
-                dedicated ? (int)StandaloneBuildSubtarget.Server : (int)StandaloneBuildSubtarget.Player, dedicated ? null : new[] { "MOTTAINAI_SERVER_BUILD" });
-        }
-
-        [MenuItem("Mottainai/Build/Server (Linux)")]
-        public static void BuildServerLinux()
-        {
-            SetupProject();
-            bool linux = Directory.Exists(Path.Combine(EditorApplication.applicationContentsPath, "PlaybackEngines", "LinuxStandaloneSupport"));
-            if (!linux)
-            {
-                Debug.LogError("[BuildTools] Linux Build Support module not installed for this editor. Install 'Linux Dedicated Server Build Support' in Unity Hub.");
-                if (Application.isBatchMode) EditorApplication.Exit(2);
-                return;
-            }
-            bool dedicated = ServerModule("LinuxStandaloneSupport", "linux64_server");
-            Build(BuildTarget.StandaloneLinux64, BuildTargetGroup.Standalone, Arg("-out", "Builds/Server/Linux/MottainaiServer.x86_64"), BuildOptions.None,
-                dedicated ? (int)StandaloneBuildSubtarget.Server : (int)StandaloneBuildSubtarget.Player, dedicated ? null : new[] { "MOTTAINAI_SERVER_BUILD" });
-        }
-
-        public static void BuildServerForThisOS()
-        {
-            if (Application.platform == RuntimePlatform.LinuxEditor) BuildServerLinux();
-            else BuildServerWindows();
         }
 
         static void Build(BuildTarget target, BuildTargetGroup group, string path, BuildOptions options, int subtarget, string[] defines)

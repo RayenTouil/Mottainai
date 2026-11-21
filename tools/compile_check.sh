@@ -16,7 +16,7 @@ done
 [ -f "$E/PlaybackEngines/AndroidPlayer/UnityEditor.Android.Extensions.dll" ] && echo "-r:\"$(cygpath -w "$E/PlaybackEngines/AndroidPlayer/UnityEditor.Android.Extensions.dll")\"" >> "$RSP"
 SRC=$(find "$PROJ/Assets/_Mottainai/Scripts" -name "*.cs" | while read -r f; do printf '"%s" ' "$(cygpath -w "$f")"; done)
 status=0
-for target in "UNITY_STANDALONE_WIN;UNITY_STANDALONE;UNITY_EDITOR;MOTTAINAI_SERVER_BUILD" "UNITY_ANDROID"; do
+for target in "UNITY_STANDALONE_WIN;UNITY_STANDALONE;UNITY_EDITOR" "UNITY_ANDROID"; do
   echo "== defines: $target"
   eval "\"$E/NetCoreRuntime/dotnet.exe\" \"$E/DotNetSdkRoslyn/csc.dll\" -nologo -noconfig -nostdlib -t:library -langversion:9 -nowarn:1701,1702,0649,0414,0169,0067 -unsafe -define:\"$target;UNITY_6000_0_OR_NEWER\" -out:\"$(cygpath -w "$OUT/check.dll")\" @\"$(cygpath -w "$RSP")\" $SRC" | grep -aE "error|warning CS8" | sort -u
   [ ${PIPESTATUS[0]} -ne 0 ] && status=1

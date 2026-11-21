@@ -51,7 +51,7 @@ u8 teamCount, per team:
 f32 originZ, u16 n, n × entity (10 B):
   u16 id, u8 code (kind<<4 | sub), i16 x cm, i16 (z-originZ) cm, i8 y (2 cm), u8 yaw, u8 flags
 ```
-Entity window: team raft z −15 m … +60 m. `code` kinds: 1 Waste, 2 Obstacle, 3 Shield, 4 PowerUp (sub 1 Magnet, 2 Turbo). Shark `flags`: 0 circling, 1 telegraph, 2 attacking.
+Entity window: team raft z −15 m … +60 m. `code` kinds: 1 Waste (sub = WasteType), 2 Obstacle (sub = ObstacleType), 3 Power-up bubble (sub 0 Shield, 1 Magnet, 2 Turbo). Shark `flags`: 0 circling, 1 telegraph, 2 attacking.
 Rate: 60 Hz, 30 Hz when any client reports `backlogMs > 100`.
 
 ### Event types (EVENTS.type)

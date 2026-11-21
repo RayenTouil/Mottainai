@@ -35,6 +35,8 @@ namespace Mottainai.Platform
             }
         }
         public static string DeviceLabel => $"{SystemInfo.deviceModel} ({SystemInfo.operatingSystem})";
+        /// PROTOCOL.md netType: 0 unknown, 1 Wi-Fi, 2 LTE, 3 5G NSA, 4 5G SA.
+        public static byte TypeCode => Provider.NetworkType switch { "Wi-Fi" => 1, "LAN" => 1, "Ethernet" => 1, "LTE" => 2, "5G NSA" => 3, "5G SA" => 4, _ => 0 };
     }
 
     public class DefaultNetworkInfoProvider : INetworkInfoProvider

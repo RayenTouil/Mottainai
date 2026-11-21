@@ -16,17 +16,17 @@ namespace Mottainai.Client
 
         // login
         TMP_InputField nameInput, serverInput;
-        TextMeshProUGUI loginStatus;
-        Button hostToggle, forceToggle;
+        TextMeshProUGUI loginStatus, menuHeader, menuStatus;
+        Button forceToggle;
+        GameObject debugPanel;
+        int titleTaps; float titleTapAt;
         // download
         TextMeshProUGUI downloadTitle, downloadInfo, downloadFile;
         RectTransform downloadFill;
         // lobby
-        TextMeshProUGUI lobbyHeader, lobbyRoomTitle, lobbyPlayers, lobbyStatus, roomsLabel;
-        GameObject noRoomPanel, roomPanel;
+        TextMeshProUGUI lobbyHeader, lobbyRoomTitle, lobbyPlayers, lobbyStatus;
         TMP_InputField codeInput;
         readonly Button[] roleButtons = new Button[3];
-        readonly Button[] roomButtons = new Button[6];
         Button readyButton, startButton;
         // hud
         RectTransform progressFill;
@@ -66,7 +66,7 @@ namespace Mottainai.Client
             hudCanvas.GetComponent<GraphicRaycaster>().enabled = false;
             netCanvas = UIKit.Canvas("UI_NetHud", 30);
             netCanvas.GetComponent<GraphicRaycaster>().enabled = false;
-            BuildLogin(); BuildDownload(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud();
+            BuildLogin(); BuildDownload(); BuildMenu(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud();
         }
 
         GameObject Panel(UiScreen s, Color bg)
@@ -95,32 +95,75 @@ namespace Mottainai.Client
             title.textWrappingMode = TextWrappingModes.NoWrap;
             title.overflowMode = TextOverflowModes.Overflow;
             title.characterSpacing = 12;
+            title.raycastTarget = true;
+            var tapper = title.gameObject.AddComponent<Button>();
+            tapper.transition = Selectable.Transition.None;
+            tapper.onClick.AddListener(TitleTap);
             UIKit.Size(UIKit.Text(col, "\"What a waste!\"  -  paddle together, clean the river", 38, UIKit.TextLight), 60);
             nameInput = UIKit.Size(UIKit.Input(col, "Your name", playerName), 92);
-            serverInput = UIKit.Size(UIKit.Input(col, "Server IP (laptop)", serverHost), 92);
             UIKit.Size(UIKit.Button(col, "PLAY", UIKit.Accent, StartLogin, 56), 120);
             var row = UIKit.Rect("Row", col);
             UIKit.HLayout(row, 16, 0);
             UIKit.Size(row, 90);
             UIKit.Button(row, "NETWORK LAB", UIKit.Accent2, () => Show(UiScreen.Lab), 34);
             forceToggle = UIKit.Button(row, "", UIKit.Muted, () => { forceDownload = !forceDownload; RefreshToggles(); }, 30);
-            if (AppHooks.ServerAvailable && (Application.isEditor || Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.LinuxPlayer))
-            {
-                hostToggle = UIKit.Size(UIKit.Button(col, "", UIKit.Muted, () => { hostInEditor = !hostInEditor; RefreshToggles(); }, 30), 80);
-            }
+            // hidden debug panel (5 taps on the title): server URL override
+            var dbg = UIKit.Rect("Debug", col);
+            UIKit.HLayout(dbg, 16, 0);
+            UIKit.Size(dbg, 90);
+            serverInput = UIKit.Input(dbg, "Server URL (empty = default)", PlayerPrefs.GetString("serverOverride", ""), 30);
+            UIKit.Button(dbg, "APPLY", UIKit.Warn, () => { content.SetBaseUrl(serverInput.text); SetStatus("Server: " + content.BaseUrl); }, 30);
+            debugPanel = dbg.gameObject;
+            debugPanel.SetActive(false);
             loginStatus = UIKit.Size(UIKit.Text(col, "Landscape, 3 players per raft. Bots fill empty seats.", 32, new Color(1f, 0.9f, 0.6f)), 90);
             RefreshToggles();
+        }
+
+        void TitleTap()
+        {
+            titleTaps = Time.unscaledTime - titleTapAt < 0.8f ? titleTaps + 1 : 1;
+            titleTapAt = Time.unscaledTime;
+            if (titleTaps < 5) return;
+            titleTaps = 0;
+            debugPanel.SetActive(!debugPanel.activeSelf);
+            SetStatus("Server: " + content.BaseUrl);
         }
 
         void RefreshToggles()
         {
             UIKit.Label(forceToggle).text = forceDownload ? "FORCE RE-DOWNLOAD: ON" : "FORCE RE-DOWNLOAD: OFF";
             forceToggle.image.color = forceDownload ? UIKit.Warn : UIKit.Muted;
-            if (hostToggle != null)
-            {
-                UIKit.Label(hostToggle).text = hostInEditor ? "HOST SERVER IN EDITOR (dev): ON" : "HOST SERVER IN EDITOR (dev): OFF";
-                hostToggle.image.color = hostInEditor ? UIKit.Accent2 : UIKit.Muted;
-            }
+        }
+
+        void BuildMenu()
+        {
+            var p = Panel(UiScreen.Menu, new Color(0.04f, 0.16f, 0.2f, 0.5f));
+            menuHeader = UIKit.Text(p.transform, "", 34, UIKit.TextLight, TextAlignmentOptions.Left);
+            UIKit.Place(menuHeader.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -20), new Vector2(1600, 60));
+            var col = Column(p.transform, 1000, 860, -30);
+            UIKit.Size(UIKit.Text(col, "Team up on one raft!", 64, new Color(0.55f, 0.95f, 0.6f)), 90);
+            UIKit.Size(UIKit.Button(col, "QUICK PLAY", UIKit.Accent, () => JoinRoom("DEMO"), 56), 120);
+            UIKit.Size(UIKit.Button(col, "CREATE ROOM", UIKit.Accent2, CreateRoom, 44), 100);
+            var row = UIKit.Rect("JoinRow", col);
+            UIKit.HLayout(row, 16, 0);
+            UIKit.Size(row, 100);
+            codeInput = UIKit.Input(row, "CODE", "", 48);
+            codeInput.characterLimit = 4;
+            codeInput.characterValidation = TMP_InputField.CharacterValidation.Alphanumeric;
+            codeInput.onValueChanged.AddListener(v => { var up = v.ToUpperInvariant(); if (up != v) codeInput.text = up; });
+            UIKit.Button(row, "JOIN CODE", UIKit.Accent2, () => JoinRoom(codeInput.text), 40);
+            var row2 = UIKit.Rect("Row2", col);
+            UIKit.HLayout(row2, 16, 0);
+            UIKit.Size(row2, 90);
+            UIKit.Button(row2, "NETWORK LAB", UIKit.Muted, () => Show(UiScreen.Lab), 34);
+            UIKit.Button(row2, "RE-DOWNLOAD PACK", UIKit.Muted, () => StartCoroutine(Redownload()), 30);
+            menuStatus = UIKit.Size(UIKit.Text(col, "", 32, new Color(1f, 0.9f, 0.6f)), 70);
+        }
+
+        void RefreshMenuUi()
+        {
+            var ni = NetworkInfo.Provider;
+            menuHeader.text = $"Hi <b>{playerName}</b>  |  <color=#7CFC9A>{ni.NetworkType}</color>  slice: {ni.SliceStatus}  |  edge <b>{content.EdgeColo}</b>";
         }
 
         void BuildDownload()
@@ -133,49 +176,16 @@ namespace Mottainai.Client
             downloadFill.anchorMin = Vector2.zero; downloadFill.anchorMax = new Vector2(0, 1); downloadFill.offsetMin = downloadFill.offsetMax = Vector2.zero;
             downloadInfo = UIKit.Size(UIKit.Text(col, "", 46, new Color(0.7f, 1f, 0.8f)), 80);
             downloadFile = UIKit.Size(UIKit.Text(col, "", 30, new Color(0.8f, 0.85f, 0.9f)), 60);
-            UIKit.Size(UIKit.Text(col, "Tuning + high-res water normal maps + raft skin, cached by hash", 28, UIKit.Muted * 2f), 50);
+            UIKit.Size(UIKit.Text(col, "Tuning + high-res water normal maps + raft skin from the Cloudflare edge, cached by sha256", 28, UIKit.Muted * 2f), 50);
         }
 
         void BuildLobby()
         {
             var p = Panel(UiScreen.Lobby, new Color(0.04f, 0.16f, 0.2f, 0.55f));
             lobbyHeader = UIKit.Text(p.transform, "", 34, UIKit.TextLight, TextAlignmentOptions.Left);
-            UIKit.Place(lobbyHeader.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -20), new Vector2(1400, 60));
-            var side = UIKit.Rect("Side", p.transform);
-            UIKit.Place(side, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-30, -20), new Vector2(380, 230));
-            UIKit.VLayout(side, 12, 0);
-            UIKit.Size(UIKit.Button(side, "NETWORK LAB", UIKit.Accent2, () => Show(UiScreen.Lab), 28), 64);
-            UIKit.Size(UIKit.Button(side, "RE-DOWNLOAD PACK", UIKit.Muted, () => StartCoroutine(Redownload()), 28), 64);
-            UIKit.Size(UIKit.Button(side, "LOG OUT", UIKit.Warn, Logout, 28), 64);
+            UIKit.Place(lobbyHeader.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -20), new Vector2(1500, 60));
 
-            // no-room panel
-            var nr = Column(p.transform, 1000, 760, -40);
-            noRoomPanel = nr.gameObject;
-            UIKit.Size(UIKit.Text(nr, "Team up on one raft!", 64, new Color(0.55f, 0.95f, 0.6f)), 90);
-            UIKit.Size(UIKit.Button(nr, "CREATE ROOM", UIKit.Accent, () => net.Simple(Msg.CreateRoom), 50), 110);
-            var row = UIKit.Rect("JoinRow", nr);
-            UIKit.HLayout(row, 16, 0);
-            UIKit.Size(row, 100);
-            codeInput = UIKit.Input(row, "CODE", "", 48);
-            codeInput.characterLimit = 4;
-            codeInput.characterValidation = TMP_InputField.CharacterValidation.Alphanumeric;
-            codeInput.onValueChanged.AddListener(v => { var up = v.ToUpperInvariant(); if (up != v) codeInput.text = up; });
-            UIKit.Button(row, "JOIN", UIKit.Accent2, () => net.JoinRoom(codeInput.text), 44);
-            roomsLabel = UIKit.Size(UIKit.Text(nr, "Open rooms:", 32, UIKit.TextLight), 50);
-            var grid = UIKit.Rect("Rooms", nr);
-            var gl = grid.gameObject.AddComponent<GridLayoutGroup>();
-            gl.cellSize = new Vector2(310, 80); gl.spacing = new Vector2(14, 14); gl.childAlignment = TextAnchor.UpperCenter;
-            UIKit.Size(grid, 190);
-            for (int i = 0; i < roomButtons.Length; i++)
-            {
-                int k = i;
-                roomButtons[i] = UIKit.Button(grid, "", UIKit.Panel, () => { if (k < roomList.Length) net.JoinRoom(roomList[k].code); }, 30);
-                roomButtons[i].gameObject.SetActive(false);
-            }
-
-            // in-room panel
             var rp = Column(p.transform, 1500, 800, -50);
-            roomPanel = rp.gameObject;
             lobbyRoomTitle = UIKit.Size(UIKit.Text(rp, "", 80, new Color(1f, 0.9f, 0.5f)), 110);
             lobbyRoomTitle.fontStyle = FontStyles.Bold;
             var roles = UIKit.Rect("Roles", rp);
@@ -184,15 +194,15 @@ namespace Mottainai.Client
             for (int i = 0; i < 3; i++)
             {
                 var r = (Role)(i + 1);
-                roleButtons[i] = UIKit.Button(roles, "", UIKit.Panel, () => net.PickRole(r), 34);
+                roleButtons[i] = UIKit.Button(roles, "", UIKit.Panel, () => { preferredRole = r; PlayerPrefs.SetInt("role", (int)r); net.PickRole(r); }, 34);
             }
             lobbyPlayers = UIKit.Size(UIKit.Text(rp, "", 34, UIKit.TextLight), 120);
             var actions = UIKit.Rect("Actions", rp);
             UIKit.HLayout(actions, 20, 0);
             UIKit.Size(actions, 120);
             readyButton = UIKit.Button(actions, "READY", UIKit.Muted, ToggleReady, 46);
-            startButton = UIKit.Button(actions, "START", UIKit.Accent, () => net.Simple(Msg.StartMatch), 52);
-            UIKit.Button(actions, "LEAVE", UIKit.Warn, () => { net.Simple(Msg.LeaveRoom); lobby = null; RefreshLobbyUi(); }, 40);
+            startButton = UIKit.Button(actions, "START", UIKit.Accent, () => net.StartMatch(), 52);
+            UIKit.Button(actions, "LEAVE", UIKit.Warn, LeaveRoom, 40);
 
             lobbyStatus = UIKit.Text(p.transform, "", 32, new Color(1f, 0.9f, 0.6f));
             UIKit.Place(lobbyStatus.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(1600, 60));
@@ -202,14 +212,6 @@ namespace Mottainai.Client
         {
             var me = lobby?.players.Find(x => x.clientId == net.ClientId);
             net.SetReady(me == null || !me.ready);
-        }
-
-        void Logout()
-        {
-            if (lobby != null && !string.IsNullOrEmpty(lobby.code)) net.Simple(Msg.LeaveRoom);
-            net.Disconnect();
-            lobby = null;
-            Show(UiScreen.Login);
         }
 
         System.Collections.IEnumerator Redownload()
@@ -222,34 +224,21 @@ namespace Mottainai.Client
             downloadTitle.text = err ?? content.Status;
             yield return new WaitForSecondsRealtime(1.5f);
             Show(back);
-            RefreshLobbyUi();
+            RefreshMenuUi();
         }
 
         void RefreshLobbyUi()
         {
             var ni = NetworkInfo.Provider;
-            lobbyHeader.text = $"Hi <b>{playerName}</b>  |  {content.Login?.serverName} @ {serverHost}  |  <color=#7CFC9A>{ni.NetworkType}</color>  slice: {ni.SliceStatus}";
-            bool inRoom = lobby != null && !string.IsNullOrEmpty(lobby.code) && lobby.players.Exists(x => x.clientId == net.ClientId);
-            noRoomPanel.SetActive(!inRoom);
-            roomPanel.SetActive(inRoom);
-            if (!inRoom)
-            {
-                roomsLabel.text = roomList.Length == 0 ? "No open rooms yet - create one!" : "Open rooms (tap to join):";
-                for (int i = 0; i < roomButtons.Length; i++)
-                {
-                    bool on = i < roomList.Length;
-                    roomButtons[i].gameObject.SetActive(on);
-                    if (on) UIKit.Label(roomButtons[i]).text = $"{roomList[i].code}  ({roomList[i].players}/3) {roomList[i].phase}";
-                }
-                return;
-            }
-            lobbyRoomTitle.text = $"ROOM  {lobby.code}";
+            lobbyHeader.text = $"Hi <b>{playerName}</b>  |  <color=#7CFC9A>{ni.NetworkType}</color>  slice: {ni.SliceStatus}  |  edge <b>{content.EdgeColo}</b>  room <b>{net.RoomColo}</b>";
+            lobbyRoomTitle.text = net.roomCode == "DEMO" ? "QUICK PLAY  (room DEMO)" : $"ROOM  {net.roomCode}";
+            if (lobby == null) { lobbyPlayers.text = "Waiting for room state..."; return; }
             for (int i = 0; i < 3; i++)
             {
                 var r = (Role)(i + 1);
-                var holder = lobby.players.Find(x => x.role == r);
+                var holder = lobby.IsBot(r) ? null : lobby.players.Find(x => x.role == r && x.connected);
                 bool mine = holder != null && holder.clientId == net.ClientId;
-                string who = holder == null ? "<color=#9AA>BOT</color>" : holder.name + (holder.ready ? "  <color=#7CFC9A>READY</color>" : "") + (holder.connected ? "" : " (offline)");
+                string who = holder == null ? "<color=#9AA>BOT</color>" : holder.name + (holder.ready ? "  <color=#7CFC9A>READY</color>" : "");
                 UIKit.Label(roleButtons[i]).text = $"{RoleInfo.Name(r)}\n<size=28>{who}</size>";
                 roleButtons[i].image.color = mine ? UIKit.Accent : holder == null ? UIKit.Panel : UIKit.Muted;
             }
@@ -258,10 +247,10 @@ namespace Mottainai.Client
             UIKit.Label(readyButton).text = me != null && me.ready ? "READY!" : "READY?";
             sb.Clear();
             sb.Append("Crew: ");
-            foreach (var pl in lobby.players) sb.Append(pl.name).Append(pl.clientId == lobby.creator ? " (host)" : "").Append("   ");
-            sb.Append("\n<size=26>Empty roles are played by bots. Anyone can press START.</size>");
+            foreach (var pl in lobby.players) if (pl.connected) sb.Append(pl.name).Append("   ");
+            sb.Append("\n<size=26>Tap a role to take it. Empty roles are played by bots. Anyone can press START.</size>");
             lobbyPlayers.text = sb.ToString();
-            UIKit.Label(startButton).text = lobby.phase == MatchPhase.Running || lobby.phase == MatchPhase.Countdown ? "REJOIN" : "START";
+            UIKit.Label(startButton).text = lobby.phase == MatchPhase.Running || lobby.phase == MatchPhase.Countdown ? "IN MATCH..." : "START";
         }
 
         void BuildResults()
@@ -291,8 +280,8 @@ namespace Mottainai.Client
             var row = UIKit.Rect("Buttons", p.transform);
             UIKit.Place(row, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(1500, 110));
             UIKit.HLayout(row, 24, 0);
-            UIKit.Button(row, "PLAY AGAIN", UIKit.Accent, () => { net.Simple(Msg.BackToLobby); net.Simple(Msg.StartMatch); }, 44);
-            UIKit.Button(row, "LOBBY", UIKit.Accent2, () => { net.Simple(Msg.BackToLobby); Show(UiScreen.Lobby); RefreshLobbyUi(); }, 44);
+            UIKit.Button(row, "REMATCH", UIKit.Accent, () => net.StartMatch(), 44);
+            UIKit.Button(row, "LOBBY", UIKit.Accent2, () => { Show(UiScreen.Lobby); RefreshLobbyUi(); }, 44);
             UIKit.Button(row, "NETWORK LAB", UIKit.Muted, () => Show(UiScreen.Lab), 40);
         }
 
@@ -329,8 +318,8 @@ namespace Mottainai.Client
             sb.Append($"\n\nAccuracy <b>{r.Accuracy * 100f:F0}%</b> ({r.hits}/{r.throws})    Distance <b>{r.distance:F0} m</b>    Time <b>{r.duration:F0} s</b>\n");
             sb.Append($"<color=#7CFC9A><b>Ocean cleaned: {r.kg:F1} kg</b></color>\n\n");
             float avgRtt = s.nRtt > 0 ? (float)(s.sumRtt / s.nRtt) : 0;
-            sb.Append($"<size=30><b>NETWORK</b>  {ni.NetworkType} (slice {ni.SliceStatus})   RTT avg {avgRtt:F0} ms  p95 max {s.maxP95:F0} ms  jitter {s.Jitter:F1} ms   " +
-                      $"loss {(s.nLoss > 0 ? s.sumLoss / s.nLoss : 0):F1}%   downlink avg {(s.nDown > 0 ? s.sumDown / s.nDown : 0):F0} kbps   received {s.TotalDownMB:F1} MB</size>");
+            sb.Append($"<size=30><b>NETWORK</b>  {ni.NetworkType} (slice {ni.SliceStatus})  edge {content.EdgeColo} / room {net.RoomColo}   RTT avg {avgRtt:F0} ms  p95 max {s.maxP95:F0} ms  jitter {s.Jitter:F1} ms   " +
+                      $"downlink avg {(s.nDown > 0 ? s.sumDown / s.nDown : 0):F0} kbps   received {s.TotalDownMB:F1} MB</size>");
             resultsText.text = sb.ToString();
         }
 
@@ -359,7 +348,7 @@ namespace Mottainai.Client
             var p = Panel(UiScreen.Lab, new Color(0.03f, 0.1f, 0.16f, 0.75f));
             var col = Column(p.transform, 1500, 900);
             UIKit.Size(UIKit.Text(col, "NETWORK LAB", 72, new Color(0.5f, 0.85f, 1f)), 100);
-            labPhase = UIKit.Size(UIKit.Text(col, "10 s UDP ping burst @100 Hz + 20 MB download from the edge server", 32, UIKit.TextLight), 60);
+            labPhase = UIKit.Size(UIKit.Text(col, "Edge RTT (50 HTTPS) + room RTT (100 WebSocket pings) + pack download + 5 MB upload", 32, UIKit.TextLight), 60);
             var bar = UIKit.Size(UIKit.Image(col, new Color(1, 1, 1, 0.15f)), 40);
             labFill = UIKit.Image(bar.transform, UIKit.Accent2).rectTransform;
             labFill.anchorMin = Vector2.zero; labFill.anchorMax = new Vector2(0, 1); labFill.offsetMin = labFill.offsetMax = Vector2.zero;
@@ -368,17 +357,14 @@ namespace Mottainai.Client
             UIKit.HLayout(row, 20, 0);
             UIKit.Size(row, 110);
             UIKit.Button(row, "RUN TEST", UIKit.Accent, RunLab, 46);
-            UIKit.Button(row, "BACK", UIKit.Muted, () => Show(net.Ready ? UiScreen.Lobby : UiScreen.Login), 46);
+            UIKit.Button(row, "BACK", UIKit.Muted, () => { if (net.Ready) { Show(UiScreen.Lobby); RefreshLobbyUi(); } else if (content.Login != null) { Show(UiScreen.Menu); RefreshMenuUi(); } else Show(UiScreen.Login); }, 46);
         }
 
         void RunLab()
         {
             if (lab.Running) return;
-            serverHost = string.IsNullOrWhiteSpace(serverInput.text) ? serverHost : serverInput.text.Trim();
-            ParseHost(out var host, out var httpPort);
-            if (string.IsNullOrEmpty(content.BaseUrl)) content.SetServer(host, httpPort);
             var ni = NetworkInfo.Provider;
-            StartCoroutine(lab.Run(host, content.BaseUrl, playerName, ni.NetworkType, ni.SliceStatus));
+            StartCoroutine(lab.Run(content, ni.NetworkType, "slice " + ni.SliceStatus));
         }
 
         void BuildHud()
@@ -483,6 +469,7 @@ namespace Mottainai.Client
         {
             if (loginStatus != null) loginStatus.text = text;
             if (lobbyStatus != null) lobbyStatus.text = text;
+            if (menuStatus != null) menuStatus.text = text;
         }
 
         void Toast(string text)
@@ -528,11 +515,11 @@ namespace Mottainai.Client
                 if (lab.Result != null)
                 {
                     var r = lab.Result;
-                    labText.text = $"<b>{r.net}</b>  slice {r.slice}  ({r.device})\n" +
-                                   $"RTT avg <b>{r.rttAvg:F1} ms</b>   min {r.rttMin:F1}   p95 <b>{r.rttP95:F1}</b>   max {r.rttMax:F1}\n" +
-                                   $"Jitter <b>{r.jitter:F2} ms</b>   Loss <b>{r.loss:F1}%</b>   ({r.received}/{r.sent})\n" +
-                                   $"Download <b>{r.downMbps:F1} Mbit/s</b>  ({r.downMB:F1} MB in {r.downSec:F1} s)\n" +
-                                   $"<size=26>Saved: {lab.CsvPath} + server logs/lab_results.csv</size>";
+                    labText.text = $"<b>{r.netType}</b>  ({r.device})   edge <b>{r.edgeColo}</b>   room <b>{r.roomColo}</b>\n" +
+                                   $"Edge RTT avg <b>{r.edgeRttAvg:F1} ms</b>   p95 <b>{r.edgeRttP95:F1}</b>   jitter {r.edgeJitter:F1}  (n={r.edgeN})\n" +
+                                   $"Room RTT avg <b>{r.roomRttAvg:F1} ms</b>   p95 <b>{r.roomRttP95:F1}</b>   jitter {r.roomJitter:F1}  (n={r.roomN})\n" +
+                                   $"Download <b>{r.downMbps:F1} Mbit/s</b> ({r.downMB:F1} MB)   Upload <b>{r.upMbps:F1} Mbit/s</b> ({r.upMB:F1} MB)\n" +
+                                   $"<size=26>Saved: {lab.CsvPath} + {content.BaseUrl}/api/telemetry.csv</size>";
                     if (!lab.Running) labPhase.text = "Done - run again on another network (Wi-Fi / 4G / 5G NSA / 5G SA) to compare";
                 }
                 else if (!lab.Running) labText.text = $"Network: <b>{NetworkInfo.Provider.NetworkType}</b>   Latency slice: {NetworkInfo.Provider.SliceStatus}\n<size=26>{NetworkInfo.Provider.Detail}</size>";
@@ -595,11 +582,11 @@ namespace Mottainai.Client
                 string badgeColor = ni.NetworkType == "5G SA" ? "#39FF88" : ni.NetworkType == "5G NSA" ? "#B6FF5C" : ni.NetworkType == "LTE" ? "#FFD24C" : "#9AD0FF";
                 sb.Clear();
                 sb.Append($"<size=30><b><color={badgeColor}>{ni.NetworkType}</color></b></size>   slice: <b>{ni.SliceStatus}</b>\n");
+                sb.Append($"Edge <b>{content.EdgeColo}</b>   Room <b>{net.RoomColo}</b>   (Cloudflare, wss)\n");
                 sb.Append($"RTT avg <b>{s.RttAvg:F1}</b>  p95 <b>{s.RttP95:F1}</b>  jitter {s.Jitter:F1} ms\n");
-                sb.Append($"Tick {(world != null ? world.TickRate : 60)} Hz  #{s.ServerTick}   snapshots {s.SnapshotRate:F0}/s\n");
+                sb.Append($"Snapshots <b>{s.SnapshotRate:F0}</b>/s (server {net.SnapshotHz} Hz)  tick #{s.ServerTick}\n");
                 sb.Append(world != null && world.PredictionLeadMs > 0 ? $"Raft prediction ON  lead {world.PredictionLeadMs:F0} ms\n" : "Raft prediction idle\n");
-                sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps\n");
-                sb.Append($"Packets {s.Pps:F0}/s   Loss {s.LossPct:F1}%\n");
+                sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps   msgs {s.Pps:F0}/s\n");
                 sb.Append($"Interp buffer {(world != null ? world.InterpMs : 0):F0} ms (jitter p95 {(world != null ? world.JitterMs : 0):F0})\n");
                 float frameMs = 1000f / Mathf.Max(1f, s.Fps);
                 float worldMs = s.RttAvg * 0.5f + (world != null ? world.InterpMs : 0f) + frameMs;
@@ -610,8 +597,6 @@ namespace Mottainai.Client
                 if (s.RttP95 > 30f) q--;
                 if (s.RttP95 > 60f) q--;
                 if (s.Jitter > 8f) q--;
-                if (s.LossPct > 1f) q--;
-                if (s.LossPct > 5f) q--;
                 q = Mathf.Clamp(q, 0, 4);
                 var qc = q >= 4 ? new Color(0.25f, 1f, 0.5f) : q == 3 ? new Color(0.7f, 1f, 0.35f) : q == 2 ? new Color(1f, 0.85f, 0.3f) : q == 1 ? new Color(1f, 0.55f, 0.2f) : new Color(1f, 0.3f, 0.25f);
                 for (int i = 0; i < 4; i++) qualityBars[i].color = i < q ? qc : new Color(1f, 1f, 1f, 0.2f);

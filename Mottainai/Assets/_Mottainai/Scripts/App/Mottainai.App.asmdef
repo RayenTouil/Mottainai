@@ -1,1 +1,1 @@
-{ "name": "Mottainai.App", "rootNamespace": "Mottainai", "references": ["Mottainai.Core","Mottainai.Net","Mottainai.Client","Mottainai.Platform","Unity.Netcode.Runtime"], "autoReferenced": true }
+{"name":"Mottainai.App","rootNamespace":"Mottainai","references":["Mottainai.Core","Mottainai.Net","Mottainai.Client","Mottainai.Platform"],"autoReferenced":true}

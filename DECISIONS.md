@@ -41,3 +41,8 @@
 - v2: Snapshot = per-team raft block + 10-byte entities, window -15..+60 m; 30 Hz fallback when any STATS backlogMs > 100.
 - v2: Strings = u8 length + UTF-8; client→server STROKE/BACKPADDLE carry u8 power (0..255).
 - v2: npm install-scripts approved only for esbuild + workerd (wrangler requirements).
+- v2 C1: interpolation stays in WorldView (per-entity ring buffers); delay target = max(2 snapshot intervals, jitter p95) + 0.35 tick.
+- v2 C1: flow field no longer sent: client computes FlowField.Sample(seed) locally (deterministic).
+- v2 C1: preferred role saved in PlayerPrefs and sent in the WS URL; server default order L, C, R (demo: phone A = L, phone B = C, bot = R).
+- v2 C1: client keeps one stable token (PlayerPrefs) so a reconnect within 60 s restores the role.
+- v2 C1: Network Lab room RTT uses a throwaway room `LAB####`; edge RTT via `<baseUrl>/cdn-cgi/trace` (fallback /api/lab/ping).

@@ -10,6 +10,7 @@ namespace Mottainai.Client
     {
         const int MaxIds = 4096, Ring = 6;
         public int TickRate = NetConst.TickRate;
+        public int SnapshotHz = 60; // adaptive delay = max(2 snapshot intervals, jitter p95)
 
         struct Sample { public uint tick; public float x, y, z, yaw; }
 
@@ -292,7 +293,7 @@ namespace Mottainai.Client
             double nowTicks = Time.unscaledTimeAsDouble * TickRate;
             double diff = baseOffset - smoothOffset;
             smoothOffset = System.Math.Abs(diff) > 12 ? baseOffset : smoothOffset + diff * Mathf.Min(1f, Time.unscaledDeltaTime * 2f);
-            float target = Mathf.Max(1f, jitterTicks) + 0.35f;
+            float target = Mathf.Max(2f * TickRate / Mathf.Max(1, SnapshotHz), jitterTicks) + 0.35f;
             delayTicks = Mathf.Lerp(delayTicks, target, Mathf.Min(1f, Time.unscaledDeltaTime * 1.5f));
             RenderTick = nowTicks + smoothOffset - delayTicks;
 

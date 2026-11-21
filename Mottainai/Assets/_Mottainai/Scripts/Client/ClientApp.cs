@@ -7,9 +7,9 @@ using UnityEngine;
 
 namespace Mottainai.Client
 {
-    public enum UiScreen { Login, Download, Lobby, Game, Results, Lab }
+    public enum UiScreen { Login, Download, Menu, Lobby, Game, Results, Lab }
 
-    /// Client state machine: Login -> Content Pack -> Lobby -> Match -> Results.
+    /// Client state machine: Title -> Content Pack -> Menu -> Lobby (room WebSocket) -> Match -> Results.
     public partial class ClientApp : MonoBehaviour
     {
         public static ClientApp Instance { get; private set; }
@@ -23,18 +23,17 @@ namespace Mottainai.Client
         NetworkLab lab;
         UiScreen screen;
 
-        string playerName, serverHost, token;
-        bool hostInEditor, forceDownload, netHudOn = true;
+        string playerName, token;
+        bool forceDownload, netHudOn = true;
+        Role preferredRole;
         Role myRole;
         LobbyState lobby;
         MatchStartInfo match;
         ResultsData results;
-        float hintUntil, telemetryTimer, roomsTimer, localThrowReady, lastLocalStroke, lastLocalThrow;
+        float hintUntil, localThrowReady, lastLocalStroke, lastLocalThrow;
         int hudScore; float hudTimeLeft; MatchPhase hudPhase; bool hudCombo; float hudShield;
-        bool reconnecting;
         int syncStreak; float lastSyncTime;
         float magnetUntil, turboUntil;
-        RoomInfo[] roomList = new RoomInfo[0];
 
         public static ClientApp Create()
         {
@@ -56,12 +55,11 @@ namespace Mottainai.Client
             // match the display (120 Hz phones -> lower touch-to-photon latency); PerfGovernor protects low-end devices
             Application.targetFrameRate = Mathf.Clamp(Mathf.RoundToInt((float)Screen.currentResolution.refreshRateRatio.value), 60, 120);
             playerName = PlayerPrefs.GetString("name", "Player" + Random.Range(10, 99));
-            serverHost = PlayerPrefs.GetString("server", Application.isEditor ? "127.0.0.1" : "");
             token = PlayerPrefs.GetString("token", "");
-            hostInEditor = Application.isEditor && AppHooks.ServerAvailable && PlayerPrefs.GetInt("hostInEditor", 1) == 1;
+            preferredRole = (Role)PlayerPrefs.GetInt("role", 0);
             NetworkInfo.Provider.Refresh();
 
-            net.OnWelcome += (id, name) => { reconnecting = false; Toast($"Connected as {name}"); };
+            net.OnWelcome += w => { if (net.ProtocolMismatch) Toast("Update app: protocol mismatch"); else Toast($"Connected to room {w.roomCode} (room colo {w.roomColo})"); };
             net.OnLobby += OnLobby;
             net.OnError += e => { Toast(e); SetStatus(e); };
             net.OnMatchStart += OnMatchStart;
@@ -81,7 +79,7 @@ namespace Mottainai.Client
             for (int i = 0; i < cli.Length; i++)
             {
                 if (cli[i] == "-autoplay") autoplay = true;
-                if (cli[i] == "-connect" && i + 1 < cli.Length) { serverHost = cli[i + 1]; hostInEditor = false; }
+                if (cli[i] == "-connect" && i + 1 < cli.Length) content.SetBaseUrl(cli[i + 1]);
                 if (cli[i] == "-name" && i + 1 < cli.Length) playerName = cli[i + 1];
                 if (cli[i] == "-shots" && i + 1 < cli.Length) shotsDir = cli[i + 1];
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
@@ -110,9 +108,8 @@ namespace Mottainai.Client
 
         IEnumerator AutoPlay()
         {
-            hostInEditor = false;
             yield return null;
-            nameInput.text = playerName; serverInput.text = serverHost;
+            nameInput.text = playerName;
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-lab") >= 0)
             {
                 Show(UiScreen.Lab);
@@ -120,23 +117,21 @@ namespace Mottainai.Client
                 yield return null;
                 while (lab.Running) yield return null;
                 var lr = lab.Result;
-                Debug.Log(lr == null ? "[AUTOPLAY] LAB failed" : $"[AUTOPLAY] LAB rtt avg {lr.rttAvg:F2} min {lr.rttMin:F2} p95 {lr.rttP95:F2} max {lr.rttMax:F2} jitter {lr.jitter:F2} loss {lr.loss:F1}% ({lr.received}/{lr.sent}) down {lr.downMbps:F0} Mbit/s ({lr.downMB:F1} MB in {lr.downSec:F2}s) csv={lab.CsvPath}");
+                Debug.Log(lr == null ? "[AUTOPLAY] LAB failed" : $"[AUTOPLAY] LAB edge {lr.edgeColo} {lr.edgeRttAvg:F1}/{lr.edgeRttP95:F1} ms, room {lr.roomColo} {lr.roomRttAvg:F1}/{lr.roomRttP95:F1} ms, down {lr.downMbps:F0} Mbit/s, up {lr.upMbps:F0} Mbit/s csv={lab.CsvPath}");
                 Shot("lab");
-                yield return new WaitForSecondsRealtime(0.5f);
             }
-            Debug.Log($"[AUTOPLAY] login to {serverHost} as {playerName}");
+            Debug.Log($"[AUTOPLAY] login to {content.BaseUrl} as {playerName}");
             StartLogin();
             float t0 = Time.realtimeSinceStartup;
-            while (screen != UiScreen.Lobby && Time.realtimeSinceStartup - t0 < 90f) yield return null;
-            if (screen != UiScreen.Lobby) { Debug.LogError("[AUTOPLAY] FAIL: never reached lobby. " + loginStatus.text); Application.Quit(2); yield break; }
-            Debug.Log($"[AUTOPLAY] lobby reached; content {content.BytesTotal / 1048576f:F1} MB at {content.Mbps:F1} MB/s cached={content.FromCache}");
-            net.Simple(Msg.CreateRoom);
-            while (lobby == null || string.IsNullOrEmpty(lobby.code)) yield return null;
-            net.PickRole(Role.Collector);
+            while (screen != UiScreen.Menu && Time.realtimeSinceStartup - t0 < 90f) yield return null;
+            if (screen != UiScreen.Menu) { Debug.LogError("[AUTOPLAY] FAIL: never reached menu. " + loginStatus.text); Application.Quit(2); yield break; }
+            Debug.Log($"[AUTOPLAY] menu; content {content.BytesTotal / 1048576f:F1} MB at {content.Mbps:F1} MB/s cached={content.FromCache}");
+            JoinRoom("DEMO");
+            while (screen != UiScreen.Lobby || lobby == null) yield return null;
             yield return new WaitForSecondsRealtime(0.8f);
             Shot("lobby");
-            Debug.Log($"[AUTOPLAY] room {lobby.code}, starting");
-            net.Simple(Msg.StartMatch);
+            Debug.Log($"[AUTOPLAY] room {lobby.code} role {myRole}, starting");
+            net.StartMatch();
             float logT = 0, throwT = 0, gameT = 0;
             int nextShot = 0;
             float[] shotTimes = { 1.5f, 8f, 20f, 40f };
@@ -146,17 +141,16 @@ namespace Mottainai.Client
                 if (screen == UiScreen.Game) gameT += Time.unscaledDeltaTime;
                 if (nextShot < shotTimes.Length && gameT >= shotTimes[nextShot]) Shot($"game_{shotTimes[nextShot++]:0}s");
                 if (quitAfter > 0 && gameT > quitAfter) { Debug.Log("[AUTOPLAY] quitafter reached"); Application.Quit(0); yield break; }
-                if (screen == UiScreen.Game && throwT > 0.7f && world != null)
+                if (screen == UiScreen.Game && throwT > 0.7f && world != null && myRole == Role.Collector)
                 {
                     throwT = 0;
-                    var f = world.CameraFlatForward;
-                    ThrowDirection(Quaternion.Euler(0, Random.Range(-35f, 35f), 0) * f);
+                    ThrowDirection(Quaternion.Euler(0, Random.Range(-35f, 35f), 0) * world.CameraFlatForward);
                 }
                 if (logT > 5f)
                 {
                     logT = 0;
                     var s = net.stats;
-                    Debug.Log($"[AUTOPLAY] screen={screen} tick={s.ServerTick} score={hudScore} left={hudTimeLeft:F0}s snaps={s.SnapshotRate:F0}/s down={s.DownKbps:F0}kbps up={s.UpKbps:F0}kbps pps={s.Pps:F0} rtt={s.RttAvg:F1}/{s.RttP95:F1}ms loss={s.LossPct:F1}% interp={s.InterpMs:F0}ms raft={(world != null ? world.RaftPos.ToString() : "-")}");
+                    Debug.Log($"[AUTOPLAY] screen={screen} tick={s.ServerTick} score={hudScore} left={hudTimeLeft:F0}s snaps={s.SnapshotRate:F0}/s down={s.DownKbps:F0}kbps up={s.UpKbps:F0}kbps msgs={s.Pps:F0}/s rtt={s.RttAvg:F1}/{s.RttP95:F1}ms interp={s.InterpMs:F0}ms raft={(world != null ? world.RaftPos.ToString() : "-")}");
                 }
                 yield return null;
             }
@@ -172,85 +166,74 @@ namespace Mottainai.Client
         void StartLogin()
         {
             playerName = string.IsNullOrWhiteSpace(nameInput.text) ? playerName : nameInput.text.Trim();
-            serverHost = string.IsNullOrWhiteSpace(serverInput.text) ? serverHost : serverInput.text.Trim();
             PlayerPrefs.SetString("name", playerName);
-            PlayerPrefs.SetString("server", serverHost);
-            PlayerPrefs.SetInt("hostInEditor", hostInEditor ? 1 : 0);
             PlayerPrefs.Save();
             StartCoroutine(LoginFlow());
-        }
-
-        void ParseHost(out string host, out int httpPort)
-        {
-            host = serverHost; httpPort = NetConst.HttpPort;
-            int c = serverHost.LastIndexOf(':');
-            if (c > 0 && int.TryParse(serverHost.Substring(c + 1), out var p)) { host = serverHost.Substring(0, c); httpPort = p; }
         }
 
         IEnumerator LoginFlow()
         {
             string error = null;
-            if (hostInEditor && AppHooks.ServerAvailable && !AppHooks.ServerRunning)
-            {
-                SetStatus("Starting local server...");
-                if (!AppHooks.StartServer(new LaunchArgs { server = true, host = true })) { SetStatus("Local server failed to start (port in use?)"); yield break; }
-                serverHost = "127.0.0.1";
-                yield return null;
-            }
-            ParseHost(out var host, out var httpPort);
-            content.SetServer(host, httpPort);
             Show(UiScreen.Download);
-            downloadTitle.text = "Logging in...";
-            yield return content.DoLogin(playerName, token, e => error = e);
+            downloadTitle.text = "Contacting server...";
+            yield return content.CheckHealth(e => error = e);
             if (error != null) { Show(UiScreen.Login); SetStatus(error); yield break; }
-            token = content.Login.token;
+            downloadTitle.text = "Logging in...";
+            yield return content.DoLogin(playerName, e => error = e);
+            if (error != null) { Show(UiScreen.Login); SetStatus(error); yield break; }
+            if (string.IsNullOrEmpty(token)) token = content.Login.token; // stable token: a reconnect restores the role
             playerName = content.Login.name;
             PlayerPrefs.SetString("token", token);
-            roomList = content.Login.rooms ?? new RoomInfo[0];
 
             downloadTitle.text = "Downloading Content Pack";
             yield return content.DownloadPack(forceDownload, e => error = e);
             if (error != null) { Show(UiScreen.Login); SetStatus(error); yield break; }
             downloadTitle.text = content.Status;
             yield return new WaitForSecondsRealtime(content.FromCache ? 0.4f : 1.2f);
+            world.ApplyContent(content); // texture upload hitch now, not at match start
+            Show(UiScreen.Menu);
+            RefreshMenuUi();
+        }
 
-            downloadTitle.text = "Connecting (UDP " + content.Login.gamePort + ")...";
-            net.Connect(host, (ushort)content.Login.gamePort, token, playerName);
+        void JoinRoom(string code)
+        {
+            code = (code ?? "").Trim().ToUpperInvariant();
+            if (code.Length < 3) { SetStatus("Enter a room code"); return; }
+            lobby = null;
+            net.Connect(content.BaseUrl, code, token, playerName, preferredRole);
+            StartCoroutine(WaitJoin(code));
+        }
+
+        void CreateRoom() => StartCoroutine(content.CreateRoom(JoinRoom, e => SetStatus(e)));
+
+        IEnumerator WaitJoin(string code)
+        {
+            SetStatus($"Joining {code}...");
             float t0 = Time.realtimeSinceStartup;
             while (!net.Ready && Time.realtimeSinceStartup - t0 < 10f) yield return null;
-            if (!net.Ready) { net.Disconnect(); Show(UiScreen.Login); SetStatus($"UDP connect to {host}:{content.Login.gamePort} failed (firewall?)"); yield break; }
-            lobby = null;
-            // build the 3D world now (texture upload hitch) so the match starts smoothly
-            world.ApplyContent(content);
+            if (!net.Ready) { string err = net.ws.LastError; net.Disconnect(); SetStatus($"Could not join {code}: {err}"); yield break; }
+            SetStatus("");
             Show(UiScreen.Lobby);
             RefreshLobbyUi();
+        }
+
+        void LeaveRoom()
+        {
+            net.Disconnect();
+            lobby = null;
+            Show(UiScreen.Menu);
+            RefreshMenuUi();
         }
 
         void OnDisconnected(string reason)
         {
             if (!net.WantConnected) return;
-            Toast("Disconnected: " + reason);
-            if (!reconnecting) StartCoroutine(Reconnect());
-        }
-
-        IEnumerator Reconnect()
-        {
-            reconnecting = true;
-            while (net.WantConnected && !net.Ready)
-            {
-                SetStatus("Reconnecting...");
-                ParseHost(out var host, out _);
-                net.Connect(host, net.port, token, playerName);
-                float t0 = Time.realtimeSinceStartup;
-                while (!net.Ready && Time.realtimeSinceStartup - t0 < 3f) yield return null;
-            }
-            reconnecting = false;
+            Toast("Connection lost - reconnecting...");
         }
 
         void OnLobby(LobbyState s)
         {
             lobby = s;
-            if (!string.IsNullOrEmpty(s.message)) Toast(s.message);
             var me = s.players.Find(p => p.clientId == net.ClientId);
             if (me != null && screen != UiScreen.Game) myRole = me.role;
             if (screen == UiScreen.Lobby) RefreshLobbyUi();
@@ -398,7 +381,7 @@ namespace Mottainai.Client
         void LocalStroke(float power, bool back)
         {
             if (screen != UiScreen.Game || world == null) return;
-            net.SendStroke(power, back);
+            net.SendStroke(myRole, power, back);
             if (hudPhase == MatchPhase.Running) world.PredictStroke(myRole == Role.LeftPaddler, power, back);
             lastLocalStroke = Time.time;
             world.raftView.Stroke(myRole, back);
@@ -455,51 +438,16 @@ namespace Mottainai.Client
         {
             float dt = Time.unscaledDeltaTime;
             bool inMatch = screen == UiScreen.Game;
-            if (world != null) { net.stats.InterpMs = world.InterpMs; world.RttMs = net.stats.RttAvg; }
+            if (world != null) { net.stats.InterpMs = world.InterpMs; world.RttMs = net.stats.RttAvg; world.SnapshotHz = net.SnapshotHz; }
             net.Tick(dt, inMatch);
             NetworkInfo.Provider.Refresh();
 
-            if (net.Ready)
-            {
-                telemetryTimer -= dt;
-                if (telemetryTimer <= 0f)
-                {
-                    telemetryTimer = 2f;
-                    var s = net.stats;
-                    var dto = new TelemetryDto
-                    {
-                        token = token, name = playerName, device = NetworkInfo.DeviceLabel, net = NetworkInfo.Provider.NetworkType, slice = NetworkInfo.Provider.SliceStatus,
-                        room = lobby?.code, rttAvg = s.RttAvg, rttP95 = s.RttP95, jitter = s.Jitter, fps = s.Fps, dlKbps = s.DownKbps, ulKbps = s.UpKbps,
-                        loss = s.LossPct, interpMs = s.InterpMs, pps = s.Pps
-                    };
-                    content.PostJson(this, "/telemetry", JsonUtility.ToJson(dto));
-                }
-            }
-            if (screen == UiScreen.Lobby && (lobby == null || string.IsNullOrEmpty(lobby.code)))
-            {
-                roomsTimer -= dt;
-                if (roomsTimer <= 0f) { roomsTimer = 3f; StartCoroutine(FetchRooms()); }
-            }
             UpdateUi(dt);
-        }
-
-        IEnumerator FetchRooms()
-        {
-            if (string.IsNullOrEmpty(content.BaseUrl)) yield break;
-            using var req = UnityEngine.Networking.UnityWebRequest.Get(content.BaseUrl + "/rooms");
-            req.timeout = 4;
-            yield return req.SendWebRequest();
-            if (req.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
-            {
-                var list = JsonUtility.FromJson<RoomList>(req.downloadHandler.text);
-                roomList = list?.rooms ?? new RoomInfo[0];
-                if (screen == UiScreen.Lobby) RefreshLobbyUi();
-            }
         }
 
         void OnApplicationPause(bool paused)
         {
-            if (!paused && net.WantConnected && !net.Ready && !reconnecting) StartCoroutine(Reconnect());
+            if (!paused && net.WantConnected && !net.ws.IsOpen) net.Connect(content.BaseUrl, net.roomCode, token, playerName, myRole);
         }
     }
 }

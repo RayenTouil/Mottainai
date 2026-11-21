@@ -1,1 +1,1 @@
-{ "name": "Mottainai.Net", "rootNamespace": "Mottainai", "references": ["Mottainai.Core","Mottainai.Gameplay","Unity.Netcode.Runtime","Unity.Networking.Transport","Unity.Collections"], "autoReferenced": true }
+{"name":"Mottainai.Net","rootNamespace":"Mottainai","references":["Mottainai.Core","Mottainai.Gameplay"],"autoReferenced":true}

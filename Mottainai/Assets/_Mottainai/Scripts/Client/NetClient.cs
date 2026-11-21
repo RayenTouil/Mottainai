@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Mottainai.Gameplay;
 using Mottainai.Net;
-using Unity.Netcode;
+using Mottainai.Platform;
 using UnityEngine;
 
 namespace Mottainai.Client
@@ -20,10 +20,7 @@ namespace Mottainai.Client
         long lastRecv, lastSent, lastMsgs;
         float window;
         int snapshots;
-        uint seqMin = uint.MaxValue, seqMax;
-        int seqCount;
         float fpsAcc; int fpsFrames;
-        // whole-match aggregates for the results card
         public double sumRtt; public int nRtt; public float maxP95, sumLoss; public int nLoss; public float sumDown; public int nDown;
 
         public void AddRtt(float ms)
@@ -46,47 +43,35 @@ namespace Mottainai.Client
             sumRtt += ms; nRtt++;
         }
 
-        public void OnSnapshotChunk(uint seq, bool first)
-        {
-            if (first) snapshots++;
-            seqMin = Math.Min(seqMin, seq);
-            seqMax = Math.Max(seqMax, seq);
-            seqCount++;
-        }
-
+        public void OnSnapshot() => snapshots++;
         public void ResetAggregates() { sumRtt = 0; nRtt = 0; maxP95 = 0; sumLoss = 0; nLoss = 0; sumDown = 0; nDown = 0; }
 
-        public void Update(float dt)
+        public void Update(float dt, WsClient ws)
         {
             window += dt;
             fpsAcc += dt; fpsFrames++;
             if (fpsAcc >= 0.5f) { Fps = fpsFrames / fpsAcc; fpsAcc = 0; fpsFrames = 0; }
             if (window < 1f) return;
-            long recv = NetBus.BytesRecv, sent = NetBus.BytesSent, msgs = NetBus.MsgsRecv + NetBus.MsgsSent;
-            DownKbps = (recv - lastRecv) * 8f / 1000f / window;
-            UpKbps = (sent - lastSent) * 8f / 1000f / window;
-            Pps = (msgs - lastMsgs) / window;
+            long recv = ws.BytesRecv, sent = ws.BytesSent, msgs = ws.MsgsRecv + ws.MsgsSent;
+            DownKbps = Mathf.Max(0, recv - lastRecv) * 8f / 1000f / window;
+            UpKbps = Mathf.Max(0, sent - lastSent) * 8f / 1000f / window;
+            Pps = Mathf.Max(0, msgs - lastMsgs) / window;
             TotalDownMB = recv / 1048576f; TotalUpMB = sent / 1048576f;
             lastRecv = recv; lastSent = sent; lastMsgs = msgs;
             SnapshotRate = snapshots / window;
-            if (seqCount > 0)
-            {
-                long expected = (long)seqMax - seqMin + 1;
-                LossPct = expected > 0 ? Mathf.Clamp01(1f - (float)seqCount / expected) * 100f : 0f;
-                sumLoss += LossPct; nLoss++;
-                sumDown += DownKbps; nDown++;
-            }
+            sumDown += DownKbps; nDown++;
             if (RttP95 > maxP95) maxP95 = RttP95;
-            snapshots = 0; seqCount = 0; seqMin = uint.MaxValue; seqMax = 0;
+            snapshots = 0;
             window = 0;
         }
     }
 
-    /// Owns the NGO client connection + message dispatch.
+    /// One WebSocket per room (Cloudflare RoomDO). Event-based uplink, full-snapshot downlink.
     public class NetClient
     {
         public readonly NetStats stats = new NetStats();
-        public event Action<ulong, string> OnWelcome;
+        public readonly WsClient ws = new WsClient();
+        public event Action<WelcomeInfo> OnWelcome;
         public event Action<LobbyState> OnLobby;
         public event Action<string> OnError;
         public event Action<MatchStartInfo> OnMatchStart;
@@ -94,197 +79,142 @@ namespace Mottainai.Client
         public event Action<List<MatchEvent>> OnEvents;
         public event Action<ResultsData> OnResults;
         public event Action<string> OnDisconnected;
-        public event Action OnConnected;
 
-        public string token, playerName, address;
-        public ushort port;
+        public string token, playerName, roomCode = "", baseUrl;
+        public string RoomColo = "?";
         public ulong ClientId { get; private set; } = ulong.MaxValue;
         public bool Welcomed { get; private set; }
-        public bool WantConnected { get; private set; }
+        public bool WantConnected => ws.Want;
+        public int TickRate = NetConst.TickRate;
+        public int SnapshotHz = 60;
+        public int MyTeam, Seed;
+        public bool ProtocolMismatch;
 
         readonly SnapshotFrame frame = new SnapshotFrame();
         readonly List<MatchEvent> evBuffer = new List<MatchEvent>(64);
-        float pingTimer, inputTimer;
-        uint inputSeq;
-        public int TickRate = NetConst.TickRate;
-        float TickDt => 1f / Mathf.Max(10, TickRate);
+        readonly ByteWriter w = new ByteWriter();
+        float pingTimer, statsTimer, backlogMaxMs;
         readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+        public double NowMs => clock.Elapsed.TotalMilliseconds;
         public double Now => clock.Elapsed.TotalSeconds;
 
-        public void Connect(string addr, ushort gamePort, string tok, string name)
+        public NetClient()
         {
-            address = addr; port = gamePort; token = tok; playerName = name;
-            WantConnected = true;
-            Welcomed = false;
-            var nm = NetBus.EnsureManager();
-            NetBus.OnClient = Dispatch;
-            nm.OnClientConnectedCallback -= HandleConnected;
-            nm.OnClientConnectedCallback += HandleConnected;
-            nm.OnClientDisconnectCallback -= HandleDisconnected;
-            nm.OnClientDisconnectCallback += HandleDisconnected;
-
-            if (nm.IsHost)
-            {
-                SendHello();
-                return;
-            }
-            if (nm.IsListening) nm.Shutdown();
-            NetBus.Transport.SetConnectionData(true, ResolveIPv4(addr), gamePort);
-            if (!nm.StartClient()) OnDisconnected?.Invoke("Could not start client");
+            ws.ClosedEvt += reason => { Welcomed = false; OnDisconnected?.Invoke(reason); };
         }
 
-        static string ResolveIPv4(string host)
+        public static string WsUrl(string httpBase, string code, string token, string name, Role role)
         {
-            if (System.Net.IPAddress.TryParse(host, out _)) return host;
-            try
-            {
-                foreach (var a in System.Net.Dns.GetHostAddresses(host))
-                    if (a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) return a.ToString();
-            }
-            catch { }
-            return host == "localhost" ? "127.0.0.1" : host;
+            string b = httpBase.TrimEnd('/');
+            b = b.StartsWith("https://") ? "wss://" + b.Substring(8) : b.StartsWith("http://") ? "ws://" + b.Substring(7) : b;
+            return $"{b}/ws/room/{Uri.EscapeDataString(code)}?token={Uri.EscapeDataString(token ?? "")}&name={Uri.EscapeDataString(name ?? "Player")}&role={(int)role}";
+        }
+
+        public void Connect(string httpBase, string code, string tok, string name, Role wantRole)
+        {
+            baseUrl = httpBase; roomCode = code.ToUpperInvariant(); token = tok; playerName = name;
+            Welcomed = false;
+            ws.Connect(WsUrl(httpBase, roomCode, tok, name, wantRole));
         }
 
         public void Disconnect()
         {
-            WantConnected = false;
             Welcomed = false;
-            var nm = NetBus.NM;
-            if (nm != null && nm.IsClient && !nm.IsHost) nm.Shutdown();
+            ws.Close();
         }
 
-        void HandleConnected(ulong id)
-        {
-            var nm = NetBus.NM;
-            if (nm.IsServer || id != nm.LocalClientId) return;
-            OnConnected?.Invoke();
-            SendHello();
-        }
+        public bool Ready => Welcomed && ws.IsOpen;
 
-        void HandleDisconnected(ulong id)
+        void Dispatch(byte[] m)
         {
-            var nm = NetBus.NM;
-            if (nm.IsServer) return;
-            Welcomed = false;
-            string reason = string.IsNullOrEmpty(nm.DisconnectReason) ? "Connection lost" : nm.DisconnectReason;
-            OnDisconnected?.Invoke(reason);
-        }
-
-        void SendHello()
-        {
-            var w = NetBus.Begin(Msg.Hello, 128);
-            w.WriteValueSafe(token ?? "");
-            w.WriteValueSafe(playerName ?? "Player");
-            NetBus.ToServer(w, NetworkDelivery.ReliableSequenced);
-        }
-
-        public bool Ready => Welcomed && (NetBus.IsHost || NetBus.IsConnectedClient);
-
-        void Dispatch(Msg type, FastBufferReader r)
-        {
-            switch (type)
+            var r = new ByteReader(m, 1, m.Length - 1);
+            try
             {
-                case Msg.Welcome:
-                    r.ReadValueSafe(out ulong id);
-                    r.ReadValueSafe(out string name);
-                    r.ReadValueSafe(out string tok);
-                    ClientId = id; playerName = name; token = tok; Welcomed = true;
-                    OnWelcome?.Invoke(id, name);
-                    break;
-                case Msg.Pong:
-                    r.ReadValueSafe(out double sent);
-                    r.ReadValueSafe(out uint _);
-                    stats.AddRtt((float)((Now - sent) * 1000.0));
-                    break;
-                case Msg.Lobby: OnLobby?.Invoke(Codec.ReadLobby(r)); break;
-                case Msg.Error: r.ReadValueSafe(out string err); OnError?.Invoke(err); break;
-                case Msg.MatchStart: OnMatchStart?.Invoke(Codec.ReadMatchStart(r)); break;
-                case Msg.Snapshot:
-                    Codec.ReadSnapshot(r, frame, GameTuning.Current);
-                    stats.OnSnapshotChunk(frame.seq, frame.chunk == 0);
-                    if (frame.hasRaft) stats.ServerTick = frame.tick;
-                    OnSnapshot?.Invoke(frame);
-                    break;
-                case Msg.Events:
-                    r.ReadValueSafe(out uint _);
-                    evBuffer.Clear();
-                    Codec.ReadEvents(r, evBuffer);
-                    OnEvents?.Invoke(evBuffer);
-                    break;
-                case Msg.Results: OnResults?.Invoke(Codec.ReadResults(r)); break;
+                switch (m[0])
+                {
+                    case Msg.Welcome:
+                    {
+                        var wi = Codec.ReadWelcome(ref r);
+                        ClientId = wi.playerId; RoomColo = wi.roomColo; roomCode = wi.roomCode; TickRate = wi.tickRate; SnapshotHz = wi.snapshotHz;
+                        ProtocolMismatch = wi.protocolVersion != Msg.ProtocolVersion;
+                        Welcomed = true;
+                        pingTimer = 0f;
+                        OnWelcome?.Invoke(wi);
+                        break;
+                    }
+                    case Msg.Pong:
+                    {
+                        double sent = r.F64();
+                        stats.ServerTick = r.U32();
+                        stats.AddRtt((float)(NowMs - sent));
+                        break;
+                    }
+                    case Msg.Lobby: OnLobby?.Invoke(Codec.ReadLobby(ref r, roomCode)); break;
+                    case Msg.Notice: OnError?.Invoke(r.Str()); break;
+                    case Msg.MatchStart:
+                    {
+                        var ms = Codec.ReadMatchStart(ref r, roomCode);
+                        MyTeam = ms.team; Seed = ms.seed; TickRate = ms.tickRate;
+                        OnMatchStart?.Invoke(ms);
+                        break;
+                    }
+                    case Msg.Snapshot:
+                        Codec.ReadSnapshot(ref r, frame, MyTeam, Seed, GameTuning.Current);
+                        SnapshotHz = Mathf.Max(1, frame.snapshotHz);
+                        stats.OnSnapshot();
+                        stats.ServerTick = frame.tick;
+                        OnSnapshot?.Invoke(frame);
+                        break;
+                    case Msg.Events:
+                        evBuffer.Clear();
+                        Codec.ReadEvents(ref r, evBuffer);
+                        OnEvents?.Invoke(evBuffer);
+                        break;
+                    case Msg.Results: OnResults?.Invoke(Codec.ReadResults(ref r)); break;
+                }
             }
+            catch (Exception e) { Debug.LogWarning($"[Net] bad frame 0x{m[0]:X2}: {e.Message}"); }
         }
 
         public void Tick(float dt, bool inMatch)
         {
-            stats.Update(dt);
+            backlogMaxMs = Mathf.Max(backlogMaxMs, ws.Backlog * 1000f / Mathf.Max(1, SnapshotHz));
+            ws.Poll(Dispatch);
+            stats.Update(dt, ws);
             if (!Ready) return;
             pingTimer -= dt;
             if (pingTimer <= 0f)
             {
-                pingTimer = 0.1f;
-                var w = NetBus.Begin(Msg.Ping, 16);
-                w.WriteValueSafe(Now);
-                NetBus.ToServer(w, NetworkDelivery.Unreliable);
+                pingTimer = 0.5f;
+                ws.Send(w.Begin(Msg.Ping).F64(NowMs).ToArray());
             }
-            if (inMatch)
+            statsTimer -= dt;
+            if (statsTimer <= 0f)
             {
-                inputTimer += dt;
-                // input heartbeat every tick (unreliable sequenced)
-                while (inputTimer >= TickDt)
-                {
-                    inputTimer -= TickDt;
-                    var w = NetBus.Begin(Msg.Input, 16);
-                    w.WriteValueSafe(inputSeq++);
-                    w.WriteValueSafe((ushort)Mathf.Clamp(stats.InterpMs, 0, 1000));
-                    NetBus.ToServer(w, NetworkDelivery.UnreliableSequenced);
-                }
+                statsTimer = 2f;
+                ws.Send(w.Begin(Msg.Stats).U8(Mathf.Clamp(Mathf.RoundToInt(stats.Fps), 0, 255)).U16(Mathf.Clamp(Mathf.RoundToInt(stats.RttAvg), 0, 65535))
+                    .U8(NetworkInfo.TypeCode).U16(Mathf.Clamp(Mathf.RoundToInt(backlogMaxMs), 0, 65535)).ToArray());
+                backlogMaxMs = 0f;
             }
         }
 
-        public void SendStroke(float power, bool back)
+        float ClientTime => (float)Now;
+        static int Power255(float p) => Mathf.Clamp(Mathf.RoundToInt(p * 255f), 0, 255);
+
+        public void SendStroke(Role side, float power, bool back)
         {
-            var w = NetBus.Begin(Msg.Stroke, 16);
-            w.WriteValueSafe(power);
-            w.WriteValueSafe(back);
-            NetBus.ToServer(w, NetworkDelivery.Reliable);
+            int s = side == Role.RightPaddler ? 1 : 0;
+            ws.Send(w.Begin(back ? Msg.BackPaddle : Msg.Stroke).U8(s).U8(Power255(power)).F32(ClientTime).ToArray());
         }
 
         public void SendThrow(ushort target, Vector2 dir)
         {
-            var w = NetBus.Begin(Msg.Throw, 24);
-            w.WriteValueSafe(target);
-            w.WriteValueSafe(dir.x);
-            w.WriteValueSafe(dir.y);
-            w.WriteValueSafe((ushort)Mathf.Clamp(stats.InterpMs, 0, 1000));
-            NetBus.ToServer(w, NetworkDelivery.Reliable);
+            if (dir.sqrMagnitude > 1e-6f) dir.Normalize();
+            ws.Send(w.Begin(Msg.Net).U16(target).I16(Mathf.RoundToInt(dir.x * 1000f)).I16(Mathf.RoundToInt(dir.y * 1000f)).F32(ClientTime).ToArray());
         }
 
-        public void Simple(Msg m)
-        {
-            var w = NetBus.Begin(m, 8);
-            NetBus.ToServer(w, NetworkDelivery.ReliableSequenced);
-        }
-
-        public void JoinRoom(string code)
-        {
-            var w = NetBus.Begin(Msg.JoinRoom, 32);
-            w.WriteValueSafe(code ?? "");
-            NetBus.ToServer(w, NetworkDelivery.ReliableSequenced);
-        }
-
-        public void PickRole(Role r)
-        {
-            var w = NetBus.Begin(Msg.PickRole, 8);
-            w.WriteValueSafe((byte)r);
-            NetBus.ToServer(w, NetworkDelivery.ReliableSequenced);
-        }
-
-        public void SetReady(bool ready)
-        {
-            var w = NetBus.Begin(Msg.SetReady, 8);
-            w.WriteValueSafe(ready);
-            NetBus.ToServer(w, NetworkDelivery.ReliableSequenced);
-        }
+        public void PickRole(Role r) => ws.Send(w.Begin(Msg.Role).U8((int)r).ToArray());
+        public void SetReady(bool ready) => ws.Send(w.Begin(Msg.Ready).U8(ready ? 1 : 0).ToArray());
+        public void StartMatch() => ws.Send(w.Begin(Msg.Start).ToArray());
     }
 }

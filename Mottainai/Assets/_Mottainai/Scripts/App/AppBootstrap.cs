@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Mottainai.App
 {
-    /// Single entry point living in the generated Bootstrap scene. Decides server vs client from command line.
+    /// Single entry point living in the generated Bootstrap scene.
     public class AppBootstrap : MonoBehaviour
     {
         static bool started;
@@ -17,38 +17,6 @@ namespace Mottainai.App
             Application.targetFrameRate = 60;
             Application.runInBackground = true;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
-            primary = true;
-        }
-
-        bool primary;
-
-        // Start (not Awake): NGO registers its message types in an AfterSceneLoad callback.
-        void Start()
-        {
-            if (!primary) return;
-            if (!AppHooks.ServerAvailable)
-                System.Type.GetType("Mottainai.Server.ServerEntry, Mottainai.Server")?.GetMethod("Register")?.Invoke(null, null);
-            var args = LaunchArgs.Parse(System.Environment.GetCommandLineArgs());
-#if UNITY_SERVER || MOTTAINAI_SERVER_BUILD
-            args.server = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-client") < 0;
-#endif
-            if (Application.isBatchMode) args.headless = true;
-
-            if (args.server)
-            {
-                if (!AppHooks.ServerAvailable) { Debug.LogError("Server code not included in this build."); return; }
-                if (!args.headless)
-                {
-                    var cam = new GameObject("ServerCamera").AddComponent<Camera>();
-                    cam.clearFlags = CameraClearFlags.SolidColor;
-                    cam.backgroundColor = new Color(0.04f, 0.1f, 0.12f);
-                    cam.cullingMask = 0;
-                    DontDestroyOnLoad(cam.gameObject);
-                }
-                AppHooks.StartServer(args);
-                return;
-            }
-
             Screen.orientation = ScreenOrientation.AutoRotation;
             Screen.autorotateToPortrait = false;
             Screen.autorotateToPortraitUpsideDown = false;
