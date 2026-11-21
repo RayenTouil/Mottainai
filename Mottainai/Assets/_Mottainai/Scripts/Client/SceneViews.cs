@@ -164,10 +164,6 @@ namespace Mottainai.Client
         readonly List<Transform> trees = new List<Transform>();
         const int TreeCount = 36;
         const float TreeSpacing = 8f;
-        static readonly int DirtId = Shader.PropertyToID("_MottainaiDirt"), DirtCountId = Shader.PropertyToID("_MottainaiDirtCount");
-        readonly Vector4[] dirtBuf = new Vector4[16];
-        static readonly int FoamId = Shader.PropertyToID("_MottainaiFoam"), FoamCountId = Shader.PropertyToID("_MottainaiFoamCount");
-        static readonly int WakeId = Shader.PropertyToID("_MottainaiWake"), WakeCountId = Shader.PropertyToID("_MottainaiWakeCount");
 
         public static WaterView Create(Transform parent, ContentService content)
         {
@@ -258,7 +254,7 @@ namespace Mottainai.Client
             return m;
         }
 
-        public void Follow(Vector3 raft, List<Vector4> dirt, Vector4[] foam, int foamCount, Vector4[] wake, int wakeCount)
+        public void Follow(Vector3 raft)
         {
             float z = Mathf.Floor(raft.z / 2f) * 2f;
             waterT.localPosition = new Vector3(0, 0, z);
@@ -280,15 +276,6 @@ namespace Mottainai.Client
                 tr.localPosition = new Vector3(side * (hw + off), 0.9f, c * TreeSpacing + ((h >> 20) % 100) / 100f * 4f);
                 tr.localScale = Vector3.one * s;
             }
-
-            int n = Mathf.Min(16, dirt.Count);
-            for (int i = 0; i < 16; i++) dirtBuf[i] = i < n ? dirt[i] : Vector4.zero;
-            Shader.SetGlobalVectorArray(DirtId, dirtBuf);
-            Shader.SetGlobalFloat(DirtCountId, n);
-            Shader.SetGlobalVectorArray(FoamId, foam);
-            Shader.SetGlobalFloat(FoamCountId, foamCount);
-            Shader.SetGlobalVectorArray(WakeId, wake);
-            Shader.SetGlobalFloat(WakeCountId, wakeCount);
         }
     }
 

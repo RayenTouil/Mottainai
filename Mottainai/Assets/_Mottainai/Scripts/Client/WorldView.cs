@@ -106,7 +106,11 @@ namespace Mottainai.Client
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Custom;
             RenderSettings.ambientProbe = sh;
 
+            NoiseTexture.Ensure();
             var horizon = new Color(0.72f, 0.88f, 0.98f);
+            var zenith = new Color(0.22f, 0.52f, 0.9f);
+            Shader.SetGlobalVector("_MottainaiSkyHorizon", horizon);
+            Shader.SetGlobalVector("_MottainaiSkyZenith", zenith);
             cam.backgroundColor = horizon;
             RenderSettings.fogColor = horizon;
             var skyShader = Shader.Find("Mottainai/Sky");
@@ -115,6 +119,7 @@ namespace Mottainai.Client
                 var skyMat = new Material(skyShader);
                 skyMat.SetVector("_SunDir", -lightGo.transform.forward);
                 skyMat.SetColor("_Horizon", horizon);
+                skyMat.SetColor("_Zenith", zenith);
                 sky = VisualFactory.Part(transform, VisualFactory.Sphere, skyMat, Vector3.zero, Vector3.one * 250f, default, "SkyDome").transform;
             }
             postFx = PostFx.Create(transform, cam);
@@ -258,8 +263,8 @@ namespace Mottainai.Client
                 }
             }
             UpdateCamera();
-            UpdateFoamAndWake();
-            water.Follow(RaftPos, DirtPoints(), foamBuf, foamCount, wakeBuf, wakeCount);
+            UpdateWaterFx();
+            water.Follow(RaftPos);
         }
 
         // ---------------- own-raft prediction (hides RTT for paddlers) ----------------
@@ -330,63 +335,68 @@ namespace Mottainai.Client
             raftView.SetPose(RaftPos, RaftHeading);
         }
 
-        // obstacle foam rings + raft wake trail for the water shader
-        readonly Vector4[] foamBuf = new Vector4[16], wakeBuf = new Vector4[16];
-        readonly Vector3[] trail = new Vector3[16];
-        readonly float[] trailT = new float[16];
-        int foamCount, wakeCount, trailHead;
-        float trailTimer;
+        // ---------------- water effects map (foam rings, waste dirt, raft wake) ----------------
+        WaterFxMap fxMap;
+        const int TrailLen = 24;
+        readonly Vector2[] trail = new Vector2[TrailLen];
+        readonly float[] trailT = new float[TrailLen], trailS = new float[TrailLen];
+        int trailHead;
+        float trailTimer, fxTimer;
 
-        void UpdateFoamAndWake()
+        void UpdateWaterFx()
         {
-            foamCount = 0;
-            for (int k = 0; k < active.Count && foamCount < 16; k++)
-            {
-                var s = slots[active[k]];
-                if (EntityCode.Kind(s.code) != EntityKind.Obstacle) continue;
-                var p = s.go.transform.localPosition;
-                if (Mathf.Abs(p.z - RaftPos.z) > 45f) continue;
-                int sub = EntityCode.Sub(s.code);
-                bool shark = sub == (byte)ObstacleType.Shark;
-                if (shark && s.flags == 0) continue;
-                float r = ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] * 0.7f;
-                foamBuf[foamCount++] = new Vector4(p.x, p.z, r, shark ? 0.6f : 1f);
-            }
-            for (int i = foamCount; i < 16; i++) foamBuf[i] = Vector4.zero;
             float now = Time.time;
+            var stern = new Vector2(RaftPos.x, RaftPos.z) - new Vector2(Mathf.Sin(RaftHeading), Mathf.Cos(RaftHeading)) * 1.45f;
+            float strength = Attract ? 0.55f : Mathf.Clamp01(0.3f + Mathf.Max(0f, smoothSpeed - 2f) * 0.22f);
             trailTimer -= Time.deltaTime;
             if (trailTimer <= 0f)
             {
-                trailTimer = 0.1f;
-                trail[trailHead] = RaftPos - new Vector3(Mathf.Sin(RaftHeading), 0f, Mathf.Cos(RaftHeading)) * 1.5f;
+                trailTimer = 0.07f;
+                trail[trailHead] = stern;
                 trailT[trailHead] = now;
-                trailHead = (trailHead + 1) % trail.Length;
+                trailS[trailHead] = strength;
+                trailHead = (trailHead + 1) % TrailLen;
             }
-            wakeCount = 0;
-            for (int i = 0; i < trail.Length; i++)
-            {
-                float age = (now - trailT[i]) / 1.6f;
-                if (trailT[i] <= 0f || age >= 1f) continue;
-                wakeBuf[wakeCount++] = new Vector4(trail[i].x, trail[i].z, age, 0.9f);
-            }
-            for (int i = wakeCount; i < 16; i++) wakeBuf[i] = Vector4.zero;
-        }
-
-        // provides waste positions to the water dirt tint without allocations
-        readonly List<Vector4> dirt = new List<Vector4>(16);
-        List<Vector4> DirtPoints()
-        {
-            dirt.Clear();
-            for (int k = 0; k < active.Count && dirt.Count < 16; k++)
+            fxTimer -= Time.unscaledDeltaTime;
+            if (fxTimer > 0f) return;
+            fxTimer = 1f / 30f;
+            fxMap ??= new WaterFxMap();
+            fxMap.Begin(RaftPos.z);
+            for (int k = 0; k < active.Count; k++)
             {
                 var s = slots[active[k]];
-                if (EntityCode.Kind(s.code) != EntityKind.Waste) continue;
                 var p = s.go.transform.localPosition;
-                if (Mathf.Abs(p.z - RaftPos.z) > 35f) continue;
-                dirt.Add(new Vector4(p.x, p.z, EntityCode.Sub(s.code) == (byte)WasteType.Toxic ? 4.5f : 3f, 1f));
+                if (p.z < RaftPos.z - 16f || p.z > RaftPos.z + 68f) continue;
+                var kind = EntityCode.Kind(s.code);
+                int sub = EntityCode.Sub(s.code);
+                if (kind == EntityKind.Obstacle)
+                {
+                    bool shark = sub == (byte)ObstacleType.Shark;
+                    if (shark && s.flags == 0) continue;
+                    float r = ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] * 0.7f;
+                    fxMap.Ring(p.x, p.z, r, shark ? (s.flags == 2 ? 0.8f : 0.45f) : 1f);
+                }
+                else if (kind == EntityKind.Waste)
+                    fxMap.Disc(p.x, p.z, sub == (byte)WasteType.Toxic ? 4.5f : 3f, 1f, 1);
             }
-            return dirt;
+            // wake: chronological segments from the oldest trail point up to the current stern
+            Vector2 prev = default;
+            float prevAge = 0f, prevS = 0f;
+            bool havePrev = false;
+            for (int i = 0; i < TrailLen; i++)
+            {
+                int idx = (trailHead + i) % TrailLen;
+                if (trailT[idx] <= 0f) continue;
+                float age = (now - trailT[idx]) / 1.7f;
+                if (age >= 1f) continue;
+                if (havePrev) fxMap.Wake(prev, trail[idx], WakeWidth(prevAge), WakeWidth(age), (1f - prevAge) * prevS, (1f - age) * trailS[idx]);
+                prev = trail[idx]; prevAge = age; prevS = trailS[idx]; havePrev = true;
+            }
+            if (havePrev) fxMap.Wake(prev, stern, WakeWidth(prevAge), WakeWidth(0f), (1f - prevAge) * prevS, strength);
+            fxMap.End();
         }
+
+        static float WakeWidth(float age) => 0.75f + age * 2.2f;
 
         static void Interp(Slot s, double rt, out Vector3 p, out float yaw)
         {
@@ -493,8 +503,8 @@ namespace Mottainai.Client
             camT.rotation = Quaternion.LookRotation(RaftPos + Vector3.up * 0.8f - camT.position);
             cam.fieldOfView = 50f;
             if (sky != null) sky.position = camT.position;
-            UpdateFoamAndWake();
-            water.Follow(RaftPos, DirtPoints(), foamBuf, foamCount, wakeBuf, wakeCount);
+            UpdateWaterFx();
+            water.Follow(RaftPos);
             UpdateWakeSpray(Time.deltaTime);
         }
 

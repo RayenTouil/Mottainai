@@ -38,14 +38,7 @@ Shader "Mottainai/Sky"
                 return o;
             }
 
-            float hash(float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
-            float noise(float2 p)
-            {
-                float2 i = floor(p), f = frac(p);
-                f = f * f * (3 - 2 * f);
-                return lerp(lerp(hash(i), hash(i + float2(1, 0)), f.x), lerp(hash(i + float2(0, 1)), hash(i + float2(1, 1)), f.x), f.y);
-            }
-            float fbm(float2 p) { float v = 0, a = 0.5; for (int k = 0; k < 4; k++) { v += a * noise(p); p *= 2.03; a *= 0.5; } return v; }
+            TEXTURE2D(_MottainaiNoise); SAMPLER(sampler_MottainaiNoise);
 
             half4 frag (Varyings i) : SV_Target
             {
@@ -57,8 +50,9 @@ Shader "Mottainai/Sky"
                 col += _SunColor.rgb * (pow(s, 900) * 3 + pow(s, 12) * 0.25);
                 if (d.y > 0.02)
                 {
-                    float2 uv = d.xz / (d.y + 0.15) * 1.6 + float2(_Time.y * 0.012, _Time.y * 0.02);
-                    float c = smoothstep(0.52, 0.8, fbm(uv));
+                    float2 uv = d.xz / (d.y + 0.15) * 0.22 + float2(_Time.y * 0.0015, _Time.y * 0.003);
+                    float c = SAMPLE_TEXTURE2D(_MottainaiNoise, sampler_MottainaiNoise, uv).r * 0.65 + SAMPLE_TEXTURE2D(_MottainaiNoise, sampler_MottainaiNoise, uv * 2.3 + 0.37).r * 0.35;
+                    c = smoothstep(0.5, 0.78, c);
                     col = lerp(col, _CloudColor.rgb * (0.9 + 0.1 * s), c * saturate(d.y * 4) * 0.85);
                 }
                 col = lerp(col, _Horizon.rgb * 1.02, saturate(1 - d.y * 8) * 0.6);

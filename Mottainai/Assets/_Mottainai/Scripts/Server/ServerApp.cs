@@ -89,8 +89,8 @@ namespace Mottainai.Server
             File.WriteAllText(Path.Combine(root, "server_status.txt"), banner);
             log.Event("server_start", "", $"udp={a.port} http={a.http} ips={string.Join("|", ips)}");
 
-            if (a.headless) Application.targetFrameRate = 240;
-            else if (!a.host) Application.targetFrameRate = 120;
+            // high server frame rate: inputs wait <= ~4 ms before being processed, snapshots leave on time
+            if (!a.host) Application.targetFrameRate = 240;
             return true;
         }
 
