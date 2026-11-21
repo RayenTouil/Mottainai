@@ -13,6 +13,7 @@ Install on a phone: `adb install -r Builds/Mottainai.apk`.
 ```
 run_server.bat               # small status window with IPs, rooms, tick rate
 run_server.bat -headless     # console only (-batchmode -nographics)
+run_server.bat -tick 120      # 5G SA mode: 120 Hz snapshots, 8 ms interpolation floor
 ```
 Full command line: `MottainaiServer.exe -server -port 7777 -http 8080 -tick 60 -log [-batchmode -nographics]`.
 On start it prints every IPv4 address in big text (window + `ServerData/server_status.txt` next to the exe). Type one of them on the phone login screen.

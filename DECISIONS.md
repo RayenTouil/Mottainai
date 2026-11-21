@@ -29,3 +29,9 @@
 - In-game RTT is measured with app-level ping/pong (includes frame quantization ~1 frame each side); Network Lab measures raw UDP RTT.
 - Render scale starts at 1.0 and the PerfGovernor drops it to 0.8 after 3 s below 45 FPS; MSAA 2x, HDR and shadows off.
 - Battle-mode hooks: `IGameMode`, `ModeConfig`, `TeamState` list, `HealthComponent`, per-team `ScoreService`; course spawner is team-independent.
+- 5G SA latency: server tick configurable up to 120 Hz (`run_server.bat -tick 120`), sent to clients in MatchStart; interpolation floor drops to 1 tick (8 ms). Lag-comp history 32 ticks.
+- Own-raft client prediction: paddler strokes are applied locally on a RaftSim copy re-simulated from the latest server state (+ one-way latency); errors decay exponentially (no snapping). Other entities stay interpolated.
+- Client frame rate follows the display (up to 120 FPS on 120 Hz phones) for lower touch-to-photon latency; PerfGovernor drops render scale/MSAA if FPS < 45.
+- Graphics: runtime URP Volume (bloom, neutral tonemap, color grading, vignette with hit/shield/sync pulses), procedural sky dome shader, water foam (banks, obstacles, raft wake) + glints, faceted procedural rocks/icebergs/trees, torus raft, hemispheric SH ambient. MSAA 4x on devices with ≥6 GB RAM.
+- Menus render the live 3D river (attract mode) behind translucent panels.
+- tools/compile_check.sh type-checks all scripts with Unity's bundled Roslyn while the editor is open (no batchmode needed).
