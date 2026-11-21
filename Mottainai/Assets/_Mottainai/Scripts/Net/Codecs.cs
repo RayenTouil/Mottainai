@@ -44,7 +44,7 @@ namespace Mottainai.Net
         public readonly List<LobbyPlayer> players = new List<LobbyPlayer>();
     }
 
-    public class MatchStartInfo { public string code; public int seed; public Role role; public byte team; public float duration, countdown; }
+    public class MatchStartInfo { public string code; public int seed; public Role role; public byte team, tickRate = 60; public float duration, countdown; }
 
     public static class Codec
     {
@@ -293,6 +293,7 @@ namespace Mottainai.Net
             w.WriteValueSafe(m.team);
             w.WriteValueSafe(m.duration);
             w.WriteValueSafe(m.countdown);
+            w.WriteValueSafe(m.tickRate);
         }
 
         public static MatchStartInfo ReadMatchStart(FastBufferReader rd)
@@ -304,6 +305,7 @@ namespace Mottainai.Net
             rd.ReadValueSafe(out m.team);
             rd.ReadValueSafe(out m.duration);
             rd.ReadValueSafe(out m.countdown);
+            rd.ReadValueSafe(out m.tickRate);
             return m;
         }
     }

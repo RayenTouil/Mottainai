@@ -106,6 +106,8 @@ namespace Mottainai.Client
         readonly List<MatchEvent> evBuffer = new List<MatchEvent>(64);
         float pingTimer, inputTimer;
         uint inputSeq;
+        public int TickRate = NetConst.TickRate;
+        float TickDt => 1f / Mathf.Max(10, TickRate);
         readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
         public double Now => clock.Elapsed.TotalSeconds;
 
@@ -229,9 +231,9 @@ namespace Mottainai.Client
             {
                 inputTimer += dt;
                 // input heartbeat every tick (unreliable sequenced)
-                while (inputTimer >= NetConst.TickDt)
+                while (inputTimer >= TickDt)
                 {
-                    inputTimer -= NetConst.TickDt;
+                    inputTimer -= TickDt;
                     var w = NetBus.Begin(Msg.Input, 16);
                     w.WriteValueSafe(inputSeq++);
                     w.WriteValueSafe((ushort)Mathf.Clamp(stats.InterpMs, 0, 1000));

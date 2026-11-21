@@ -9,6 +9,7 @@ namespace Mottainai.Client
     public class WorldView : MonoBehaviour
     {
         const int MaxIds = 4096, Ring = 6;
+        public int TickRate = NetConst.TickRate;
 
         struct Sample { public uint tick; public float x, y, z, yaw; }
 
@@ -43,8 +44,8 @@ namespace Mottainai.Client
         double baseOffset, smoothOffset;
         bool clockInit;
         float delayTicks = 2f, jitterTicks;
-        public float InterpMs => delayTicks / NetConst.TickRate * 1000f;
-        public float JitterMs => jitterTicks / NetConst.TickRate * 1000f;
+        public float InterpMs => delayTicks / TickRate * 1000f;
+        public float JitterMs => jitterTicks / TickRate * 1000f;
         public double RenderTick { get; private set; }
 
         public RaftView raftView;
@@ -110,12 +111,13 @@ namespace Mottainai.Client
             raftCount = 0; raftHead = 0;
             offCount = 0; offHead = 0; clockInit = false;
             LatestTick = 0;
+            srvTick = 0; lastPredTick = 0; havePred = false; srvRunning = false; localStrokes.Clear(); predErr = Vector3.zero; predErrH = 0f;
         }
 
         // ---------------- snapshot intake ----------------
         public void OnSnapshot(SnapshotFrame f)
         {
-            double nowTicks = Time.unscaledTimeAsDouble * NetConst.TickRate;
+            double nowTicks = Time.unscaledTimeAsDouble * TickRate;
             if (f.tick > LatestTick) LatestTick = f.tick;
             if (f.hasRaft && Time.unscaledDeltaTime < 0.1f) // ignore frame hitches (loading) in the jitter estimate
             {
@@ -135,6 +137,14 @@ namespace Mottainai.Client
                     float p5 = sortBuf[Mathf.Clamp(Mathf.FloorToInt(offCount * 0.05f), 0, offCount - 1)];
                     jitterTicks = (float)(baseOffset - p5);
                 }
+            }
+            if (f.hasRaft && f.tick >= srvTick)
+            {
+                srvTick = f.tick;
+                srv = f.raft.x; srvZ = f.raft.z; srvH = f.raft.heading; srvVx = f.raft.vx; srvVz = f.raft.vz; srvYaw = f.raft.yawRate;
+                srvRecv = Time.unscaledTimeAsDouble;
+                srvRunning = f.phase == MatchPhase.Running;
+                havePred = true;
             }
             if (f.hasRaft)
             {
@@ -196,7 +206,7 @@ namespace Mottainai.Client
         void LateUpdate()
         {
             if (!clockInit) return;
-            double nowTicks = Time.unscaledTimeAsDouble * NetConst.TickRate;
+            double nowTicks = Time.unscaledTimeAsDouble * TickRate;
             double diff = baseOffset - smoothOffset;
             smoothOffset = System.Math.Abs(diff) > 12 ? baseOffset : smoothOffset + diff * Mathf.Min(1f, Time.unscaledDeltaTime * 2f);
             float target = Mathf.Max(1f, jitterTicks) + 0.35f;
@@ -204,6 +214,8 @@ namespace Mottainai.Client
             RenderTick = nowTicks + smoothOffset - delayTicks;
 
             UpdateRaft();
+            if (PredictOwnRaft && havePred && srvRunning) ApplyPrediction();
+            else PredictionLeadMs = 0f;
             for (int k = active.Count - 1; k >= 0; k--)
             {
                 int id = active[k];
@@ -221,6 +233,74 @@ namespace Mottainai.Client
             }
             UpdateCamera();
             water.Follow(RaftPos, DirtPoints());
+        }
+
+        // ---------------- own-raft prediction (hides RTT for paddlers) ----------------
+        public bool PredictOwnRaft = true;
+        public int Seed;
+        public float RttMs;
+        public float PredictionLeadMs { get; private set; }
+        uint srvTick;
+        float srv, srvZ, srvH, srvVx, srvVz, srvYaw;
+        double srvRecv;
+        bool havePred, srvRunning;
+        readonly RaftSim pred = new RaftSim();
+        struct LocalStroke { public double t; public bool left, back; public float power; }
+        readonly List<LocalStroke> localStrokes = new List<LocalStroke>(16);
+        Vector3 predErr, lastDisplayed;
+        float predErrH, lastDisplayedH;
+        uint lastPredTick;
+
+        /// Register a stroke sent by this client so the raft reacts this frame instead of after a round trip.
+        public void PredictStroke(bool left, float power, bool back)
+        {
+            localStrokes.Add(new LocalStroke { t = Time.unscaledTimeAsDouble, left = left, back = back, power = power });
+            if (localStrokes.Count > 12) localStrokes.RemoveAt(0);
+        }
+
+        void ApplyPrediction()
+        {
+            var t = GameTuning.Current;
+            double now = Time.unscaledTimeAsDouble;
+            float oneWay = Mathf.Clamp(RttMs * 0.0005f, 0f, 0.15f);
+            float lead = Mathf.Clamp((float)(now - srvRecv) + oneWay, 0f, 0.25f);
+            PredictionLeadMs = lead * 1000f;
+            pred.SetFromServer(srv, srvZ, srvH, srvVx, srvVz, srvYaw, Seed, t);
+            double t0 = now - lead; // local-clock time matching the server state
+            double ackBefore = srvRecv - 2f * oneWay; // strokes older than this are already in the server state
+            for (int i = localStrokes.Count - 1; i >= 0; i--) if (localStrokes[i].t < now - 1.0) localStrokes.RemoveAt(i);
+            const float step = 1f / 60f;
+            double simT = t0;
+            int next = 0;
+            while (simT < now - 1e-4)
+            {
+                float dt = (float)System.Math.Min(step, now - simT);
+                for (; next < localStrokes.Count; next++)
+                {
+                    var s = localStrokes[next];
+                    if (s.t > simT + dt) break;
+                    if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t);
+                }
+                pred.Step(dt, Seed, t);
+                simT += dt;
+            }
+            for (; next < localStrokes.Count; next++)
+            {
+                var s = localStrokes[next];
+                if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t);
+            }
+            var p = new Vector3(pred.x, 0f, pred.z);
+            float dtf = Time.unscaledDeltaTime;
+            // smooth corrections when a new authoritative state arrives (no visible snapping)
+            if (srvTick != lastPredTick && lastPredTick != 0) { predErr = lastDisplayed - p; predErrH = lastDisplayedH - pred.heading; }
+            lastPredTick = srvTick;
+            float k = Mathf.Exp(-12f * dtf);
+            predErr *= k; predErrH *= k;
+            if (predErr.sqrMagnitude > 9f) predErr = Vector3.zero; // teleport-size error: snap
+            RaftPos = p + predErr;
+            RaftHeading = pred.heading + predErrH;
+            lastDisplayed = RaftPos; lastDisplayedH = RaftHeading;
+            raftView.SetPose(RaftPos, RaftHeading);
         }
 
         // provides waste positions to the water dirt tint without allocations

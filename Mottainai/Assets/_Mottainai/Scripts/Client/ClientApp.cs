@@ -49,6 +49,8 @@ namespace Mottainai.Client
             sfx = gameObject.AddComponent<Sfx>();
             gameObject.AddComponent<PerfGovernor>();
             input = gameObject.AddComponent<GestureInput>();
+            // match the display (120 Hz phones -> lower touch-to-photon latency); PerfGovernor protects low-end devices
+            Application.targetFrameRate = Mathf.Clamp(Mathf.RoundToInt((float)Screen.currentResolution.refreshRateRatio.value), 60, 120);
             playerName = PlayerPrefs.GetString("name", "Player" + Random.Range(10, 99));
             serverHost = PlayerPrefs.GetString("server", Application.isEditor ? "127.0.0.1" : "");
             token = PlayerPrefs.GetString("token", "");
@@ -255,6 +257,8 @@ namespace Mottainai.Client
             myRole = info.role;
             if (world == null) world = WorldView.Create(content);
             world.ResetWorld();
+            world.TickRate = info.tickRate; world.Seed = info.seed;
+            net.TickRate = info.tickRate;
             world.raftView.SetLocalRole(myRole);
             input.role = myRole;
             input.active = true;
@@ -366,6 +370,7 @@ namespace Mottainai.Client
         {
             if (screen != UiScreen.Game || world == null) return;
             net.SendStroke(power, back);
+            if (hudPhase == MatchPhase.Running) world.PredictStroke(myRole == Role.LeftPaddler, power, back);
             lastLocalStroke = Time.time;
             world.raftView.Stroke(myRole, back);
             world.fx.Splash(world.raftView.PaddleTip(myRole == Role.LeftPaddler), false);
@@ -421,7 +426,7 @@ namespace Mottainai.Client
         {
             float dt = Time.unscaledDeltaTime;
             bool inMatch = screen == UiScreen.Game;
-            if (world != null) net.stats.InterpMs = world.InterpMs;
+            if (world != null) { net.stats.InterpMs = world.InterpMs; world.RttMs = net.stats.RttAvg; }
             net.Tick(dt, inMatch);
             NetworkInfo.Provider.Refresh();
 

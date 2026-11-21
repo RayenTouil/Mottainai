@@ -23,6 +23,7 @@ namespace Mottainai.Server
 
     public class Room
     {
+        public static int TickRate = NetConst.TickRate;
         public readonly string code;
         public readonly List<Session> members = new List<Session>();
         public ulong creator;
@@ -74,7 +75,7 @@ namespace Mottainai.Server
                 if (m.role == Role.None && m.Connected) m.role = FirstFreeRole();
             var t = GameTuning.Current;
             int seed = Random.Range(1, int.MaxValue);
-            sim = new MatchSim(seed, t, new Coop2MinMode(t));
+            sim = new MatchSim(seed, t, new Coop2MinMode(t)) { TickRate = TickRate };
             foreach (Role r in new[] { Role.LeftPaddler, Role.RightPaddler, Role.Collector })
             {
                 var h = Holder(r);
@@ -89,7 +90,7 @@ namespace Mottainai.Server
         public void SendMatchStart(Session m)
         {
             if (!m.Connected || sim == null) return;
-            var info = new MatchStartInfo { code = code, seed = sim.Seed, role = m.role, team = 0, duration = sim.Mode.Config.duration, countdown = sim.CountdownLeft };
+            var info = new MatchStartInfo { code = code, seed = sim.Seed, tickRate = (byte)TickRate, role = m.role, team = 0, duration = sim.Mode.Config.duration, countdown = sim.CountdownLeft };
             var w = NetBus.Begin(Msg.MatchStart, 64);
             Codec.WriteMatchStart(ref w, info);
             NetBus.ToClient(m.clientId, w, NetworkDelivery.ReliableSequenced);

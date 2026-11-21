@@ -10,6 +10,16 @@ namespace Mottainai.Gameplay
         bool lastLeftBack, lastRightBack;
         public float worldVx, worldVz;
 
+        /// Client prediction: rebuild from an authoritative snapshot (world velocity -> velocity relative to water).
+        public void SetFromServer(float px, float pz, float h, float worldVx_, float worldVz_, float yaw, int seed, TuningData t)
+        {
+            x = px; z = pz; heading = h; yawRate = yaw;
+            var flow = FlowField.Sample(seed, px, pz, t);
+            vx = worldVx_ - flow.x; vz = worldVz_ - flow.y;
+            worldVx = worldVx_; worldVz = worldVz_;
+            lastLeft = lastRight = -99f;
+        }
+
         public void CopyFrom(RaftSim o)
         {
             x = o.x; z = o.z; heading = o.heading; vx = o.vx; vz = o.vz; yawRate = o.yawRate;

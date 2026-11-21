@@ -6,7 +6,8 @@ namespace Mottainai.Gameplay
     /// Authoritative match simulation (server only drives it). No Unity scene objects.
     public class MatchSim
     {
-        public const int HistoryTicks = 16;
+        public const int HistoryTicks = 32;
+        public int TickRate = NetConst.TickRate;
 
         public TuningData T;
         public IGameMode Mode;
@@ -225,7 +226,7 @@ namespace Mottainai.Gameplay
             if (Phase != MatchPhase.Running || Time < team.netReadyAt) return false;
             team.netReadyAt = Time + T.netCooldown;
             team.score.throws++;
-            int back = Mathf.RoundToInt(rewindSec * NetConst.TickRate);
+            int back = Mathf.RoundToInt(rewindSec * TickRate);
             Vector2 raftPos = HistoricRaft(back);
             Vector2 land;
             float range = T.netRange;

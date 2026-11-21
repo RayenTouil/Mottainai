@@ -51,6 +51,7 @@ namespace Mottainai.Server
             if (File.Exists(tuningOverride)) GameTuning.ApplyJson(File.ReadAllText(tuningOverride));
             else File.WriteAllText(tuningOverride, GameTuning.ToJson());
 
+            Room.TickRate = Mathf.Clamp(a.tick, 10, 120);
             rooms = new RoomManager(log);
             ips = NetUtil.LocalIPv4();
 

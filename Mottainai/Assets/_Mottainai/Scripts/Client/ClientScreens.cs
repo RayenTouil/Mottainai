@@ -511,7 +511,8 @@ namespace Mottainai.Client
                 sb.Clear();
                 sb.Append($"<size=30><b><color={badgeColor}>{ni.NetworkType}</color></b></size>   slice: <b>{ni.SliceStatus}</b>\n");
                 sb.Append($"RTT avg <b>{s.RttAvg:F1}</b>  p95 <b>{s.RttP95:F1}</b>  jitter {s.Jitter:F1} ms\n");
-                sb.Append($"Server tick {s.ServerTick}   snapshots {s.SnapshotRate:F0}/s\n");
+                sb.Append($"Tick {(world != null ? world.TickRate : 60)} Hz  #{s.ServerTick}   snapshots {s.SnapshotRate:F0}/s\n");
+                sb.Append(world != null && world.PredictionLeadMs > 0 ? $"Raft prediction ON  lead {world.PredictionLeadMs:F0} ms\n" : "Raft prediction idle\n");
                 sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps\n");
                 sb.Append($"Packets {s.Pps:F0}/s   Loss {s.LossPct:F1}%\n");
                 sb.Append($"Interp buffer {(world != null ? world.InterpMs : 0):F0} ms (jitter p95 {(world != null ? world.JitterMs : 0):F0})\n");
