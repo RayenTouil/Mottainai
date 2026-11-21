@@ -17,10 +17,20 @@ namespace Mottainai.App
             Application.targetFrameRate = 60;
             Application.runInBackground = true;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            primary = true;
+        }
 
+        bool primary;
+
+        // Start (not Awake): NGO registers its message types in an AfterSceneLoad callback.
+        void Start()
+        {
+            if (!primary) return;
+            if (!AppHooks.ServerAvailable)
+                System.Type.GetType("Mottainai.Server.ServerEntry, Mottainai.Server")?.GetMethod("Register")?.Invoke(null, null);
             var args = LaunchArgs.Parse(System.Environment.GetCommandLineArgs());
 #if UNITY_SERVER || MOTTAINAI_SERVER_BUILD
-            args.server = true;
+            args.server = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-client") < 0;
 #endif
             if (Application.isBatchMode) args.headless = true;
 

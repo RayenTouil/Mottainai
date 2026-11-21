@@ -10,6 +10,8 @@
 *.controller text merge=unityyamlmerge eol=lf
 *.meta     text eol=lf
 *.cs       text diff=csharp
+*.sh       text eol=lf
+*.bat      text eol=crlf
 
 # ---- Git LFS: large binary assets ----
 # 3D models

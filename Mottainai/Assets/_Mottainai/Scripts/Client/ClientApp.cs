@@ -71,8 +71,61 @@ namespace Mottainai.Client
             input.OnDevStroke += side => { if (side == myRole) LocalStroke(0.85f, false); };
             input.OnDevThrow += () => { if (myRole == Role.Collector && world != null) ThrowDirection(world.CameraFlatForward); };
 
+            var cli = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i < cli.Length; i++)
+            {
+                if (cli[i] == "-autoplay") autoplay = true;
+                if (cli[i] == "-connect" && i + 1 < cli.Length) { serverHost = cli[i + 1]; hostInEditor = false; }
+                if (cli[i] == "-name" && i + 1 < cli.Length) playerName = cli[i + 1];
+            }
+
             BuildUi();
             Show(UiScreen.Login);
+            if (autoplay) StartCoroutine(AutoPlay());
+        }
+
+        // ---------------- smoke test: -autoplay -connect <ip> ----------------
+        bool autoplay;
+
+        IEnumerator AutoPlay()
+        {
+            hostInEditor = false;
+            yield return null;
+            nameInput.text = playerName; serverInput.text = serverHost;
+            Debug.Log($"[AUTOPLAY] login to {serverHost} as {playerName}");
+            StartLogin();
+            float t0 = Time.realtimeSinceStartup;
+            while (screen != UiScreen.Lobby && Time.realtimeSinceStartup - t0 < 90f) yield return null;
+            if (screen != UiScreen.Lobby) { Debug.LogError("[AUTOPLAY] FAIL: never reached lobby. " + loginStatus.text); Application.Quit(2); yield break; }
+            Debug.Log($"[AUTOPLAY] lobby reached; content {content.BytesTotal / 1048576f:F1} MB at {content.Mbps:F1} MB/s cached={content.FromCache}");
+            net.Simple(Msg.CreateRoom);
+            while (lobby == null || string.IsNullOrEmpty(lobby.code)) yield return null;
+            net.PickRole(Role.Collector);
+            yield return new WaitForSecondsRealtime(0.5f);
+            Debug.Log($"[AUTOPLAY] room {lobby.code}, starting");
+            net.Simple(Msg.StartMatch);
+            float logT = 0, throwT = 0;
+            while (results == null)
+            {
+                logT += Time.unscaledDeltaTime; throwT += Time.unscaledDeltaTime;
+                if (screen == UiScreen.Game && throwT > 0.7f && world != null)
+                {
+                    throwT = 0;
+                    var f = world.CameraFlatForward;
+                    ThrowDirection(Quaternion.Euler(0, Random.Range(-35f, 35f), 0) * f);
+                }
+                if (logT > 5f)
+                {
+                    logT = 0;
+                    var s = net.stats;
+                    Debug.Log($"[AUTOPLAY] screen={screen} tick={s.ServerTick} score={hudScore} left={hudTimeLeft:F0}s snaps={s.SnapshotRate:F0}/s down={s.DownKbps:F0}kbps up={s.UpKbps:F0}kbps pps={s.Pps:F0} rtt={s.RttAvg:F1}/{s.RttP95:F1}ms loss={s.LossPct:F1}% interp={s.InterpMs:F0}ms raft={(world != null ? world.RaftPos.ToString() : "-")}");
+                }
+                yield return null;
+            }
+            var r = results;
+            Debug.Log($"[AUTOPLAY] RESULT reason={r.reason} total={r.total} catch={r.catchScore} toxic=-{r.toxicPenalty} acc={r.Accuracy:P0} dist={r.distance:F0}m kg={r.kg:F1} dur={r.duration:F0}s counts={string.Join(",", r.counts)} rxMB={net.stats.TotalDownMB:F1}");
+            yield return new WaitForSecondsRealtime(2f);
+            Application.Quit(0);
         }
 
         // ---------------- flow ----------------

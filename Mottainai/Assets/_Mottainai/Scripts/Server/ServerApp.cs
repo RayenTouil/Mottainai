@@ -10,8 +10,8 @@ namespace Mottainai.Server
 {
     public static class ServerEntry
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void Register()
+        [UnityEngine.Scripting.Preserve, RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        public static void Register()
         {
             AppHooks.StartServer = args =>
             {

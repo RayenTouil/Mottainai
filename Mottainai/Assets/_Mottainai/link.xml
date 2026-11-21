@@ -1,0 +1,4 @@
+<linker>
+  <assembly fullname="Mottainai.Server" preserve="all"/>
+  <assembly fullname="Mottainai.Core" preserve="all"/>
+</linker>
