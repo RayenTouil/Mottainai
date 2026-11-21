@@ -35,3 +35,9 @@
 - Graphics: runtime URP Volume (bloom, neutral tonemap, color grading, vignette with hit/shield/sync pulses), procedural sky dome shader, water foam (banks, obstacles, raft wake) + glints, faceted procedural rocks/icebergs/trees, torus raft, hemispheric SH ambient. MSAA 4x on devices with ≥6 GB RAM.
 - Menus render the live 3D river (attract mode) behind translucent panels.
 - tools/compile_check.sh type-checks all scripts with Unity's bundled Roslyn while the editor is open (no batchmode needed).
+- v2: Cloudflare Worker `mottainai` on workers.dev subdomain `mottainai-server`; assets binding serves /pack/*, Worker-first for /api/* and /ws/*.
+- v2: RoomDO uses the WebSocket Hibernation API (ctx.acceptWebSocket); players restored from socket attachments after wake.
+- v2: Room colo learned via `https://cloudflare.com/cdn-cgi/trace` from inside the DO (edge colo = request.cf.colo).
+- v2: Snapshot = per-team raft block + 10-byte entities, window -15..+60 m; 30 Hz fallback when any STATS backlogMs > 100.
+- v2: Strings = u8 length + UTF-8; client→server STROKE/BACKPADDLE carry u8 power (0..255).
+- v2: npm install-scripts approved only for esbuild + workerd (wrangler requirements).
