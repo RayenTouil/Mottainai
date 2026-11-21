@@ -33,7 +33,7 @@ netsh advfirewall firewall add rule name="Mottainai UDP 7777" dir=in action=allo
 netsh advfirewall firewall add rule name="Mottainai TCP 8080" dir=in action=allow protocol=TCP localport=8080
 ```
 Also accept the Windows "allow access" popup on first launch (tick Private **and** Public if the 5G CPE network is classified Public).
-If the log says `[HTTP] ... localhost fallback`: LAN phones cannot log in (the local playit agent still can); run once as admin `netsh http add urlacl url=http://+:8080/ user=Everyone`.
+If the log says `[HTTP] localhost-only fallback`: TCP 8080 could not be bound on all interfaces (port busy?) and HTTP via playit/LAN gets 400; free the port or use `-http <port>` (and retarget the playit TCP tunnel).
 Linux: `sudo ufw allow 7777/udp && sudo ufw allow 8080/tcp`. (Network Lab echo uses the game port 7777.)
 
 ## 5. Reaching the laptop from phones on 5G SA

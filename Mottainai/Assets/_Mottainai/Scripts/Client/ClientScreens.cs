@@ -329,6 +329,7 @@ namespace Mottainai.Client
         void RunLab()
         {
             if (labBusy || lab.Running) return;
+            if (net.WantConnected && !net.Ready) { labPhase.text = "Reconnecting to the game server - try again in a moment"; return; }
             StartCoroutine(LabFlow());
         }
 

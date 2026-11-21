@@ -44,6 +44,31 @@ namespace Mottainai.Server
         [System.Runtime.InteropServices.DllImport("kernel32.dll")]
         static extern uint SetThreadExecutionState(uint esFlags);
 #endif
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool AttachConsole(uint pid);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GetStdHandle(int which);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern uint GetFileType(IntPtr h);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr sec, uint disposition, uint flags, IntPtr template);
+#endif
+
+        /// The Windows player is a GUI exe: without this, Console output never reaches the run_server.bat window.
+        static void AttachParentConsole()
+        {
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
+            try
+            {
+                var std = GetStdHandle(-11);
+                if (std != IntPtr.Zero && std != new IntPtr(-1) && GetFileType(std) != 0) return; // stdout already usable/redirected
+                if (!AttachConsole(0xFFFFFFFF)) return; // no parent console (double-click)
+                var con = CreateFileW("CONOUT$", 0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+                if (con == new IntPtr(-1)) return;
+                var fs = new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(con, true), FileAccess.Write, 1);
+                Console.SetOut(new StreamWriter(fs) { AutoFlush = true });
+            }
+            catch (Exception e) { Debug.LogWarning("[Server] console attach: " + e.Message); }
+#endif
+        }
 
         /// Windows: no system sleep while the server runs (main thread; display may still turn off).
         static void KeepAwake(bool on)
@@ -89,6 +114,7 @@ namespace Mottainai.Server
             http = new HttpApi(rooms, content, log) { gamePort = a.port };
             bool httpOk = http.Start(a.http);
             KeepAwake(true);
+            if (!a.host) AttachParentConsole();
 
             var sb = new StringBuilder();
             sb.AppendLine("==========================================================");

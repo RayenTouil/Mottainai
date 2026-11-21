@@ -30,7 +30,7 @@ namespace Mottainai.Server
             new System.Random(42).NextBytes(labBlock);
         }
 
-        /// "+"/"*" = 0.0.0.0. Fallback localhost: enough for the local playit agent, not for LAN clients.
+        /// "+"/"*" = 0.0.0.0, no admin needed with Mono, any Host header. Localhost fallback: Mono answers 400 to other Host names.
         public bool Start(int port)
         {
             foreach (var prefixes in new[] { new[] { $"http://+:{port}/" }, new[] { $"http://*:{port}/" }, new[] { $"http://localhost:{port}/", $"http://127.0.0.1:{port}/" } })
@@ -46,7 +46,7 @@ namespace Mottainai.Server
                     Bound = string.Join(" ", prefixes);
                     Debug.Log($"[HTTP] listening on {Bound}");
                     if (prefixes.Length > 1)
-                        Debug.LogWarning("[HTTP] all-interfaces bind refused (admin rights?) -> localhost fallback: the local playit agent can connect, LAN clients cannot.");
+                        Debug.LogWarning($"[HTTP] localhost-only fallback: requests via playit/LAN (other Host names) get HTTP 400. Free TCP {port} or start with -http <port> and retarget the playit TCP tunnel.");
                     return true;
                 }
                 catch (Exception e)
