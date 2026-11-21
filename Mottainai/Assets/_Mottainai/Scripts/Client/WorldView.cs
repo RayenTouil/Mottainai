@@ -536,7 +536,13 @@ namespace Mottainai.Client
         float smoothSpeed, fovKick, shake, sprayTimer, attractT;
         Transform sky, highlight;
         public PostFx postFx;
-        public bool Attract = true;
+        bool attract = true;
+        /// Menu fly-over mode. Entering it clears the previous match (entities, flyers, prediction).
+        public bool Attract
+        {
+            get => attract;
+            set { if (value && !attract) ResetWorld(); attract = value; }
+        }
         public bool AimAssist;
         public ushort HighlightId { get; private set; } = NetConst.NoEntity;
 
@@ -546,6 +552,9 @@ namespace Mottainai.Client
         // menus: slow river fly-over with the crew idling on the raft
         void UpdateAttract()
         {
+            if (highlight.gameObject.activeSelf) highlight.gameObject.SetActive(false);
+            raftView.SetShield(0f, 1f);
+            postFx.ShieldLeft = 0f;
             attractT += Time.deltaTime;
             RaftPos += new Vector3(0f, 0f, GameTuning.Current.currentSpeed * Time.deltaTime);
             RaftPos = new Vector3(Mathf.Sin(attractT * 0.25f) * 3f, 0f, RaftPos.z);
@@ -606,6 +615,8 @@ namespace Mottainai.Client
 
         public void SnapCamera()
         {
+            lastRaftPos = RaftPos;
+            smoothSpeed = 0f;
             camT.position = RaftPos + new Vector3(0, 6.3f, -9f);
             camT.rotation = Quaternion.LookRotation(RaftPos + new Vector3(0, 0.5f, 5f) - camT.position);
         }

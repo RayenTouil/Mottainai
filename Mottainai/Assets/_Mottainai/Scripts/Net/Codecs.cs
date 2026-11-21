@@ -305,7 +305,8 @@ namespace Mottainai.Net
             rd.ReadValueSafe(out m.team);
             rd.ReadValueSafe(out m.duration);
             rd.ReadValueSafe(out m.countdown);
-            rd.ReadValueSafe(out m.tickRate);
+            if (rd.Position < rd.Length) rd.ReadValueSafe(out m.tickRate); // tolerant: older servers omit it
+            if (m.tickRate < 10) m.tickRate = 60;
             return m;
         }
     }

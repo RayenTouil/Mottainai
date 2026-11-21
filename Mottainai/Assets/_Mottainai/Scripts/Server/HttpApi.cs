@@ -125,6 +125,12 @@ namespace Mottainai.Server
             int len = 0;
             foreach (var l in lines)
                 if (l.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) int.TryParse(l.Substring(15).Trim(), out len);
+            foreach (var l in lines)
+                if (l.StartsWith("Expect:", StringComparison.OrdinalIgnoreCase) && l.IndexOf("100-continue", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var cont = Encoding.ASCII.GetBytes("HTTP/1.1 100 Continue\r\n\r\n");
+                    s.Write(cont, 0, cont.Length);
+                }
             if (len > 0 && len < 1 << 20)
             {
                 req.body = new byte[len];
