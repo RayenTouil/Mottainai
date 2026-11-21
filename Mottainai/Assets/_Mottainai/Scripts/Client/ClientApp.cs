@@ -22,8 +22,9 @@ namespace Mottainai.Client
         NetworkLab lab;
         UiScreen screen;
 
-        string playerName, serverHost, token;
-        bool hostInEditor, forceDownload, netHudOn = true;
+        string playerName, token, gameHost, apiHost, linkLabel = "";
+        ushort gamePort, apiPort;
+        bool hostInEditor, forceDownload, netHudOn = true, labBusy;
         Role myRole;
         LobbyState lobby;
         MatchStartInfo match;
@@ -50,7 +51,10 @@ namespace Mottainai.Client
             gameObject.AddComponent<PerfGovernor>();
             input = gameObject.AddComponent<GestureInput>();
             playerName = PlayerPrefs.GetString("name", "Player" + Random.Range(10, 99));
-            serverHost = PlayerPrefs.GetString("server", Application.isEditor ? "127.0.0.1" : "192.168.1.100");
+            gameHost = PlayerPrefs.GetString("gameHost", "");
+            gamePort = (ushort)PlayerPrefs.GetInt("gamePort", NetConst.GamePort);
+            apiHost = PlayerPrefs.GetString("apiHost", "");
+            apiPort = (ushort)PlayerPrefs.GetInt("apiPort", NetConst.HttpPort);
             token = PlayerPrefs.GetString("token", "");
             hostInEditor = Application.isEditor && AppHooks.ServerAvailable && PlayerPrefs.GetInt("hostInEditor", 1) == 1;
             NetworkInfo.Provider.Refresh();
@@ -75,7 +79,9 @@ namespace Mottainai.Client
             for (int i = 0; i < cli.Length; i++)
             {
                 if (cli[i] == "-autoplay") autoplay = true;
-                if (cli[i] == "-connect" && i + 1 < cli.Length) { serverHost = cli[i + 1]; hostInEditor = false; }
+                if (cli[i] == "-connect" && i + 1 < cli.Length) { gameHost = apiHost = cli[i + 1]; hostInEditor = false; }
+                if (cli[i] == "-gameport" && i + 1 < cli.Length && ushort.TryParse(cli[i + 1], out var gp)) gamePort = gp;
+                if (cli[i] == "-apiport" && i + 1 < cli.Length && ushort.TryParse(cli[i + 1], out var ap)) apiPort = ap;
                 if (cli[i] == "-name" && i + 1 < cli.Length) playerName = cli[i + 1];
                 if (cli[i] == "-shots" && i + 1 < cli.Length) shotsDir = cli[i + 1];
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
@@ -105,19 +111,21 @@ namespace Mottainai.Client
         {
             hostInEditor = false;
             yield return null;
-            nameInput.text = playerName; serverInput.text = serverHost;
+            nameInput.text = playerName;
+            gameHostInput.text = gameHost; gamePortInput.text = gamePort.ToString();
+            apiHostInput.text = apiHost; apiPortInput.text = apiPort.ToString();
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-lab") >= 0)
             {
                 Show(UiScreen.Lab);
                 RunLab();
                 yield return null;
-                while (lab.Running) yield return null;
+                while (labBusy) yield return null;
                 var lr = lab.Result;
                 Debug.Log(lr == null ? "[AUTOPLAY] LAB failed" : $"[AUTOPLAY] LAB rtt avg {lr.rttAvg:F2} min {lr.rttMin:F2} p95 {lr.rttP95:F2} max {lr.rttMax:F2} jitter {lr.jitter:F2} loss {lr.loss:F1}% ({lr.received}/{lr.sent}) down {lr.downMbps:F0} Mbit/s ({lr.downMB:F1} MB in {lr.downSec:F2}s) csv={lab.CsvPath}");
                 Shot("lab");
                 yield return new WaitForSecondsRealtime(0.5f);
             }
-            Debug.Log($"[AUTOPLAY] login to {serverHost} as {playerName}");
+            Debug.Log($"[AUTOPLAY] login: game {gameHost}:{gamePort} api {apiHost}:{apiPort} as {playerName}");
             StartLogin();
             float t0 = Time.realtimeSinceStartup;
             while (screen != UiScreen.Lobby && Time.realtimeSinceStartup - t0 < 90f) yield return null;
@@ -164,20 +172,47 @@ namespace Mottainai.Client
         // ---------------- flow ----------------
         void StartLogin()
         {
+            if (labBusy) { SetStatus("Network Lab is running - wait for it to finish"); return; }
             playerName = string.IsNullOrWhiteSpace(nameInput.text) ? playerName : nameInput.text.Trim();
-            serverHost = string.IsNullOrWhiteSpace(serverInput.text) ? serverHost : serverInput.text.Trim();
+            ReadAddressFields();
             PlayerPrefs.SetString("name", playerName);
-            PlayerPrefs.SetString("server", serverHost);
             PlayerPrefs.SetInt("hostInEditor", hostInEditor ? 1 : 0);
             PlayerPrefs.Save();
             StartCoroutine(LoginFlow());
         }
 
-        void ParseHost(out string host, out int httpPort)
+        /// Login screen -> gameHost/gamePort (UDP) + apiHost/apiPort (HTTP), saved in PlayerPrefs.
+        /// Empty host = the other host, else 127.0.0.1. "name.ply.gg:12345" in a host field also sets its port.
+        void ReadAddressFields()
         {
-            host = serverHost; httpPort = NetConst.HttpPort;
-            int c = serverHost.LastIndexOf(':');
-            if (c > 0 && int.TryParse(serverHost.Substring(c + 1), out var p)) { host = serverHost.Substring(0, c); httpPort = p; }
+            ParseAddress(gameHostInput.text, gamePortInput.text, NetConst.GamePort, out var gh, out var gp);
+            ParseAddress(apiHostInput.text, apiPortInput.text, NetConst.HttpPort, out var ah, out var ap);
+            if (gh.Length == 0) gh = ah.Length > 0 ? ah : "127.0.0.1";
+            if (ah.Length == 0) ah = gh;
+            gameHost = gh; gamePort = gp; apiHost = ah; apiPort = ap;
+            gameHostInput.text = gameHost; gamePortInput.text = gamePort.ToString();
+            apiHostInput.text = apiHost; apiPortInput.text = apiPort.ToString();
+            PlayerPrefs.SetString("gameHost", gameHost); PlayerPrefs.SetInt("gamePort", gamePort);
+            PlayerPrefs.SetString("apiHost", apiHost); PlayerPrefs.SetInt("apiPort", apiPort);
+        }
+
+        static void ParseAddress(string hostText, string portText, ushort defPort, out string host, out ushort port)
+        {
+            host = (hostText ?? "").Trim();
+            int scheme = host.IndexOf("://", System.StringComparison.Ordinal);
+            if (scheme >= 0) host = host.Substring(scheme + 3);
+            host = host.TrimEnd('/');
+            if (!ushort.TryParse((portText ?? "").Trim(), out port) || port == 0) port = defPort;
+            int c = host.LastIndexOf(':');
+            if (c > 0 && host.IndexOf(':') == c && ushort.TryParse(host.Substring(c + 1), out var p) && p > 0) { port = p; host = host.Substring(0, c); }
+        }
+
+        /// In-editor host mode: game link is in-process, HTTP is the local listener.
+        void EffectiveAddresses(out string gh, out ushort gp, out string ah, out ushort ap)
+        {
+            bool local = AppHooks.ServerRunning && AppHooks.HostMode;
+            gh = local ? "127.0.0.1" : gameHost; gp = local ? NetConst.GamePort : gamePort;
+            ah = local ? "127.0.0.1" : apiHost; ap = local ? NetConst.HttpPort : apiPort;
         }
 
         IEnumerator LoginFlow()
@@ -187,12 +222,16 @@ namespace Mottainai.Client
             {
                 SetStatus("Starting local server...");
                 if (!AppHooks.StartServer(new LaunchArgs { server = true, host = true })) { SetStatus("Local server failed to start (port in use?)"); yield break; }
-                serverHost = "127.0.0.1";
                 yield return null;
             }
-            ParseHost(out var host, out var httpPort);
-            content.SetServer(host, httpPort);
+            EffectiveAddresses(out var gHost, out var gPort, out var aHost, out var aPort);
             Show(UiScreen.Download);
+            downloadTitle.text = $"Resolving {gHost}...";
+            string ip = null;
+            yield return NetClient.ResolveIPv4(gHost, 3f, (a, e) => { ip = a; error = e; });
+            if (ip == null) { Show(UiScreen.Login); SetStatus($"Game host \"{gHost}\" not resolved: {error}"); yield break; }
+            linkLabel = $"{gHost}:{gPort}";
+            content.SetServer(aHost, aPort);
             downloadTitle.text = "Logging in...";
             yield return content.DoLogin(playerName, token, e => error = e);
             if (error != null) { Show(UiScreen.Login); SetStatus(error); yield break; }
@@ -207,11 +246,11 @@ namespace Mottainai.Client
             downloadTitle.text = content.Status;
             yield return new WaitForSecondsRealtime(content.FromCache ? 0.4f : 1.2f);
 
-            downloadTitle.text = "Connecting (UDP " + content.Login.gamePort + ")...";
-            net.Connect(host, (ushort)content.Login.gamePort, token, playerName);
+            downloadTitle.text = $"Connecting UDP {gHost}:{gPort}...";
+            net.Connect(ip, gPort, token, playerName);
             float t0 = Time.realtimeSinceStartup;
             while (!net.Ready && Time.realtimeSinceStartup - t0 < 10f) yield return null;
-            if (!net.Ready) { net.Disconnect(); Show(UiScreen.Login); SetStatus($"UDP connect to {host}:{content.Login.gamePort} failed (firewall?)"); yield break; }
+            if (!net.Ready) { net.Disconnect(); Show(UiScreen.Login); SetStatus($"UDP connect to {gHost}:{gPort} ({ip}) failed - check game port / playit UDP tunnel"); yield break; }
             lobby = null;
             // build the 3D world now (texture upload hitch) so the match starts smoothly
             if (world == null) { world = WorldView.Create(content); world.gameObject.SetActive(false); }
@@ -232,8 +271,7 @@ namespace Mottainai.Client
             while (net.WantConnected && !net.Ready)
             {
                 SetStatus("Reconnecting...");
-                ParseHost(out var host, out _);
-                net.Connect(host, net.port, token, playerName);
+                net.Connect(net.address, net.port, token, playerName);
                 float t0 = Time.realtimeSinceStartup;
                 while (!net.Ready && Time.realtimeSinceStartup - t0 < 3f) yield return null;
             }

@@ -25,7 +25,7 @@ namespace Mottainai.Client
         public void SetServer(string host, int httpPort)
         {
             host = (host ?? "").Trim();
-            if (host.StartsWith("http")) BaseUrl = host.TrimEnd('/');
+            if (host.Contains("://")) BaseUrl = host.TrimEnd('/');
             else BaseUrl = $"http://{host}:{httpPort}";
         }
 

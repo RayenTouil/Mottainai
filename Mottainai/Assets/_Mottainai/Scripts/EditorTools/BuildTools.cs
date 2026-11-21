@@ -306,6 +306,8 @@ namespace Mottainai.EditorTools
                 el.SetAttribute("name", ns, perm);
                 root.PrependChild(el);
             }
+            // plain http:// to the playit TCP tunnel (also covered by insecureHttpOption = AlwaysAllowed)
+            if (root.SelectSingleNode("application") is XmlElement app) app.SetAttribute("usesCleartextTraffic", ns, "true");
             doc.Save(manifest);
         }
     }

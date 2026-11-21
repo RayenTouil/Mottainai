@@ -10,9 +10,9 @@ namespace Mottainai.Net
     {
         // client -> server
         Hello = 1, Input = 2, Stroke = 3, Throw = 4, Ping = 5, CreateRoom = 6, JoinRoom = 7, PickRole = 8,
-        SetReady = 9, StartMatch = 10, LeaveRoom = 11, BackToLobby = 12,
+        SetReady = 9, StartMatch = 10, LeaveRoom = 11, BackToLobby = 12, LabEcho = 13,
         // server -> client
-        Welcome = 32, Pong = 33, Lobby = 34, Error = 35, MatchStart = 36, Snapshot = 37, Events = 38, Results = 39
+        Welcome = 32, Pong = 33, Lobby = 34, Error = 35, MatchStart = 36, Snapshot = 37, Events = 38, Results = 39, LabEchoReply = 40
     }
 
     /// All gameplay traffic goes through NGO unnamed custom messages (1 byte type header).

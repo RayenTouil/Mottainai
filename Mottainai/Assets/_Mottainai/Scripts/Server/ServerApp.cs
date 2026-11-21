@@ -29,10 +29,9 @@ namespace Mottainai.Server
         LaunchArgs args;
         RoomManager rooms;
         HttpApi http;
-        EchoServer echo;
         ContentPack content;
         SessionLog log;
-        float acc, statusTimer;
+        float acc, statusTimer, consoleTimer = 5f, avgRtt;
         int ticksThisSecond, measuredTickRate;
         float tickSecond;
         List<string> ips = new List<string>();
@@ -40,6 +39,25 @@ namespace Mottainai.Server
         long lastBytes;
         float kbpsOut;
         GUIStyle big, small;
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        static extern uint SetThreadExecutionState(uint esFlags);
+#endif
+
+        /// Windows: no system sleep while the server runs (main thread; display may still turn off).
+        static void KeepAwake(bool on)
+        {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x00000001;
+            try
+            {
+                if (SetThreadExecutionState(on ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED : ES_CONTINUOUS) == 0) Debug.LogWarning("[Server] SetThreadExecutionState failed");
+                else if (on) Debug.Log("[Server] Windows sleep disabled while the server runs");
+            }
+            catch (Exception e) { Debug.LogWarning("[Server] SetThreadExecutionState: " + e.Message); }
+#endif
+        }
 
         public bool Launch(LaunchArgs a)
         {
@@ -67,19 +85,19 @@ namespace Mottainai.Server
             AppHooks.ServerStatus = () => banner;
 
             content = new ContentPack(root);
-            content.BuildAsync(GameTuning.ToJson(), new ServerJson { address = NetUtil.FirstIp(ips), gamePort = a.port, httpPort = a.http });
+            content.BuildAsync(GameTuning.ToJson(), new ServerJson());
             http = new HttpApi(rooms, content, log) { gamePort = a.port };
-            http.Start(a.http);
-            echo = new EchoServer();
-            echo.Start(NetConst.EchoPort);
+            bool httpOk = http.Start(a.http);
+            KeepAwake(true);
 
             var sb = new StringBuilder();
             sb.AppendLine("==========================================================");
             sb.AppendLine("  M O T T A I N A I   S E R V E R   (what a waste!)");
             sb.AppendLine("==========================================================");
-            sb.AppendLine($"  Game  UDP {a.port}   HTTP TCP {a.http}   Echo UDP {NetConst.EchoPort}   Tick {nm.NetworkConfig.TickRate} Hz");
-            sb.AppendLine("  Type one of these addresses on the phones:");
-            foreach (var ip in ips) sb.AppendLine("     >>>  " + ip);
+            sb.AppendLine($"  Game UDP 0.0.0.0:{a.port}   API HTTP {(httpOk ? http.Bound : $"FAILED on TCP {a.http} (port in use?)")}   Tick {nm.NetworkConfig.TickRate} Hz");
+            sb.AppendLine($"  Waiting for playit tunnels:  Custom UDP -> 127.0.0.1:{a.port}   TCP -> 127.0.0.1:{a.http}");
+            sb.AppendLine("  Phones: type the PUBLIC playit addresses (game host + port, API host + port). See PLAYIT.md");
+            if (ips.Count > 0) sb.AppendLine("  LAN/dev: " + string.Join("   ", ips));
             sb.AppendLine($"  Logs: {log.dir}");
             sb.AppendLine("==========================================================");
             banner = sb.ToString();
@@ -97,6 +115,17 @@ namespace Mottainai.Server
         {
             try
             {
+                if (type == Msg.LabEcho) // Network Lab ping burst: echoed on the game socket, no session needed
+                {
+                    r.ReadValueSafe(out int seq);
+                    r.ReadValueSafe(out double ct);
+                    var w = NetBus.Begin(Msg.LabEchoReply, 16);
+                    w.WriteValueSafe(seq);
+                    w.WriteValueSafe(ct);
+                    NetBus.ToClient(sender, w, NetworkDelivery.Unreliable);
+                    w.Dispose();
+                    return;
+                }
                 if (type == Msg.Hello)
                 {
                     r.ReadValueSafe(out string token);
@@ -187,6 +216,20 @@ namespace Mottainai.Server
                 http.roomsJson = rooms.RoomsJson();
                 http.statusJson = $"{{\"tick\":{measuredTickRate},\"rooms\":{rooms.rooms.Count},\"clients\":{rooms.byClient.Count},\"kbpsOut\":{kbpsOut:F0},\"httpBytes\":{http.BytesServed},\"content\":{(content.ready ? "true" : "false")}}}";
             }
+            consoleTimer -= Time.unscaledDeltaTime;
+            if (consoleTimer <= 0f && !args.host)
+            {
+                consoleTimer = 5f;
+                var nm = NetBus.NM;
+                float sum = 0; int n = 0;
+                foreach (var id in rooms.byClient.Keys)
+                {
+                    ulong rtt = nm.IsHost && id == nm.LocalClientId ? 0 : NetBus.Transport.GetCurrentRtt(id);
+                    if (rtt > 0) { sum += rtt; n++; }
+                }
+                avgRtt = n > 0 ? sum / n : 0f;
+                Console.WriteLine($"[STATUS] {DateTime.Now:HH:mm:ss}  players {rooms.byClient.Count}  rooms {rooms.rooms.Count}  tick {measuredTickRate} Hz  avg RTT {avgRtt:F0} ms  out {kbpsOut:F0} kbps");
+            }
         }
 
         void OnGUI()
@@ -196,9 +239,10 @@ namespace Mottainai.Server
             small ??= new GUIStyle(GUI.skin.label) { fontSize = 15, normal = { textColor = Color.white } };
             GUILayout.BeginArea(new Rect(12, 12, Screen.width - 24, Screen.height - 24));
             GUILayout.Label("MOTTAINAI SERVER", big);
-            foreach (var ip in ips) GUILayout.Label($"  {ip}   UDP {args.port} / HTTP {args.http}", big);
+            GUILayout.Label($"  UDP {args.port} + TCP {args.http} on 0.0.0.0  -  expose with playit tunnels (PLAYIT.md)", big);
+            if (ips.Count > 0) GUILayout.Label("  LAN/dev: " + string.Join("   ", ips), small);
             GUILayout.Space(8);
-            GUILayout.Label($"Tick {measuredTickRate} Hz   Clients {rooms.byClient.Count}   Rooms {rooms.rooms.Count}   Out {kbpsOut:F0} kbps   Content {(content.ready ? "ready" : "building...")}", small);
+            GUILayout.Label($"Tick {measuredTickRate} Hz   Players {rooms.byClient.Count}   Rooms {rooms.rooms.Count}   avg RTT {avgRtt:F0} ms   Out {kbpsOut:F0} kbps   Content {(content.ready ? "ready" : "building...")}", small);
             foreach (var room in rooms.rooms.Values)
             {
                 var sb = new StringBuilder($"  [{room.code}] {room.Phase}  ");
@@ -212,7 +256,7 @@ namespace Mottainai.Server
         void OnApplicationQuit()
         {
             http?.Stop();
-            echo?.Stop();
+            KeepAwake(false);
             log?.Event("server_stop", "", "");
         }
     }

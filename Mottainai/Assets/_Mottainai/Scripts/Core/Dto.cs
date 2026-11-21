@@ -8,7 +8,8 @@ namespace Mottainai
     [Serializable] public class RoomList { public RoomInfo[] rooms; }
     [Serializable] public class ContentFile { public string name; public long size; public string hash; }
     [Serializable] public class ContentManifest { public string version; public long totalBytes; public ContentFile[] files; }
-    [Serializable] public class ServerJson { public string address; public int gamePort; public int httpPort; }
+    /// Relative to the API host:port the client typed (server never knows its public playit address).
+    [Serializable] public class ServerJson { public string login = "/login", rooms = "/rooms", content = "/content/", telemetry = "/telemetry", labDownload = "/lab/download", labResult = "/lab/result"; }
 
     [Serializable]
     public class TelemetryDto

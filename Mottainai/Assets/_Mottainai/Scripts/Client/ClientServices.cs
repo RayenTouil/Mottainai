@@ -1,10 +1,6 @@
 using System;
 using System.Collections;
-using System.Diagnostics;
 using System.IO;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Rendering;
@@ -108,7 +104,7 @@ namespace Mottainai.Client
         public bool Dropped => dropped;
     }
 
-    /// Network Lab: 10 s UDP echo burst @100 Hz + 20 MB HTTP throughput test.
+    /// Network Lab: 10 s UDP echo burst @100 Hz on the game socket (same tunnel as gameplay) + 20 MB HTTP throughput test.
     public class NetworkLab
     {
         public bool Running { get; private set; }
@@ -124,67 +120,35 @@ namespace Mottainai.Client
             protected override bool ReceiveData(byte[] data, int dataLength) { bytes += dataLength; return true; }
         }
 
-        public IEnumerator Run(string host, string httpBase, string playerName, string net, string slice)
+        /// netLink must already be connected (lobby link or a ConnectLab link).
+        public IEnumerator Run(NetClient netLink, string httpBase, string playerName, string net, string slice)
         {
             Running = true;
             Result = null;
             Progress = 0;
-            Phase = "Ping burst (UDP echo, 100 Hz, 10 s)...";
+            Phase = "Ping burst (UDP echo on the game port, 100 Hz, 10 s)...";
             const int count = 1000;
             var rtts = new float[count];
-            int received = 0, sent = 0;
-            bool done = false;
-            string ip = host;
-            try { if (!IPAddress.TryParse(host, out _)) foreach (var a in Dns.GetHostAddresses(host)) if (a.AddressFamily == AddressFamily.InterNetwork) { ip = a.ToString(); break; } }
-            catch { }
-
-            var thread = new Thread(() =>
+            int sent = 0, received = 0;
+            Action<int, double> onEcho = (seq, t) =>
             {
-                try
-                {
-                    using var udp = new UdpClient();
-                    udp.Client.ReceiveTimeout = 50;
-                    udp.Connect(ip, NetConst.EchoPort);
-                    var sw = Stopwatch.StartNew();
-                    var recvThread = new Thread(() =>
-                    {
-                        var ep = new IPEndPoint(IPAddress.Any, 0);
-                        while (!done)
-                        {
-                            try
-                            {
-                                var d = udp.Receive(ref ep);
-                                if (d.Length < 12) continue;
-                                int seq = BitConverter.ToInt32(d, 0);
-                                long t0 = BitConverter.ToInt64(d, 4);
-                                if (seq >= 0 && seq < count && rtts[seq] == 0)
-                                {
-                                    rtts[seq] = (float)((sw.ElapsedTicks - t0) * 1000.0 / Stopwatch.Frequency);
-                                    Interlocked.Increment(ref received);
-                                }
-                            }
-                            catch (SocketException) { }
-                            catch (ObjectDisposedException) { return; }
-                        }
-                    }) { IsBackground = true };
-                    recvThread.Start();
-                    var buf = new byte[32];
-                    for (int i = 0; i < count; i++)
-                    {
-                        long due = (long)(i * 0.01 * Stopwatch.Frequency);
-                        while (sw.ElapsedTicks < due) Thread.Sleep(1);
-                        BitConverter.GetBytes(i).CopyTo(buf, 0);
-                        BitConverter.GetBytes(sw.ElapsedTicks).CopyTo(buf, 4);
-                        udp.Send(buf, buf.Length);
-                        sent = i + 1;
-                    }
-                    Thread.Sleep(500);
-                }
-                catch (Exception e) { Debug.LogWarning("[Lab] ping failed: " + e.Message); }
-                done = true;
-            }) { IsBackground = true };
-            thread.Start();
-            while (!done) { Progress = sent / (float)count * 0.5f; yield return null; }
+                if (seq < 0 || seq >= count || rtts[seq] > 0f) return;
+                rtts[seq] = Mathf.Max(0.001f, (float)((netLink.Now - t) * 1000.0));
+                received++;
+            };
+            netLink.OnLabEcho += onEcho;
+            double start = netLink.Now;
+            while (sent < count && netLink.LinkUp)
+            {
+                int due = Mathf.Min(count, (int)((netLink.Now - start) * 100.0) + 1);
+                while (sent < due) netLink.SendLabEcho(sent++);
+                Progress = sent / (float)count * 0.5f;
+                yield return null;
+            }
+            float tail = Time.realtimeSinceStartup + 0.5f;
+            while (received < sent && Time.realtimeSinceStartup < tail && netLink.LinkUp) yield return null;
+            netLink.OnLabEcho -= onEcho;
+            if (sent < count) Debug.LogWarning($"[Lab] game link lost after {sent} pings");
 
             int got = 0; float sum = 0, mn = float.MaxValue, mx = 0, jit = 0, prev = -1;
             var list = new System.Collections.Generic.List<float>(count);

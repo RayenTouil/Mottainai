@@ -15,7 +15,7 @@ namespace Mottainai.Client
         readonly Dictionary<UiScreen, GameObject> panels = new Dictionary<UiScreen, GameObject>();
 
         // login
-        TMP_InputField nameInput, serverInput;
+        TMP_InputField nameInput, gameHostInput, gamePortInput, apiHostInput, apiPortInput;
         TextMeshProUGUI loginStatus;
         Button hostToggle, forceToggle;
         // download
@@ -82,15 +82,16 @@ namespace Mottainai.Client
         void BuildLogin()
         {
             var p = Panel(UiScreen.Login, new Color(0.07f, 0.24f, 0.28f));
-            var col = Column(p.transform, 1000, 1000);
+            var col = Column(p.transform, 1000, 1040);
             var title = UIKit.Size(UIKit.Text(col, "MOTTAINAI", 130, new Color(0.55f, 0.95f, 0.6f)), 150);
             title.fontStyle = FontStyles.Bold;
             title.textWrappingMode = TextWrappingModes.NoWrap;
             title.overflowMode = TextOverflowModes.Overflow;
             title.characterSpacing = 12;
             UIKit.Size(UIKit.Text(col, "\"What a waste!\"  -  paddle together, clean the river", 38, UIKit.TextLight), 60);
-            nameInput = UIKit.Size(UIKit.Input(col, "Your name", playerName), 92);
-            serverInput = UIKit.Size(UIKit.Input(col, "Server IP (laptop)", serverHost), 92);
+            nameInput = UIKit.Size(UIKit.Input(col, "Your name", playerName), 84);
+            AddressRow(col, "GAME\n<size=20>UDP</size>", "Game host (playit UDP, e.g. abc.ply.gg)", gameHost, gamePort, out gameHostInput, out gamePortInput);
+            AddressRow(col, "API\n<size=20>HTTP</size>", "API host (playit TCP, e.g. xyz.ply.gg)", apiHost, apiPort, out apiHostInput, out apiPortInput);
             UIKit.Size(UIKit.Button(col, "PLAY", UIKit.Accent, StartLogin, 56), 120);
             var row = UIKit.Rect("Row", col);
             UIKit.HLayout(row, 16, 0);
@@ -103,6 +104,19 @@ namespace Mottainai.Client
             }
             loginStatus = UIKit.Size(UIKit.Text(col, "Landscape, 3 players per raft. Bots fill empty seats.", 32, new Color(1f, 0.9f, 0.6f)), 90);
             RefreshToggles();
+        }
+
+        void AddressRow(Transform col, string label, string hostHint, string host, ushort port, out TMP_InputField hostField, out TMP_InputField portField)
+        {
+            var row = UIKit.Rect("AddressRow", col);
+            UIKit.HLayout(row, 14, 0).childForceExpandWidth = false;
+            UIKit.Size(row, 84);
+            UIKit.Size(UIKit.Text(row, label, 28, UIKit.TextLight), -1, 120).fontStyle = FontStyles.Bold;
+            hostField = UIKit.Size(UIKit.Input(row, hostHint, host, 34), -1, -1, 1);
+            hostField.keyboardType = TouchScreenKeyboardType.URL;
+            portField = UIKit.Size(UIKit.Input(row, "port", port.ToString(), 34), -1, 190);
+            portField.contentType = TMP_InputField.ContentType.IntegerNumber;
+            portField.characterLimit = 5;
         }
 
         void RefreshToggles()
@@ -221,7 +235,7 @@ namespace Mottainai.Client
         void RefreshLobbyUi()
         {
             var ni = NetworkInfo.Provider;
-            lobbyHeader.text = $"Hi <b>{playerName}</b>  |  {content.Login?.serverName} @ {serverHost}  |  <color=#7CFC9A>{ni.NetworkType}</color>  slice: {ni.SliceStatus}";
+            lobbyHeader.text = $"Hi <b>{playerName}</b>  |  {content.Login?.serverName} @ {linkLabel}  |  <color=#7CFC9A>{ni.NetworkType}</color>  slice: {ni.SliceStatus}";
             bool inRoom = lobby != null && !string.IsNullOrEmpty(lobby.code) && lobby.players.Exists(x => x.clientId == net.ClientId);
             noRoomPanel.SetActive(!inRoom);
             roomPanel.SetActive(inRoom);
@@ -300,7 +314,7 @@ namespace Mottainai.Client
             var p = Panel(UiScreen.Lab, new Color(0.05f, 0.14f, 0.2f));
             var col = Column(p.transform, 1500, 900);
             UIKit.Size(UIKit.Text(col, "NETWORK LAB", 72, new Color(0.5f, 0.85f, 1f)), 100);
-            labPhase = UIKit.Size(UIKit.Text(col, "10 s UDP ping burst @100 Hz + 20 MB download from the edge server", 32, UIKit.TextLight), 60);
+            labPhase = UIKit.Size(UIKit.Text(col, "10 s UDP ping burst @100 Hz on the game port + 20 MB download from the server", 32, UIKit.TextLight), 60);
             var bar = UIKit.Size(UIKit.Image(col, new Color(1, 1, 1, 0.15f)), 40);
             labFill = UIKit.Image(bar.transform, UIKit.Accent2).rectTransform;
             labFill.anchorMin = Vector2.zero; labFill.anchorMax = new Vector2(0, 1); labFill.offsetMin = labFill.offsetMax = Vector2.zero;
@@ -314,12 +328,49 @@ namespace Mottainai.Client
 
         void RunLab()
         {
-            if (lab.Running) return;
-            serverHost = string.IsNullOrWhiteSpace(serverInput.text) ? serverHost : serverInput.text.Trim();
-            ParseHost(out var host, out var httpPort);
-            if (string.IsNullOrEmpty(content.BaseUrl)) content.SetServer(host, httpPort);
+            if (labBusy || lab.Running) return;
+            StartCoroutine(LabFlow());
+        }
+
+        /// Logged in: reuse the game link. Login screen: temporary bare link to the typed game host:port (same tunnel).
+        System.Collections.IEnumerator LabFlow()
+        {
+            labBusy = true;
+            bool tempLink = false;
+            if (!net.Ready)
+            {
+                ReadAddressFields();
+                PlayerPrefs.Save();
+                EffectiveAddresses(out var gh, out var gp, out var ah, out var ap);
+                content.SetServer(ah, ap);
+                labPhase.text = $"Resolving {gh}...";
+                string ip = null, err = null;
+                yield return NetClient.ResolveIPv4(gh, 3f, (a, e) => { ip = a; err = e; });
+                if (ip == null) { labPhase.text = $"Game host \"{gh}\" not resolved: {err}"; labBusy = false; yield break; }
+                labPhase.text = $"Connecting UDP {gh}:{gp}...";
+                net.ConnectLab(ip, gp);
+                tempLink = true;
+                float t0 = Time.realtimeSinceStartup;
+                while (!net.LinkUp && Time.realtimeSinceStartup - t0 < 6f) yield return null;
+                if (!net.LinkUp)
+                {
+                    labPhase.text = $"UDP connect to {gh}:{gp} ({ip}) failed - check game port / playit UDP tunnel";
+                    yield return CloseLabLink();
+                    labBusy = false;
+                    yield break;
+                }
+            }
             var ni = NetworkInfo.Provider;
-            StartCoroutine(lab.Run(host, content.BaseUrl, playerName, ni.NetworkType, ni.SliceStatus));
+            yield return lab.Run(net, content.BaseUrl, playerName, ni.NetworkType, ni.SliceStatus);
+            if (tempLink) yield return CloseLabLink();
+            labBusy = false;
+        }
+
+        System.Collections.IEnumerator CloseLabLink()
+        {
+            net.Disconnect();
+            float t0 = Time.realtimeSinceStartup;
+            while (NetBus.NM != null && NetBus.NM.IsListening && !NetBus.IsHost && Time.realtimeSinceStartup - t0 < 3f) yield return null;
         }
 
         void BuildHud()

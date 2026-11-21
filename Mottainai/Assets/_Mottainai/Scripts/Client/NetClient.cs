@@ -95,24 +95,43 @@ namespace Mottainai.Client
         public event Action<ResultsData> OnResults;
         public event Action<string> OnDisconnected;
         public event Action OnConnected;
+        public event Action<int, double> OnLabEcho;
 
         public string token, playerName, address;
         public ushort port;
         public ulong ClientId { get; private set; } = ulong.MaxValue;
         public bool Welcomed { get; private set; }
         public bool WantConnected { get; private set; }
+        public bool LinkUp => NetBus.IsHost || NetBus.IsConnectedClient;
 
         readonly SnapshotFrame frame = new SnapshotFrame();
         readonly List<MatchEvent> evBuffer = new List<MatchEvent>(64);
         float pingTimer, inputTimer;
         uint inputSeq;
+        bool labOnly;
         readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
         public double Now => clock.Elapsed.TotalSeconds;
 
-        public void Connect(string addr, ushort gamePort, string tok, string name)
+        /// ip: IPv4 literal from ResolveIPv4.
+        public void Connect(string ip, ushort gamePort, string tok, string name)
         {
-            address = addr; port = gamePort; token = tok; playerName = name;
+            token = tok; playerName = name;
             WantConnected = true;
+            labOnly = false;
+            StartTransport(ip, gamePort);
+        }
+
+        /// Bare game-socket link for the Network Lab: no Hello/session, no auto-reconnect.
+        public void ConnectLab(string ip, ushort gamePort)
+        {
+            WantConnected = false;
+            labOnly = true;
+            StartTransport(ip, gamePort);
+        }
+
+        void StartTransport(string ip, ushort gamePort)
+        {
+            address = ip; port = gamePort;
             Welcomed = false;
             var nm = NetBus.EnsureManager();
             NetBus.OnClient = Dispatch;
@@ -123,24 +142,41 @@ namespace Mottainai.Client
 
             if (nm.IsHost)
             {
-                SendHello();
+                if (!labOnly) SendHello();
                 return;
             }
             if (nm.IsListening) nm.Shutdown();
-            NetBus.Transport.SetConnectionData(true, ResolveIPv4(addr), gamePort);
+            if (!System.Net.IPAddress.TryParse(ip ?? "", out _)) { OnDisconnected?.Invoke($"Game host not resolved ({ip})"); return; }
+            NetBus.Transport.SetConnectionData(true, ip, gamePort);
             if (!nm.StartClient()) OnDisconnected?.Invoke("Could not start client");
         }
 
-        static string ResolveIPv4(string host)
+        /// Async DNS -> first IPv4, never blocks the main thread. done(ip, null) or done(null, error).
+        public static System.Collections.IEnumerator ResolveIPv4(string host, float timeout, Action<string, string> done)
         {
-            if (System.Net.IPAddress.TryParse(host, out _)) return host;
-            try
+            host = (host ?? "").Trim();
+            if (System.Net.IPAddress.TryParse(host, out var lit) && (host.Contains(":") || host.Split('.').Length == 4))
             {
-                foreach (var a in System.Net.Dns.GetHostAddresses(host))
-                    if (a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) return a.ToString();
+                if (lit.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) done(lit.ToString(), null);
+                else done(null, "IPv6 not supported - use an IPv4 address or a host name");
+                yield break;
             }
-            catch { }
-            return host == "localhost" ? "127.0.0.1" : host;
+            var task = System.Threading.Tasks.Task.Run(() => System.Net.Dns.GetHostAddresses(host));
+            float t0 = Time.realtimeSinceStartup;
+            while (!task.IsCompleted && Time.realtimeSinceStartup - t0 < timeout) yield return null;
+            if (!task.IsCompleted) { done(null, $"DNS timeout ({timeout:0} s)"); yield break; }
+            if (task.IsFaulted) { done(null, task.Exception?.GetBaseException().Message ?? "DNS error"); yield break; }
+            foreach (var a in task.Result)
+                if (a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) { done(a.ToString(), null); yield break; }
+            done(null, "no IPv4 address for this name");
+        }
+
+        public void SendLabEcho(int seq)
+        {
+            var w = NetBus.Begin(Msg.LabEcho, 16);
+            w.WriteValueSafe(seq);
+            w.WriteValueSafe(Now);
+            NetBus.ToServer(w, NetworkDelivery.Unreliable);
         }
 
         public void Disconnect()
@@ -156,7 +192,7 @@ namespace Mottainai.Client
             var nm = NetBus.NM;
             if (nm.IsServer || id != nm.LocalClientId) return;
             OnConnected?.Invoke();
-            SendHello();
+            if (!labOnly) SendHello();
         }
 
         void HandleDisconnected(ulong id)
@@ -193,6 +229,11 @@ namespace Mottainai.Client
                     r.ReadValueSafe(out double sent);
                     r.ReadValueSafe(out uint _);
                     stats.AddRtt((float)((Now - sent) * 1000.0));
+                    break;
+                case Msg.LabEchoReply:
+                    r.ReadValueSafe(out int seq);
+                    r.ReadValueSafe(out double echoed);
+                    OnLabEcho?.Invoke(seq, echoed);
                     break;
                 case Msg.Lobby: OnLobby?.Invoke(Codec.ReadLobby(r)); break;
                 case Msg.Error: r.ReadValueSafe(out string err); OnError?.Invoke(err); break;

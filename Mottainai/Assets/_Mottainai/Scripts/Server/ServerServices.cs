@@ -51,45 +51,6 @@ namespace Mottainai.Server
         }
     }
 
-    /// UDP echo for the Network Lab ping burst.
-    public class EchoServer
-    {
-        UdpClient udp;
-        Thread thread;
-        volatile bool running;
-        public long Echoed;
-
-        public void Start(int port)
-        {
-            try
-            {
-                udp = new UdpClient(new IPEndPoint(IPAddress.Any, port));
-                running = true;
-                thread = new Thread(Loop) { IsBackground = true, Name = "UdpEcho" };
-                thread.Start();
-            }
-            catch (Exception e) { Debug.LogError($"[Echo] cannot bind UDP {port}: {e.Message}"); }
-        }
-
-        void Loop()
-        {
-            var any = new IPEndPoint(IPAddress.Any, 0);
-            while (running)
-            {
-                try
-                {
-                    var data = udp.Receive(ref any);
-                    udp.Send(data, data.Length, any);
-                    Interlocked.Increment(ref Echoed);
-                }
-                catch (SocketException) { }
-                catch (ObjectDisposedException) { return; }
-            }
-        }
-
-        public void Stop() { running = false; try { udp?.Close(); } catch { } }
-    }
-
     /// Generates the downloadable Content Pack ("DLC"): tuning, server info, high-res water normal maps, raft skin.
     public class ContentPack
     {
@@ -233,7 +194,5 @@ namespace Mottainai.Server
             }
             return list;
         }
-
-        public static string FirstIp(List<string> ips) => ips.Count > 0 ? ips[0].Split(' ')[0] : "127.0.0.1";
     }
 }

@@ -18,9 +18,10 @@ namespace Mottainai.Server
         readonly SessionLog log;
         public volatile string roomsJson = "{\"rooms\":[]}";
         public volatile string statusJson = "{}";
-        public string serverName = "Mottainai Edge";
+        public string serverName = "Mottainai Server";
         public int gamePort;
         public long BytesServed;
+        public string Bound = "none";
         static readonly byte[] labBlock = new byte[1 << 20];
 
         public HttpApi(RoomManager rooms, ContentPack content, SessionLog log)
@@ -29,26 +30,28 @@ namespace Mottainai.Server
             new System.Random(42).NextBytes(labBlock);
         }
 
+        /// "+"/"*" = 0.0.0.0. Fallback localhost: enough for the local playit agent, not for LAN clients.
         public bool Start(int port)
         {
-            foreach (var prefix in new[] { $"http://*:{port}/", $"http://+:{port}/", $"http://localhost:{port}/" })
+            foreach (var prefixes in new[] { new[] { $"http://+:{port}/" }, new[] { $"http://*:{port}/" }, new[] { $"http://localhost:{port}/", $"http://127.0.0.1:{port}/" } })
             {
                 try
                 {
                     listener = new HttpListener();
-                    listener.Prefixes.Add(prefix);
+                    foreach (var p in prefixes) listener.Prefixes.Add(p);
                     listener.Start();
                     running = true;
                     thread = new Thread(Loop) { IsBackground = true, Name = "HttpApi" };
                     thread.Start();
-                    Debug.Log($"[HTTP] listening on {prefix}");
-                    if (prefix.Contains("localhost"))
-                        Debug.LogWarning("[HTTP] only localhost binding allowed - phones cannot log in. See DEPLOY.md (urlacl / run as admin).");
+                    Bound = string.Join(" ", prefixes);
+                    Debug.Log($"[HTTP] listening on {Bound}");
+                    if (prefixes.Length > 1)
+                        Debug.LogWarning("[HTTP] all-interfaces bind refused (admin rights?) -> localhost fallback: the local playit agent can connect, LAN clients cannot.");
                     return true;
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning($"[HTTP] prefix {prefix} failed: {e.Message}");
+                    Debug.LogWarning($"[HTTP] prefix {string.Join(" ", prefixes)} failed: {e.Message}");
                     try { listener?.Close(); } catch { }
                 }
             }

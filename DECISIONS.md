@@ -17,7 +17,7 @@
 - Dedicated Server module not installed for 6000.3 → Windows server = standard player built with `MOTTAINAI_SERVER_BUILD` (forces server mode; `-client` flag turns it back into a client for smoke tests). With the module installed, `BuildServerWindows/Linux` automatically use the Server subtarget. Linux build fails fast with a message if Linux module missing.
 - Server code lives in the `Mottainai.Server` assembly excluded from Android/iOS (equivalent to `#if UNITY_SERVER`); registered through `AppHooks` via reflection (Unity skipped its init attribute in player builds).
 - App start moved to `Start()` because NGO registers its message types in an AfterSceneLoad callback.
-- HTTP: Mono `HttpListener` on `http://*:8080/` (works without admin on Windows with Mono); falls back to `+` then `localhost` with a warning.
+- HTTP: Mono `HttpListener` on `http://+:8080/` (0.0.0.0, no admin needed with Mono), then `*`, then `localhost`+`127.0.0.1` fallback (enough for the local playit agent) with a warning.
 - Content Pack: tuning.json + server.json + two 2048² RGBA water normal maps + 1024² raft skin = 36 MB, generated procedurally by the server (Kenney textures not downloadable, see below), MD5-cached on device, "FORCE RE-DOWNLOAD" toggle.
 - Kenney/Quaternius CC0 kits: kenney.nl returns 403 / JS donation flow to scripted downloads → `VisualFactory` primitives are used (models dropped in `Resources/Models/<waste_plastic|obstacle_rock|...>` are picked up automatically).
 - SFX procedurally synthesized (fallback); CC0 clips in `Resources/Audio/<splash|catch|...>` override automatically.
@@ -25,7 +25,15 @@
 - TMP Essentials are extracted synchronously by SetupProject (AssetDatabase.ImportPackage is async and lost in batchmode).
 - Android permissions (READ_PHONE_STATE, ACCESS/CHANGE_NETWORK_STATE, VIBRATE) injected by an `IPostGenerateGradleAndroidProject` patcher; cleartext HTTP allowed (`insecureHttpOption`), min API 26, IL2CPP ARM64.
 - 5G detection + latency slice + haptics in a plain `.java` plugin (`Plugins/Android/NetInfoPlugin.java`) behind `INetworkInfoProvider`; iOS/desktop use `DefaultNetworkInfoProvider`.
-- Network Lab echo uses an extra UDP port 7778 (Lab runs before/without a game connection).
-- In-game RTT is measured with app-level ping/pong (includes frame quantization ~1 frame each side); Network Lab measures raw UDP RTT.
+- Network Lab echo goes through the game UDP socket (NGO messages `LabEcho`/`LabEchoReply`, handled before the session check); from the login screen the Lab opens a temporary game link without Hello. The UDP 7778 echo server is removed (only 2 tunnels needed).
+- In-game RTT and Network Lab RTT are both app-level over NGO on the game socket (include ~1 frame quantization each side).
 - Render scale starts at 1.0 and the PerfGovernor drops it to 0.8 after 3 s below 45 FPS; MSAA 2x, HDR and shadows off.
 - Battle-mode hooks: `IGameMode`, `ModeConfig`, `TeamState` list, `HealthComponent`, per-team `ScoreService`; course spawner is team-independent.
+- Hosting (branch `playit`): Windows server on a team PC exposed by playit.gg (Custom UDP -> 7777, TCP -> 8080); server code stays host-agnostic (binds 0.0.0.0).
+- Login screen: 4 fields (game host + UDP port, API host + HTTP port) in PlayerPrefs; empty host = the other host, else 127.0.0.1; `name.ply.gg:PORT` pasted in a host field also sets its port; `-connect/-gameport/-apiport` for smoke tests.
+- Game host resolved to IPv4 off the main thread (`Task.Run(Dns.GetHostAddresses)`, 3 s timeout) before `SetConnectionData`; reconnect reuses the resolved IP; the server-reported `gamePort` is ignored (local port, not the public tunnel port).
+- No absolute server URLs: all HTTP URLs are built from the API host:port the client typed; `server.json` in the Content Pack only lists relative endpoint paths (no LAN IP).
+- Windows server: `SetThreadExecutionState(ES_CONTINUOUS|ES_SYSTEM_REQUIRED)` while running; `[STATUS]` line on stdout every 5 s (players, rooms, tick, avg UTP RTT); banner says "Waiting for playit tunnels".
+- Android: cleartext HTTP via `insecureHttpOption = AlwaysAllowed` + `android:usesCleartextTraffic="true"` set by the manifest patcher.
+- Build scripts also find the editor in the Unity Hub custom install folder (`%APPDATA%\UnityHub\secondaryInstallPath.json`).
+- CLAUDE.md now says Motaine/_Motaine/com.supcom.motaine: code, folders and package id kept as Mottainai (rename is out of scope for the playit change).

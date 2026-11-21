@@ -11,7 +11,6 @@ namespace Mottainai
     {
         public const ushort GamePort = 7777;
         public const ushort HttpPort = 8080;
-        public const ushort EchoPort = 7778;
         public const int TickRate = 60;
         public const float TickDt = 1f / TickRate;
         public const int WasteTypeCount = 7;
