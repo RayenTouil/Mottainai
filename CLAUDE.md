@@ -7,14 +7,16 @@
 - Reuse before writing (Cloudflare templates/patterns, Unity built-ins, CC0 assets). Keep everything already working in the Unity client (visuals, UI, HUD, Android 5G plugin, VisualFactory, tuning) unless this spec replaces it.
 - Deadline: playable demo tomorrow. Priority: playable over 5G SA > 5G/latency showcase > visuals.
 - No scene/prefab hand-editing: generate from code/Editor scripts.
-- Log every default you pick in `DECISIONS-server.md` or `DECISIONS-client.md` (one line each).
+- Log every default you pick in `DECISIONS.md` (one line each).
 
-## 0b. Git (2 PCs, same repo) — MANDATORY
-- Repo root = folder containing this file. Unity project = `Mottainai/` (do not move/rename). New server = `server/`.
-- Ownership (prevents conflicts): PC-SERVER edits only `server/`, `PROTOCOL.md`, `DECISIONS-server.md`. PC-CLIENT edits only `Mottainai/`, root `*.bat/*.sh`, `DEPLOY.md`, `DECISIONS-client.md`. `CLAUDE.md` is read-only.
-- Before work and before every push: `git pull --rebase --autostash`. Commit + push after EVERY sub-task (`<S|C><phase>: <what>`). Never > 15 min unpushed.
-- Stop + PreCompact hooks in `.claude/settings.json` auto-push; do not edit them.
-- Context nearly full or user writes "STOP": push, write `HANDOFF-server.md` / `HANDOFF-client.md` (done / in progress / next, ≤15 lines), push, stop.
+## 0b. Git + backup PC — MANDATORY
+- Repo root = folder containing this file. Unity project = `Mottainai/` (do not move/rename). Cloudflare code = `server/`.
+- ONE PC does all the work (cloud code, deploy, Unity app, APK, phones). A second PC is only a BACKUP if this session's tokens run out: it must be able to resume from git alone.
+- `git pull --rebase --autostash` before work. Commit + push after EVERY sub-task (`<phase>: <what>`). Never > 15 min unpushed.
+- Keep `HANDOFF.md` always current (update at the end of every phase): done / in progress / exact next step / commands to resume / deployed URL. ≤ 20 lines.
+- Stop + PreCompact hooks in `.claude/settings.json` auto-push; do not edit them. `CLAUDE.md` is read-only.
+- Context nearly full or user writes "STOP": update HANDOFF.md, push, stop.
+- RESUME mode (backup PC): `git pull`, read HANDOFF.md, run `npx wrangler login` if deploying, continue from "exact next step". Do not redo finished phases.
 
 ## 0c. Why v2 (context, do not discuss)
 The local laptop server is REMOVED. Phones play on 5G SA mobile data (Wi-Fi OFF) → 5G SA core → Internet → Cloudflare edge. Constraints that shape v2:
@@ -51,7 +53,7 @@ Title MOTTAINAI ("What a waste!" tagline). English UI. Kids-friendly eco cartoon
 - Combo: 3 non-toxic catches within 3 s → ×1.5 next catch.
 - End screen: total, per-type counts (colored), toxic penalty, accuracy %, distance, "Ocean cleaned: X kg", network summary.
 
-## 5. Server design (PC-SERVER)
+## 5. Cloudflare server design
 Routes (Worker):
 - `GET /api/health` → `{ok, protocolVersion, colo}` (colo = `request.cf.colo`).
 - `POST /api/login {name}` → `{token, name}` (random token, stateless).
@@ -67,9 +69,9 @@ RoomDO (authoritative):
 - Bots fill empty roles at START and take over a disconnected role within 1 s; reconnect with same token within 60 s restores role. Bot paddler = "sync assist": mirrors the human paddler's stroke within 0.1 s 80% of the time and steers toward the free lane / nearest safe waste. Bot collector: nearest non-toxic waste in range, 70% accuracy, human-like delay 0.3–0.6 s.
 - On creation, RoomDO fetches `/cdn-cgi/trace` once to learn its colo; sends `roomColo` in WELCOME.
 - No humans for 30 s → stop interval, let DO hibernate.
-- `PROTOCOL.md` (first deliverable): message ids, binary layouts (little-endian), quantization, `PROTOCOL_VERSION`. Client checks it via `/api/health` and shows "Update app" on mismatch. Only PC-SERVER changes the protocol.
+- `PROTOCOL.md` (first deliverable): message ids, binary layouts (little-endian), quantization, `PROTOCOL_VERSION`. Client checks it via `/api/health` and shows "Update app" on mismatch. 
 
-## 6. Client design (PC-CLIENT)
+## 6. Unity app design
 - DELETE local-server stack: server-side C# (`#if UNITY_SERVER` code, Server assembly), dedicated server build targets/menu items, HttpListener/TcpListener, `run_server.*`, `build_server.*`, `firewall_open.bat`, `ServerData/`, NGO + Unity Transport packages and NetworkObject/NetworkPrefab generation, IP input field. Project must compile cleanly afterwards.
 - Add: `Net/WsClient` (ClientWebSocket, auto-reconnect with backoff), `Net/Protocol` (codec mirroring PROTOCOL.md), `Net/SnapshotBuffer` (adaptive interpolation delay = max(2 snapshot intervals, jitter p95)), entity pool keyed by entity id + type → VisualFactory. Local immediate feedback for own gestures (paddle anim, net VFX), server authoritative.
 - Screens: Title (name) → Content Pack download (live MB, MB/s, Mbit/s; cached by sha256; "Force re-download") → Main menu: QUICK PLAY (room DEMO) / CREATE ROOM / JOIN CODE / NETWORK LAB → Lobby (role pick with bot indicator, START) → Game → Results (REMATCH).
@@ -82,15 +84,16 @@ RoomDO (authoritative):
 Future: N teams, 5 min, HP instead of instant death, raft-vs-raft collisions. So server keeps `GameMode` (Coop2Min now), `ModeConfig {duration, teams[], hitsToGameOver, raftCollisions}`, per-team state/score/health; client renders N rafts from snapshot.
 
 ## 8. Scripts & deploy
-- `deploy_server.bat` (PC-SERVER): `cd server && npm i && npx wrangler deploy`, then writes the deployed URL into `server_config.json` and prints it. Also `npx wrangler tail` instructions in DEPLOY.md.
+- `deploy_server.bat`: `cd server && npm i && npx wrangler deploy`, then writes the deployed URL into `server_config.json` and prints it. Also `npx wrangler tail` instructions in DEPLOY.md.
 - `build_android.bat` (existing, keep working, output `Builds\Mottainai.apk`).
 - `install_phone.bat`: for every device in `adb devices` → `adb install -r Builds\Mottainai.apk` + launch `com.supcom.mottainai`.
 - `DEPLOY.md` (≤1 page): wrangler login/deploy, URL, phone test checklist (Wi-Fi OFF, mobile data ON, browser opens `<URL>/api/health`), Free-plan limits note.
 
-## 9. Phases (both PCs in parallel after S0)
-- **S0 (PC-SERVER, ≤30 min, unblocks client):** `PROTOCOL.md` + Worker skeleton deployed: health, login, rooms, RoomDO accepting WS with WELCOME + PING/PONG + fake moving snapshot stream, static pack placeholder. Write URL to `server_config.json`. Push.
-- **S1 (PC-SERVER):** full sim + bots + scoring + lag comp + real Content Pack + Network Lab endpoints + telemetry. Test with a Node script bot client (`server/tools/fakeclient.ts`) playing a full 2:00 match. Push.
-- **C1 (PC-CLIENT, start immediately with cleanup, then use S0 URL):** remove local stack, WebSocket client/codec/interpolation, screens, HUD, Network Lab, build + `install_phone.bat`. Push.
-- **I1 (both):** 2 phones on 5G SA mobile data, Wi-Fi OFF: Quick Play → full match with 1 bot → results. Fix until it passes 3 times in a row. Network Lab runs on Wi-Fi and 5G SA (and 4G if possible) → CSV.
+## 9. Phases (sequential, one PC)
+- **S0 (≤30 min):** `PROTOCOL.md` + Worker skeleton deployed: health, login, rooms, RoomDO accepting WS with WELCOME + PING/PONG + fake moving snapshot stream, static pack placeholder. Write URL to `server_config.json`. Push.
+- **C1:** Unity cleanup (remove local-server stack, NGO/UTP), WebSocket client/codec/interpolation, screens, HUD, Network Lab; build + `install_phone.bat`. EARLY PHONE CHECK: phone on 5G SA (Wi-Fi OFF) connects to the S0 skeleton and shows RTT + Edge/Room colo. Push.
+- **S1:** full sim in RoomDO + bots + scoring + lag comp + real Content Pack + Network Lab endpoints + telemetry. Test with `server/tools/fakeclient.ts` playing a full 2:00 match. Deploy. Push.
+- **C2:** bind client to the full sim (all entities, events, results, rematch). Build + install on both phones. Push.
+- **I1:** 2 phones on 5G SA mobile data, Wi-Fi OFF: Quick Play → full match with 1 bot → results. Fix until it passes 3 times in a row. Network Lab on Wi-Fi and 5G SA (and 4G if possible) → CSV.
 - **P1 (only after I1 passes):** polish (CC0 models, water shader, VFX/SFX, combo popups, onboarding hint, perf check).
-- **Definition of Done:** APK installs on both phones; both join DEMO over 5G SA; 2 humans + 1 bot complete a 2:00 match (or game over on hit); results screen; HUD shows 5G SA + Edge/Room colo + RTT; content pack download shows MB/s; Network Lab CSV downloadable from `/api/telemetry.csv`; everything pushed.
+- **Definition of Done:** APK installs on both phones; both join DEMO over 5G SA; 2 humans + 1 bot complete a 2:00 match (or game over on hit); results screen; HUD shows 5G SA + Edge/Room colo + RTT; content pack download shows MB/s; Network Lab CSV downloadable from `/api/telemetry.csv`; everything pushed; HANDOFF.md current.
