@@ -216,8 +216,8 @@ namespace Mottainai.Client
 
             var grass = VisualFactory.Lit(new Color(0.42f, 0.7f, 0.32f));
             var sand = VisualFactory.Lit(new Color(0.88f, 0.8f, 0.6f));
-            bankL = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(-hw - 6f, 0.4f, 0), new Vector3(10f, 1.2f, 170f)).transform;
-            bankR = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(hw + 6f, 0.4f, 0), new Vector3(10f, 1.2f, 170f)).transform;
+            bankL = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(-hw - 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
+            bankR = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(hw + 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
             sandL = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(-hw - 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
             sandR = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(hw + 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
 

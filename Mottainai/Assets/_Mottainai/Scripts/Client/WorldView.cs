@@ -53,6 +53,7 @@ namespace Mottainai.Client
         Transform camT;
         Vector3 camVel;
         WaterView water;
+        Scenery scenery;
         public FxSystem fx;
         public readonly Vector2[] flow = new Vector2[16];
 
@@ -127,6 +128,7 @@ namespace Mottainai.Client
             highlight.gameObject.SetActive(false);
 
             water = WaterView.Create(transform, content);
+            scenery = Scenery.Create(transform);
             raftView = RaftView.Create(transform, content);
             fx = new GameObject("Fx").AddComponent<FxSystem>();
             fx.transform.SetParent(transform, false);
@@ -316,6 +318,7 @@ namespace Mottainai.Client
             UpdateCamera();
             UpdateWaterFx();
             water.Follow(RaftPos);
+            scenery.Follow(RaftPos);
         }
 
         // ---------------- own-raft prediction (hides RTT for paddlers) ----------------
@@ -556,6 +559,7 @@ namespace Mottainai.Client
             if (sky != null) sky.position = camT.position;
             UpdateWaterFx();
             water.Follow(RaftPos);
+            scenery.Follow(RaftPos);
             UpdateWakeSpray(Time.deltaTime);
         }
 
