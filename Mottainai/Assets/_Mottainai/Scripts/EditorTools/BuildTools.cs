@@ -27,6 +27,7 @@ namespace Mottainai.EditorTools
         public static void SetupProject()
         {
             ImportTmpEssentials();
+            ReimportUrtShaders();
             EnsureTuning();
             ConfigureUrp();
             ConfigurePlayer();
@@ -96,6 +97,22 @@ namespace Mottainai.EditorTools
             int read = 0;
             while (read < len) { int r = s.Read(buf, read, len - read); if (r <= 0) break; read += r; }
             return read;
+        }
+
+        /// Unity 6.3 bug: package .urtshader files can be imported before their importer is registered
+        /// ("Host type is not matching any asset type"). A forced reimport fixes the cached artifact.
+        [MenuItem("Mottainai/Fix URP 'Host type' errors")]
+        public static void ReimportUrtShaders()
+        {
+            int n = 0;
+            foreach (var guid in AssetDatabase.FindAssets("", new[] { "Packages/com.unity.render-pipelines.core", "Packages/com.unity.render-pipelines.universal" }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!path.EndsWith(".urtshader")) continue;
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+                n++;
+            }
+            if (n > 0) Debug.Log($"[BuildTools] Reimported {n} .urtshader assets");
         }
 
         static void EnsureTuning()
