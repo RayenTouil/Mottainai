@@ -1,0 +1,1 @@
+{ "name": "Mottainai.Gameplay", "rootNamespace": "Mottainai", "references": ["Mottainai.Core"], "autoReferenced": true }

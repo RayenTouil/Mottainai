@@ -1,0 +1,1 @@
+{ "name": "Mottainai.Platform", "rootNamespace": "Mottainai", "references": ["Mottainai.Core"], "autoReferenced": true }

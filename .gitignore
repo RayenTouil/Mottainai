@@ -69,3 +69,5 @@ desktop.ini
 # Server builds / runtime logs
 /[Bb]uilds/
 /logs/
+
+/*/ServerData/

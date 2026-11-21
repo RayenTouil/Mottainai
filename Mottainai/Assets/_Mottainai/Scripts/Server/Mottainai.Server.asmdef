@@ -1,0 +1,1 @@
+{ "name": "Mottainai.Server", "rootNamespace": "Mottainai", "references": ["Mottainai.Core","Mottainai.Gameplay","Mottainai.Net","Unity.Netcode.Runtime","Unity.Networking.Transport","Unity.Collections"], "excludePlatforms": ["Android","iOS","WebGL"], "autoReferenced": true }
