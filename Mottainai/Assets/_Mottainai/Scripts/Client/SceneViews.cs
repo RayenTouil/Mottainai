@@ -26,16 +26,11 @@ namespace Mottainai.Client
         void Build(ContentService content)
         {
             var t = transform;
-            var hullMat = VisualFactory.Lit(new Color(1f, 0.55f, 0.2f));
-            var skin = content != null ? ContentService.LoadRaw(content.RaftSkin, false) : null;
-            if (skin != null)
-            {
-                hullMat = new Material(hullMat);
-                hullMat.SetTexture("_BaseMap", skin);
-                hullMat.SetColor("_BaseColor", Color.white);
-            }
-            VisualFactory.Part(t, VisualFactory.Cylinder, hullMat, new Vector3(0, 0.12f, 0), new Vector3(2.4f, 0.2f, 3.2f), default, "hull");
-            VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.25f, 0.35f, 0.45f)), new Vector3(0, 0.2f, 0), new Vector3(1.9f, 0.16f, 2.7f), default, "floor");
+            hullRenderer = VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.27f, 1.38f), VisualFactory.Lit(new Color(1f, 0.55f, 0.2f)), new Vector3(0, 0.24f, 0), Vector3.one, default, "hull").GetComponent<MeshRenderer>();
+            ApplyContent(content);
+            VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.06f, 1.38f, 40, 6), VisualFactory.Lit(new Color(0.95f, 0.95f, 0.9f)), new Vector3(0, 0.52f, 0), Vector3.one, default, "rope");
+            VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.2f, 0.3f, 0.42f)), new Vector3(0, 0.1f, 0), new Vector3(1.95f, 0.05f, 2.65f), default, "floor");
+            VisualFactory.Part(t, VisualFactory.Cube, VisualFactory.Lit(new Color(1f, 0.85f, 0.2f), 0.4f), new Vector3(0, 0.5f, 1.58f), new Vector3(0.5f, 0.12f, 0.12f), default, "bow");
             VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Transparent(new Color(0f, 0.08f, 0.12f, 0.3f)), new Vector3(0, 0.05f, 0), new Vector3(2.9f, 0.01f, 3.7f), default, "blobShadow");
 
             crew[1] = Crew(t, new Vector3(-0.72f, 0.35f, -0.35f), new Color(0.2f, 0.6f, 1f), out leftPaddle, -1);
@@ -51,6 +46,23 @@ namespace Mottainai.Client
             bubble.SetActive(false);
         }
 
+        MeshRenderer hullRenderer;
+        bool skinApplied;
+
+        /// Raft skin from the downloaded Content Pack.
+        public void ApplyContent(ContentService content)
+        {
+            if (skinApplied || content == null) return;
+            var skin = ContentService.LoadRaw(content.RaftSkin, false);
+            if (skin == null) return;
+            var m = new Material(hullRenderer.sharedMaterial);
+            m.SetTexture("_BaseMap", skin);
+            m.SetTextureScale("_BaseMap", new Vector2(1f, 1f));
+            m.SetColor("_BaseColor", Color.white);
+            hullRenderer.sharedMaterial = m;
+            skinApplied = true;
+        }
+
         Transform Crew(Transform parent, Vector3 pos, Color c, out Transform tool, int side)
         {
             var root = new GameObject("crew").transform;
@@ -58,6 +70,9 @@ namespace Mottainai.Client
             root.localPosition = pos;
             VisualFactory.Part(root, VisualFactory.Capsule, VisualFactory.Lit(c), new Vector3(0, 0.3f, 0), new Vector3(0.42f, 0.32f, 0.42f));
             VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(new Color(1f, 0.82f, 0.65f)), new Vector3(0, 0.78f, 0), Vector3.one * 0.34f);
+            VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(c * 0.85f + Color.white * 0.15f, 0.1f), new Vector3(0, 0.88f, -0.02f), new Vector3(0.37f, 0.22f, 0.37f), default, "helmet");
+            VisualFactory.Part(root, VisualFactory.Cylinder, VisualFactory.Lit(new Color(1f, 0.45f, 0.1f)), new Vector3(0, 0.36f, 0), new Vector3(0.47f, 0.17f, 0.47f), default, "vest");
+            VisualFactory.Part(root, VisualFactory.Cube, VisualFactory.Lit(new Color(0.95f, 0.95f, 0.9f), 0.3f), new Vector3(0, 0.36f, 0.22f), new Vector3(0.12f, 0.2f, 0.04f), default, "reflector");
             VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(Color.black), new Vector3(0.07f, 0.82f, 0.15f), Vector3.one * 0.05f);
             VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(Color.black), new Vector3(-0.07f, 0.82f, 0.15f), Vector3.one * 0.05f);
             tool = new GameObject("tool").transform;
@@ -151,6 +166,8 @@ namespace Mottainai.Client
         const float TreeSpacing = 8f;
         static readonly int DirtId = Shader.PropertyToID("_MottainaiDirt"), DirtCountId = Shader.PropertyToID("_MottainaiDirtCount");
         readonly Vector4[] dirtBuf = new Vector4[16];
+        static readonly int FoamId = Shader.PropertyToID("_MottainaiFoam"), FoamCountId = Shader.PropertyToID("_MottainaiFoamCount");
+        static readonly int WakeId = Shader.PropertyToID("_MottainaiWake"), WakeCountId = Shader.PropertyToID("_MottainaiWakeCount");
 
         public static WaterView Create(Transform parent, ContentService content)
         {
@@ -166,13 +183,12 @@ namespace Mottainai.Client
             var t = GameTuning.Current;
             var shader = Shader.Find("Mottainai/Water");
             mat = shader != null ? new Material(shader) : VisualFactory.Lit(new Color(0.2f, 0.55f, 0.7f));
-            var na = content != null ? ContentService.LoadRaw(content.WaterNormalA, true) : null;
-            var nb = content != null ? ContentService.LoadRaw(content.WaterNormalB, true) : null;
             if (shader != null)
             {
                 mat.SetFloat("_Flow", t.currentSpeed);
-                if (na != null && nb != null) { mat.SetTexture("_NormalA", na); mat.SetTexture("_NormalB", nb); mat.SetFloat("_HasMaps", 1f); }
+                mat.SetFloat("_HalfWidth", t.riverWidth * 0.5f);
             }
+            ApplyContent(content);
             float hw = t.riverWidth * 0.5f;
             var wgo = new GameObject("WaterMesh");
             wgo.transform.SetParent(transform, false);
@@ -196,10 +212,28 @@ namespace Mottainai.Client
                 var tr = new GameObject("tree").transform;
                 tr.SetParent(transform, false);
                 VisualFactory.Part(tr, VisualFactory.Cylinder, trunk, new Vector3(0, 1.2f, 0), new Vector3(0.35f, 1.2f, 0.35f));
-                if (i % 3 == 0) VisualFactory.Part(tr, VisualFactory.Cone, leaf[i % 3], new Vector3(0, 2f, 0), new Vector3(2f, 3.2f, 2f));
-                else VisualFactory.Part(tr, VisualFactory.Sphere, leaf[i % 3], new Vector3(0, 3f, 0), new Vector3(2.4f, 2.2f, 2.4f));
+                if (i % 3 == 0) VisualFactory.Part(tr, ProceduralMeshes.Pine(i % 4), leaf[i % 3], Vector3.zero, Vector3.one, new Vector3(0, i * 37, 0));
+                else
+                {
+                    VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5), leaf[i % 3], new Vector3(0, 3f, 0), new Vector3(2.8f, 2.4f, 2.8f), new Vector3(0, i * 53, 0));
+                    VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5 + 5), leaf[(i + 1) % 3], new Vector3(0.7f, 2.4f, 0.4f), new Vector3(1.6f, 1.4f, 1.6f));
+                }
+                if (i % 4 == 1) VisualFactory.Part(tr, ProceduralMeshes.Rock(i % 6 + 20), VisualFactory.Lit(new Color(0.55f, 0.53f, 0.5f)), new Vector3(1.6f, 0.1f, 0.8f), new Vector3(1.2f, 0.8f, 1.1f));
                 trees.Add(tr);
             }
+        }
+
+        bool mapsApplied;
+
+        /// High-res normal maps from the downloaded Content Pack.
+        public void ApplyContent(ContentService content)
+        {
+            if (mapsApplied || content == null || !mat.HasProperty("_NormalA")) return;
+            var na = ContentService.LoadRaw(content.WaterNormalA, true);
+            var nb = ContentService.LoadRaw(content.WaterNormalB, true);
+            if (na == null || nb == null) return;
+            mat.SetTexture("_NormalA", na); mat.SetTexture("_NormalB", nb); mat.SetFloat("_HasMaps", 1f);
+            mapsApplied = true;
         }
 
         static Mesh Grid(float w, float l, int nx, int nz)
@@ -224,7 +258,7 @@ namespace Mottainai.Client
             return m;
         }
 
-        public void Follow(Vector3 raft, List<Vector4> dirt)
+        public void Follow(Vector3 raft, List<Vector4> dirt, Vector4[] foam, int foamCount, Vector4[] wake, int wakeCount)
         {
             float z = Mathf.Floor(raft.z / 2f) * 2f;
             waterT.localPosition = new Vector3(0, 0, z);
@@ -251,6 +285,10 @@ namespace Mottainai.Client
             for (int i = 0; i < 16; i++) dirtBuf[i] = i < n ? dirt[i] : Vector4.zero;
             Shader.SetGlobalVectorArray(DirtId, dirtBuf);
             Shader.SetGlobalFloat(DirtCountId, n);
+            Shader.SetGlobalVectorArray(FoamId, foam);
+            Shader.SetGlobalFloat(FoamCountId, foamCount);
+            Shader.SetGlobalVectorArray(WakeId, wake);
+            Shader.SetGlobalFloat(WakeCountId, wakeCount);
         }
     }
 

@@ -11,6 +11,8 @@ Shader "Mottainai/Water"
         _WaveHeight ("Wave Height", Float) = 0.12
         _Flow ("Flow speed", Float) = 2.5
         _HasMaps ("Has Maps", Float) = 0
+        _HalfWidth ("River half width", Float) = 12
+        _FoamColor ("Foam", Color) = (0.95, 0.98, 1, 1)
     }
     SubShader
     {
@@ -30,10 +32,16 @@ Shader "Mottainai/Water"
             TEXTURE2D(_NormalB); SAMPLER(sampler_NormalB);
             CBUFFER_START(UnityPerMaterial)
                 float4 _Shallow, _Deep, _DirtColor;
-                float _NormalStrength, _WaveHeight, _Flow, _HasMaps;
+                float _NormalStrength, _WaveHeight, _Flow, _HasMaps, _HalfWidth;
+                float4 _FoamColor;
             CBUFFER_END
             float4 _MottainaiDirt[16];
             float _MottainaiDirtCount;
+            float4 _MottainaiFoam[16];
+            float _MottainaiFoamCount;
+            float4 _MottainaiWake[16];
+            float _MottainaiWakeCount;
+            float FoamNoise(float2 p) { return frac(sin(dot(floor(p), float2(12.9898, 78.233))) * 43758.5453); }
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings { float4 positionCS : SV_POSITION; float3 positionWS : TEXCOORD0; float3 waveN : TEXCOORD1; float fog : TEXCOORD2; };
@@ -96,6 +104,35 @@ Shader "Mottainai/Water"
                     dirt = max(dirt, saturate(1 - dist / d.z) * d.w);
                 }
                 col = lerp(col, _DirtColor.rgb, dirt * 0.65);
+                // depth tint: lighter, greener water near the banks
+                float edge = saturate((abs(i.positionWS.x) - (_HalfWidth - 3.5)) / 3.5);
+                col = lerp(col, col * float3(0.95, 1.08, 0.95) + 0.06, edge);
+                // foam: shoreline + obstacle rings + raft wake, broken up by animated cells
+                float2 fp = uv * 2.2 + float2(0, -t * _Flow * 0.9);
+                float cells = FoamNoise(fp) * 0.6 + FoamNoise(fp * 2.7 + 3.1) * 0.4;
+                float foam = smoothstep(_HalfWidth - 0.9, _HalfWidth + 0.2, abs(i.positionWS.x));
+                int fc = (int)_MottainaiFoamCount;
+                for (int q = 0; q < 16; q++)
+                {
+                    if (q >= fc) break;
+                    float4 f = _MottainaiFoam[q];
+                    float dd = distance(i.positionWS.xz, f.xy) - f.z;
+                    foam = max(foam, saturate(1 - abs(dd) / 0.55) * f.w + saturate(1 - max(dd, 0) / 2.2) * 0.35 * f.w);
+                }
+                int wc = (int)_MottainaiWakeCount;
+                for (int w = 0; w < 16; w++)
+                {
+                    if (w >= wc) break;
+                    float4 k = _MottainaiWake[w];
+                    float dd = distance(i.positionWS.xz, k.xy);
+                    float width = k.w * (1 + k.z * 1.8);
+                    foam = max(foam, saturate(1 - dd / width) * (1 - k.z) * 0.9);
+                }
+                foam *= step(0.45, cells + foam * 0.35);
+                col = lerp(col, _FoamColor.rgb, saturate(foam));
+                // sun glints
+                float glint = pow(saturate(dot(reflect(-v, n), l.direction)), 300) * step(0.92, FoamNoise(uv * 9 + t * 3));
+                col += glint * 1.5;
                 float3 h = normalize(l.direction + v);
                 float spec = pow(saturate(dot(n, h)), 96) * 1.2;
                 col += spec * l.color + fres * 0.25;

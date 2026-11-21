@@ -187,16 +187,30 @@ namespace Mottainai.Client
             switch (t)
             {
                 case ObstacleType.Rock:
-                    Part(root, Sphere, Lit(new Color(0.5f, 0.5f, 0.52f)), new Vector3(0, 0.1f, 0), new Vector3(2f * r, 1.3f * r, 1.8f * r), new Vector3(0, 30, 10));
+                {
+                    int v = Random.Range(0, 4);
+                    Part(root, ProceduralMeshes.Rock(v), Lit(new Color(0.52f, 0.5f, 0.5f)), new Vector3(0, 0.05f, 0), new Vector3(2.1f * r, 1.5f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
+                    Part(root, ProceduralMeshes.Rock(v + 4), Lit(new Color(0.45f, 0.44f, 0.46f)), new Vector3(0.55f * r, 0f, -0.3f * r), new Vector3(0.9f * r, 0.7f * r, 0.9f * r));
+                    Part(root, Cylinder, Transparent(new Color(1f, 1f, 1f, 0.35f)), new Vector3(0, 0.03f, 0), new Vector3(2.6f * r, 0.01f, 2.6f * r), default, "foam");
                     break;
+                }
                 case ObstacleType.BigRock:
-                    Part(root, Sphere, Lit(new Color(0.42f, 0.42f, 0.45f)), new Vector3(0, 0.3f, 0), new Vector3(2f * r, 1.6f * r, 1.9f * r), new Vector3(10, 0, 5));
-                    Part(root, Sphere, Lit(new Color(0.36f, 0.5f, 0.3f)), new Vector3(0.2f, 1.2f, 0.1f), new Vector3(1.4f, 0.4f, 1.2f));
+                {
+                    int v = Random.Range(0, 4);
+                    Part(root, ProceduralMeshes.Rock(v + 8), Lit(new Color(0.44f, 0.43f, 0.46f)), new Vector3(0, 0.25f, 0), new Vector3(2.1f * r, 1.7f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
+                    Part(root, ProceduralMeshes.Blob(v), Lit(new Color(0.33f, 0.55f, 0.28f)), new Vector3(0.2f, 1.55f * r * 0.8f, 0.1f), new Vector3(1.6f, 0.55f, 1.4f));
+                    Part(root, ProceduralMeshes.Rock(v + 12), Lit(new Color(0.5f, 0.49f, 0.5f)), new Vector3(-0.8f * r, 0f, 0.5f * r), new Vector3(0.8f * r, 0.6f * r, 0.8f * r));
+                    Part(root, Cylinder, Transparent(new Color(1f, 1f, 1f, 0.35f)), new Vector3(0, 0.03f, 0), new Vector3(2.5f * r, 0.01f, 2.5f * r), default, "foam");
                     break;
+                }
                 case ObstacleType.Iceberg:
-                    Part(root, Cube, Lit(new Color(0.92f, 0.97f, 1f), 0.15f), new Vector3(0, 0.4f, 0), new Vector3(2.2f, 1.6f, 2.2f), new Vector3(0, 45, 8));
-                    Part(root, Cube, Lit(new Color(0.8f, 0.92f, 1f), 0.15f), new Vector3(0.3f, 1.3f, 0), new Vector3(1.2f, 1.2f, 1.2f), new Vector3(20, 10, 30));
+                {
+                    int v = Random.Range(0, 4);
+                    Part(root, ProceduralMeshes.Iceberg(v), Lit(new Color(0.9f, 0.97f, 1f), 0.25f), new Vector3(0, 0.3f, 0), new Vector3(2.4f, 2.4f, 2.4f), new Vector3(0, Random.Range(0, 360), 0));
+                    Part(root, ProceduralMeshes.Iceberg(v + 4), Lit(new Color(0.7f, 0.88f, 1f), 0.3f), new Vector3(0.7f, 0.1f, 0.4f), new Vector3(1.2f, 1.3f, 1.2f));
+                    Part(root, Cylinder, Transparent(new Color(0.6f, 0.9f, 1f, 0.4f)), new Vector3(0, 0.02f, 0), new Vector3(4f, 0.01f, 4f), default, "foam");
                     break;
+                }
                 case ObstacleType.Wreck:
                     Part(root, Capsule, Lit(new Color(0.45f, 0.28f, 0.15f)), new Vector3(0, 0.2f, 0), new Vector3(2f * r, (hl + r), 1.6f * r), new Vector3(0, 0, 90));
                     Part(root, Cylinder, Lit(new Color(0.35f, 0.22f, 0.12f)), new Vector3(0.4f, 1.3f, 0), new Vector3(0.12f, 1.1f, 0.12f), new Vector3(0, 0, 12));

@@ -29,6 +29,8 @@ namespace Mottainai.Client
         readonly Button[] roomButtons = new Button[6];
         Button readyButton, startButton;
         // hud
+        RectTransform progressFill;
+        TextMeshProUGUI distanceText;
         TextMeshProUGUI scoreText, comboText, timerText, shieldText, bigText, hintText, toastText, badgeLetter, badgeName;
         Image badgeCircle;
         GameObject hintPanel;
@@ -81,7 +83,7 @@ namespace Mottainai.Client
 
         void BuildLogin()
         {
-            var p = Panel(UiScreen.Login, new Color(0.07f, 0.24f, 0.28f));
+            var p = Panel(UiScreen.Login, new Color(0.04f, 0.16f, 0.2f, 0.45f));
             var col = Column(p.transform, 1000, 1000);
             var title = UIKit.Size(UIKit.Text(col, "MOTTAINAI", 130, new Color(0.55f, 0.95f, 0.6f)), 150);
             title.fontStyle = FontStyles.Bold;
@@ -118,7 +120,7 @@ namespace Mottainai.Client
 
         void BuildDownload()
         {
-            var p = Panel(UiScreen.Download, new Color(0.06f, 0.18f, 0.24f));
+            var p = Panel(UiScreen.Download, new Color(0.04f, 0.14f, 0.2f, 0.6f));
             var col = Column(p.transform, 1200, 600);
             downloadTitle = UIKit.Size(UIKit.Text(col, "Downloading Content Pack", 60, UIKit.TextLight), 100);
             var bar = UIKit.Size(UIKit.Image(col, new Color(1, 1, 1, 0.15f)), 50);
@@ -131,7 +133,7 @@ namespace Mottainai.Client
 
         void BuildLobby()
         {
-            var p = Panel(UiScreen.Lobby, new Color(0.07f, 0.22f, 0.27f));
+            var p = Panel(UiScreen.Lobby, new Color(0.04f, 0.16f, 0.2f, 0.55f));
             lobbyHeader = UIKit.Text(p.transform, "", 34, UIKit.TextLight, TextAlignmentOptions.Left);
             UIKit.Place(lobbyHeader.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -20), new Vector2(1400, 60));
             var side = UIKit.Rect("Side", p.transform);
@@ -297,7 +299,7 @@ namespace Mottainai.Client
 
         void BuildLab()
         {
-            var p = Panel(UiScreen.Lab, new Color(0.05f, 0.14f, 0.2f));
+            var p = Panel(UiScreen.Lab, new Color(0.03f, 0.1f, 0.16f, 0.75f));
             var col = Column(p.transform, 1500, 900);
             UIKit.Size(UIKit.Text(col, "NETWORK LAB", 72, new Color(0.5f, 0.85f, 1f)), 100);
             labPhase = UIKit.Size(UIKit.Text(col, "10 s UDP ping burst @100 Hz + 20 MB download from the edge server", 32, UIKit.TextLight), 60);
@@ -330,6 +332,14 @@ namespace Mottainai.Client
             scoreText.fontStyle = FontStyles.Bold;
             comboText = UIKit.Text(root, "", 34, new Color(1f, 0.85f, 0.3f), TextAlignmentOptions.TopLeft);
             UIKit.Place(comboText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -110), new Vector2(600, 50));
+            var track = UIKit.Image(root, new Color(1f, 1f, 1f, 0.18f));
+            track.raycastTarget = false;
+            UIKit.Place(track.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -168), new Vector2(460, 22));
+            progressFill = UIKit.Image(track.transform, new Color(0.45f, 0.95f, 0.55f)).rectTransform;
+            progressFill.GetComponent<Image>().raycastTarget = false;
+            progressFill.anchorMin = Vector2.zero; progressFill.anchorMax = new Vector2(0, 1); progressFill.offsetMin = progressFill.offsetMax = Vector2.zero;
+            distanceText = UIKit.Text(root, "", 28, Color.white, TextAlignmentOptions.TopLeft);
+            UIKit.Place(distanceText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -196), new Vector2(600, 40));
 
             badgeCircle = UIKit.Image(root, Color.white, UIKit.Circle, "Badge");
             UIKit.Place(badgeCircle.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -16), new Vector2(130, 130));
@@ -401,7 +411,7 @@ namespace Mottainai.Client
             foreach (var kv in panels) kv.Value.SetActive(kv.Key == s);
             mainCanvas.gameObject.SetActive(s != UiScreen.Game);
             hudCanvas.gameObject.SetActive(s == UiScreen.Game);
-            if (world != null) world.gameObject.SetActive(s == UiScreen.Game || s == UiScreen.Results);
+            if (world != null && s != UiScreen.Game && s != UiScreen.Results) { world.Attract = true; world.AimAssist = false; }
             if (s != UiScreen.Game) input.active = false;
         }
 
@@ -467,6 +477,12 @@ namespace Mottainai.Client
             {
                 scoreText.text = $"SCORE {hudScore}";
                 comboText.text = hudCombo ? "COMBO READY x1.5" : "";
+                if (world != null)
+                {
+                    float dist = Mathf.Max(0f, world.RaftPos.z);
+                    progressFill.anchorMax = new Vector2(Mathf.Clamp01(dist / GameTuning.Current.courseLength), 1);
+                    distanceText.text = $"{dist:F0} m  /  {GameTuning.Current.courseLength:F0} m";
+                }
                 if (hudPhase == MatchPhase.Countdown) timerText.text = $"{Mathf.CeilToInt(hudTimeLeft)}";
                 else { int s = Mathf.CeilToInt(hudTimeLeft); timerText.text = $"{s / 60}:{s % 60:00}"; }
                 timerText.color = hudPhase == MatchPhase.Running && hudTimeLeft < 15f ? new Color(1f, 0.5f, 0.4f) : Color.white;

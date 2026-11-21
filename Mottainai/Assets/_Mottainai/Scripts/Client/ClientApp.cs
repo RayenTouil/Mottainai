@@ -31,6 +31,7 @@ namespace Mottainai.Client
         float hintUntil, telemetryTimer, roomsTimer, localThrowReady, lastLocalStroke, lastLocalThrow;
         int hudScore; float hudTimeLeft; MatchPhase hudPhase; bool hudCombo; float hudShield;
         bool reconnecting;
+        int syncStreak; float lastSyncTime;
         RoomInfo[] roomList = new RoomInfo[0];
 
         public static ClientApp Create()
@@ -83,6 +84,7 @@ namespace Mottainai.Client
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
             }
 
+            world = WorldView.Create(null); // live river behind the menus (attract mode)
             BuildUi();
             Show(UiScreen.Login);
             if (autoplay) StartCoroutine(AutoPlay());
@@ -216,7 +218,7 @@ namespace Mottainai.Client
             if (!net.Ready) { net.Disconnect(); Show(UiScreen.Login); SetStatus($"UDP connect to {host}:{content.Login.gamePort} failed (firewall?)"); yield break; }
             lobby = null;
             // build the 3D world now (texture upload hitch) so the match starts smoothly
-            if (world == null) { world = WorldView.Create(content); world.gameObject.SetActive(false); }
+            world.ApplyContent(content);
             Show(UiScreen.Lobby);
             RefreshLobbyUi();
         }
@@ -260,6 +262,8 @@ namespace Mottainai.Client
             world.TickRate = info.tickRate; world.Seed = info.seed;
             net.TickRate = info.tickRate;
             world.raftView.SetLocalRole(myRole);
+            world.Attract = false;
+            world.AimAssist = myRole == Role.Collector;
             input.role = myRole;
             input.active = true;
             net.stats.ResetAggregates();
@@ -315,7 +319,10 @@ namespace Mottainai.Client
                         }
                         break;
                     case EvType.Sync:
-                        Big("SYNC!", new Color(0.4f, 0.9f, 1f), 0.7f);
+                        syncStreak = Time.time - lastSyncTime < 2f ? syncStreak + 1 : 1;
+                        lastSyncTime = Time.time;
+                        Big(syncStreak > 1 ? $"SYNC x{syncStreak}!" : "SYNC!", Color.Lerp(new Color(0.4f, 0.9f, 1f), new Color(1f, 0.85f, 0.3f), Mathf.Clamp01((syncStreak - 1) / 4f)), 0.7f);
+                        world.SyncKick();
                         world.fx.Splash(raft.PaddleTip(true), true);
                         world.fx.Splash(raft.PaddleTip(false), true);
                         sfx.Play(Sfx.Id.Sync);
@@ -351,6 +358,7 @@ namespace Mottainai.Client
                         world.fx.Burst(new Vector3(e.x, 0.5f, e.z), new Color(0.55f, 0.4f, 0.3f), 30, 4f, 0.2f, 4f);
                         world.fx.Splash(world.RaftPos, true);
                         Big("CRASH!", new Color(1f, 0.4f, 0.3f), 1.5f);
+                        world.HitShake();
                         sfx.Play(Sfx.Id.Hit);
                         NetworkInfo.Provider.Vibrate(120);
                         break;

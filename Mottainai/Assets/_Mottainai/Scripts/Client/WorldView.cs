@@ -98,6 +98,29 @@ namespace Mottainai.Client
             l.color = new Color(1f, 0.97f, 0.9f);
             l.shadows = LightShadows.None;
 
+            // hemispheric ambient (sky blue from above, warm bounce from below) for softer cartoon shading
+            var sh = new UnityEngine.Rendering.SphericalHarmonicsL2();
+            sh.AddAmbientLight(new Color(0.42f, 0.47f, 0.52f));
+            sh.AddDirectionalLight(Vector3.up, new Color(0.35f, 0.5f, 0.7f), 0.9f);
+            sh.AddDirectionalLight(Vector3.down, new Color(0.35f, 0.4f, 0.25f), 0.5f);
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Custom;
+            RenderSettings.ambientProbe = sh;
+
+            var horizon = new Color(0.72f, 0.88f, 0.98f);
+            cam.backgroundColor = horizon;
+            RenderSettings.fogColor = horizon;
+            var skyShader = Shader.Find("Mottainai/Sky");
+            if (skyShader != null)
+            {
+                var skyMat = new Material(skyShader);
+                skyMat.SetVector("_SunDir", -lightGo.transform.forward);
+                skyMat.SetColor("_Horizon", horizon);
+                sky = VisualFactory.Part(transform, VisualFactory.Sphere, skyMat, Vector3.zero, Vector3.one * 250f, default, "SkyDome").transform;
+            }
+            postFx = PostFx.Create(transform, cam);
+            highlight = VisualFactory.Part(transform, VisualFactory.Cylinder, VisualFactory.Transparent(new Color(1f, 0.95f, 0.3f, 0.55f), 1.5f), Vector3.zero, new Vector3(1.4f, 0.02f, 1.4f), default, "AimHighlight").transform;
+            highlight.gameObject.SetActive(false);
+
             water = WaterView.Create(transform, content);
             raftView = RaftView.Create(transform, content);
             fx = new GameObject("Fx").AddComponent<FxSystem>();
@@ -200,11 +223,14 @@ namespace Mottainai.Client
         }
 
         /// Immediately hide an entity (caught by net).
+        public void ApplyContent(ContentService c) { water.ApplyContent(c); raftView.ApplyContent(c); }
+
         public void Hide(ushort id) { if (id < MaxIds && slots[id].active) Despawn(id); }
 
         // ---------------- render ----------------
         void LateUpdate()
         {
+            if (Attract) { UpdateAttract(); return; }
             if (!clockInit) return;
             double nowTicks = Time.unscaledTimeAsDouble * TickRate;
             double diff = baseOffset - smoothOffset;
@@ -232,7 +258,8 @@ namespace Mottainai.Client
                 }
             }
             UpdateCamera();
-            water.Follow(RaftPos, DirtPoints());
+            UpdateFoamAndWake();
+            water.Follow(RaftPos, DirtPoints(), foamBuf, foamCount, wakeBuf, wakeCount);
         }
 
         // ---------------- own-raft prediction (hides RTT for paddlers) ----------------
@@ -301,6 +328,48 @@ namespace Mottainai.Client
             RaftHeading = pred.heading + predErrH;
             lastDisplayed = RaftPos; lastDisplayedH = RaftHeading;
             raftView.SetPose(RaftPos, RaftHeading);
+        }
+
+        // obstacle foam rings + raft wake trail for the water shader
+        readonly Vector4[] foamBuf = new Vector4[16], wakeBuf = new Vector4[16];
+        readonly Vector3[] trail = new Vector3[16];
+        readonly float[] trailT = new float[16];
+        int foamCount, wakeCount, trailHead;
+        float trailTimer;
+
+        void UpdateFoamAndWake()
+        {
+            foamCount = 0;
+            for (int k = 0; k < active.Count && foamCount < 16; k++)
+            {
+                var s = slots[active[k]];
+                if (EntityCode.Kind(s.code) != EntityKind.Obstacle) continue;
+                var p = s.go.transform.localPosition;
+                if (Mathf.Abs(p.z - RaftPos.z) > 45f) continue;
+                int sub = EntityCode.Sub(s.code);
+                bool shark = sub == (byte)ObstacleType.Shark;
+                if (shark && s.flags == 0) continue;
+                float r = ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] * 0.7f;
+                foamBuf[foamCount++] = new Vector4(p.x, p.z, r, shark ? 0.6f : 1f);
+            }
+            for (int i = foamCount; i < 16; i++) foamBuf[i] = Vector4.zero;
+            float now = Time.time;
+            trailTimer -= Time.deltaTime;
+            if (trailTimer <= 0f)
+            {
+                trailTimer = 0.1f;
+                trail[trailHead] = RaftPos - new Vector3(Mathf.Sin(RaftHeading), 0f, Mathf.Cos(RaftHeading)) * 1.5f;
+                trailT[trailHead] = now;
+                trailHead = (trailHead + 1) % trail.Length;
+            }
+            wakeCount = 0;
+            for (int i = 0; i < trail.Length; i++)
+            {
+                float age = (now - trailT[i]) / 1.6f;
+                if (trailT[i] <= 0f || age >= 1f) continue;
+                wakeBuf[wakeCount++] = new Vector4(trail[i].x, trail[i].z, age, 0.9f);
+            }
+            for (int i = wakeCount; i < 16; i++) wakeBuf[i] = Vector4.zero;
         }
 
         // provides waste positions to the water dirt tint without allocations
@@ -385,6 +454,89 @@ namespace Mottainai.Client
             camT.position = Vector3.SmoothDamp(camT.position, targetPos, ref camVel, 0.18f);
             var look = RaftPos + fwd * 5f + Vector3.up * 0.5f;
             camT.rotation = Quaternion.Slerp(camT.rotation, Quaternion.LookRotation(look - camT.position), Mathf.Min(1f, Time.deltaTime * 8f));
+            // speed-reactive FOV + punch on sync boost, roll with yaw
+            float dt = Mathf.Max(1e-4f, Time.deltaTime);
+            float speed = (RaftPos - lastRaftPos).magnitude / dt;
+            lastRaftPos = RaftPos;
+            smoothSpeed = Mathf.Lerp(smoothSpeed, Mathf.Min(speed, 12f), dt * 3f);
+            fovKick = Mathf.Max(0f, fovKick - dt * 12f);
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 52f + smoothSpeed * 1.1f + fovKick, dt * 6f);
+            if (shake > 0f) { camT.position += Random.insideUnitSphere * shake * 0.35f; shake = Mathf.Max(0f, shake - dt * 2.5f); }
+            if (sky != null) sky.position = camT.position;
+            postFx.ShieldLeft = ShieldLeft;
+            UpdateHighlight();
+            UpdateWakeSpray(dt);
+        }
+
+        Vector3 lastRaftPos;
+        float smoothSpeed, fovKick, shake, sprayTimer, attractT;
+        Transform sky, highlight;
+        public PostFx postFx;
+        public bool Attract = true;
+        public bool AimAssist;
+        public ushort HighlightId { get; private set; } = NetConst.NoEntity;
+
+        public void SyncKick() { fovKick = 7f; postFx.Sync(); }
+        public void HitShake() { shake = 1f; postFx.Hit(); }
+
+        // menus: slow river fly-over with the crew idling on the raft
+        void UpdateAttract()
+        {
+            attractT += Time.deltaTime;
+            RaftPos += new Vector3(0f, 0f, GameTuning.Current.currentSpeed * Time.deltaTime);
+            RaftPos = new Vector3(Mathf.Sin(attractT * 0.25f) * 3f, 0f, RaftPos.z);
+            RaftHeading = Mathf.Cos(attractT * 0.25f) * 0.2f;
+            raftView.SetPose(RaftPos, RaftHeading);
+            float a = attractT * 0.12f;
+            var orbit = new Vector3(Mathf.Sin(a) * 11f, 4.5f + Mathf.Sin(attractT * 0.3f), Mathf.Cos(a) * 11f);
+            camT.position = Vector3.Lerp(camT.position, RaftPos + orbit, Time.deltaTime * 2f);
+            camT.rotation = Quaternion.LookRotation(RaftPos + Vector3.up * 0.8f - camT.position);
+            cam.fieldOfView = 50f;
+            if (sky != null) sky.position = camT.position;
+            UpdateFoamAndWake();
+            water.Follow(RaftPos, DirtPoints(), foamBuf, foamCount, wakeBuf, wakeCount);
+            UpdateWakeSpray(Time.deltaTime);
+        }
+
+        // collector aim assist: pulsing ring under the best target in net range
+        void UpdateHighlight()
+        {
+            HighlightId = NetConst.NoEntity;
+            if (AimAssist)
+            {
+                float best = GameTuning.Current.netRange;
+                for (int k = 0; k < active.Count; k++)
+                {
+                    var s = slots[active[k]];
+                    if (EntityCode.Kind(s.code) != EntityKind.Waste || EntityCode.Sub(s.code) == (byte)WasteType.Toxic) continue;
+                    var p = s.go.transform.localPosition;
+                    if (p.z < RaftPos.z - 1f) continue;
+                    float d = Vector2.Distance(new Vector2(p.x, p.z), new Vector2(RaftPos.x, RaftPos.z));
+                    if (d < best) { best = d; HighlightId = (ushort)active[k]; }
+                }
+            }
+            bool on = HighlightId != NetConst.NoEntity;
+            highlight.gameObject.SetActive(on);
+            if (on)
+            {
+                var p = slots[HighlightId].go.transform.localPosition;
+                float pulse = 1.2f + Mathf.Sin(Time.time * 8f) * 0.18f;
+                highlight.localPosition = new Vector3(p.x, 0.06f, p.z);
+                highlight.localScale = new Vector3(pulse, 0.02f, pulse);
+            }
+        }
+
+        // white spray at the stern proportional to speed
+        void UpdateWakeSpray(float dt)
+        {
+            sprayTimer -= dt;
+            if (sprayTimer > 0f) return;
+            float sp = Attract ? 2.5f : smoothSpeed;
+            sprayTimer = Mathf.Lerp(0.25f, 0.05f, Mathf.InverseLerp(1f, 7f, sp));
+            var back = new Vector3(Mathf.Sin(RaftHeading), 0f, Mathf.Cos(RaftHeading));
+            var side = new Vector3(back.z, 0f, -back.x);
+            var pos = RaftPos - back * 1.6f + side * Random.Range(-0.9f, 0.9f) + Vector3.up * 0.15f;
+            fx.Burst(pos, new Color(0.9f, 0.97f, 1f), 2, 0.6f, 0.09f, 0.8f + sp * 0.15f);
         }
 
         public void SnapCamera()

@@ -80,12 +80,14 @@ namespace Mottainai.Client
         float low, fps = 60f;
         bool dropped;
         float originalScale = 1f;
+        int originalMsaa = 2;
         UniversalRenderPipelineAsset asset;
 
         void Start()
         {
             asset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             if (asset != null) originalScale = asset.renderScale;
+            if (asset != null) { originalMsaa = asset.msaaSampleCount; if (SystemInfo.systemMemorySize >= 6000 && !Application.isEditor) asset.msaaSampleCount = 4; }
         }
 
         void Update()
@@ -99,11 +101,12 @@ namespace Mottainai.Client
             {
                 dropped = true;
                 asset.renderScale = 0.8f;
+                asset.msaaSampleCount = 2;
                 Debug.Log("[Perf] FPS < 45 for 3 s -> render scale 0.8");
             }
         }
 
-        void OnDestroy() { if (dropped && asset != null) asset.renderScale = originalScale; }
+        void OnDestroy() { if (asset == null) return; asset.renderScale = originalScale; asset.msaaSampleCount = originalMsaa; }
         void OnApplicationQuit() => OnDestroy();
         public bool Dropped => dropped;
     }
