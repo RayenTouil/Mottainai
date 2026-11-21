@@ -77,6 +77,8 @@ namespace Mottainai.Client
                 if (cli[i] == "-autoplay") autoplay = true;
                 if (cli[i] == "-connect" && i + 1 < cli.Length) { serverHost = cli[i + 1]; hostInEditor = false; }
                 if (cli[i] == "-name" && i + 1 < cli.Length) playerName = cli[i + 1];
+                if (cli[i] == "-shots" && i + 1 < cli.Length) shotsDir = cli[i + 1];
+                if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
             }
 
             BuildUi();
@@ -86,12 +88,35 @@ namespace Mottainai.Client
 
         // ---------------- smoke test: -autoplay -connect <ip> ----------------
         bool autoplay;
+        string shotsDir;
+        float quitAfter;
+        int shotIndex;
+
+        void Shot(string label)
+        {
+            if (string.IsNullOrEmpty(shotsDir)) return;
+            System.IO.Directory.CreateDirectory(shotsDir);
+            var p = System.IO.Path.Combine(shotsDir, $"{shotIndex++:00}_{label}.png");
+            ScreenCapture.CaptureScreenshot(p);
+            Debug.Log("[AUTOPLAY] screenshot " + p);
+        }
 
         IEnumerator AutoPlay()
         {
             hostInEditor = false;
             yield return null;
             nameInput.text = playerName; serverInput.text = serverHost;
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-lab") >= 0)
+            {
+                Show(UiScreen.Lab);
+                RunLab();
+                yield return null;
+                while (lab.Running) yield return null;
+                var lr = lab.Result;
+                Debug.Log(lr == null ? "[AUTOPLAY] LAB failed" : $"[AUTOPLAY] LAB rtt avg {lr.rttAvg:F2} min {lr.rttMin:F2} p95 {lr.rttP95:F2} max {lr.rttMax:F2} jitter {lr.jitter:F2} loss {lr.loss:F1}% ({lr.received}/{lr.sent}) down {lr.downMbps:F0} Mbit/s ({lr.downMB:F1} MB in {lr.downSec:F2}s) csv={lab.CsvPath}");
+                Shot("lab");
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
             Debug.Log($"[AUTOPLAY] login to {serverHost} as {playerName}");
             StartLogin();
             float t0 = Time.realtimeSinceStartup;
@@ -101,13 +126,19 @@ namespace Mottainai.Client
             net.Simple(Msg.CreateRoom);
             while (lobby == null || string.IsNullOrEmpty(lobby.code)) yield return null;
             net.PickRole(Role.Collector);
-            yield return new WaitForSecondsRealtime(0.5f);
+            yield return new WaitForSecondsRealtime(0.8f);
+            Shot("lobby");
             Debug.Log($"[AUTOPLAY] room {lobby.code}, starting");
             net.Simple(Msg.StartMatch);
-            float logT = 0, throwT = 0;
+            float logT = 0, throwT = 0, gameT = 0;
+            int nextShot = 0;
+            float[] shotTimes = { 1.5f, 8f, 20f, 40f };
             while (results == null)
             {
                 logT += Time.unscaledDeltaTime; throwT += Time.unscaledDeltaTime;
+                if (screen == UiScreen.Game) gameT += Time.unscaledDeltaTime;
+                if (nextShot < shotTimes.Length && gameT >= shotTimes[nextShot]) Shot($"game_{shotTimes[nextShot++]:0}s");
+                if (quitAfter > 0 && gameT > quitAfter) { Debug.Log("[AUTOPLAY] quitafter reached"); Application.Quit(0); yield break; }
                 if (screen == UiScreen.Game && throwT > 0.7f && world != null)
                 {
                     throwT = 0;
@@ -124,7 +155,9 @@ namespace Mottainai.Client
             }
             var r = results;
             Debug.Log($"[AUTOPLAY] RESULT reason={r.reason} total={r.total} catch={r.catchScore} toxic=-{r.toxicPenalty} acc={r.Accuracy:P0} dist={r.distance:F0}m kg={r.kg:F1} dur={r.duration:F0}s counts={string.Join(",", r.counts)} rxMB={net.stats.TotalDownMB:F1}");
-            yield return new WaitForSecondsRealtime(2f);
+            yield return new WaitForSecondsRealtime(2.5f);
+            Shot("results");
+            yield return new WaitForSecondsRealtime(1f);
             Application.Quit(0);
         }
 
@@ -180,6 +213,8 @@ namespace Mottainai.Client
             while (!net.Ready && Time.realtimeSinceStartup - t0 < 10f) yield return null;
             if (!net.Ready) { net.Disconnect(); Show(UiScreen.Login); SetStatus($"UDP connect to {host}:{content.Login.gamePort} failed (firewall?)"); yield break; }
             lobby = null;
+            // build the 3D world now (texture upload hitch) so the match starts smoothly
+            if (world == null) { world = WorldView.Create(content); world.gameObject.SetActive(false); }
             Show(UiScreen.Lobby);
             RefreshLobbyUi();
         }

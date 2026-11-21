@@ -36,7 +36,7 @@ namespace Mottainai.Client
             }
             VisualFactory.Part(t, VisualFactory.Cylinder, hullMat, new Vector3(0, 0.12f, 0), new Vector3(2.4f, 0.2f, 3.2f), default, "hull");
             VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.25f, 0.35f, 0.45f)), new Vector3(0, 0.2f, 0), new Vector3(1.9f, 0.16f, 2.7f), default, "floor");
-            VisualFactory.Part(t, VisualFactory.Quad, VisualFactory.Transparent(new Color(0f, 0.05f, 0.1f, 0.35f)), new Vector3(0, 0.03f, 0), new Vector3(3.2f, 4f, 1f), new Vector3(90, 0, 0), "blobShadow");
+            VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Transparent(new Color(0f, 0.08f, 0.12f, 0.3f)), new Vector3(0, 0.05f, 0), new Vector3(2.9f, 0.01f, 3.7f), default, "blobShadow");
 
             crew[1] = Crew(t, new Vector3(-0.72f, 0.35f, -0.35f), new Color(0.2f, 0.6f, 1f), out leftPaddle, -1);
             crew[2] = Crew(t, new Vector3(0.72f, 0.35f, -0.35f), new Color(0.95f, 0.3f, 0.45f), out rightPaddle, 1);

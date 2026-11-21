@@ -370,8 +370,8 @@ namespace Mottainai.Client
         {
             var bg = UIKit.Image(netCanvas.transform, new Color(0, 0, 0, 0.5f), null, "NetHud");
             bg.raycastTarget = false;
-            UIKit.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(20, 150), new Vector2(560, 400));
-            netHudText = UIKit.Text(bg.transform, "", 25, new Color(0.75f, 1f, 0.8f), TextAlignmentOptions.TopLeft);
+            UIKit.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(16, 16), new Vector2(480, 300));
+            netHudText = UIKit.Text(bg.transform, "", 22, new Color(0.75f, 1f, 0.8f), TextAlignmentOptions.TopLeft);
             netHudText.richText = true;
             UIKit.Stretch(netHudText.rectTransform, 16, 10, 10, 10);
             netHudPanel = bg.gameObject;
@@ -422,7 +422,7 @@ namespace Mottainai.Client
             foreach (var p in pops)
             {
                 if (p.on) continue;
-                p.on = true; p.world = world; p.age = 0; p.life = 1.1f; p.scale = scale;
+                p.on = true; p.world = world + new Vector3(Random.Range(-0.6f, 0.6f), Random.Range(0f, 0.5f), 0f); p.age = 0; p.life = 1.1f; p.scale = scale;
                 p.t.text = text; p.t.color = c;
                 p.t.gameObject.SetActive(true);
                 return;
@@ -491,7 +491,7 @@ namespace Mottainai.Client
                 }
             }
 
-            netHudPanel.SetActive(netHudOn && (screen == UiScreen.Game || screen == UiScreen.Lobby || screen == UiScreen.Results));
+            netHudPanel.SetActive(netHudOn && screen == UiScreen.Game);
             netHudTimer -= dt;
             if (netHudPanel.activeSelf && netHudTimer <= 0f)
             {
@@ -500,7 +500,7 @@ namespace Mottainai.Client
                 var ni = NetworkInfo.Provider;
                 string badgeColor = ni.NetworkType == "5G SA" ? "#39FF88" : ni.NetworkType == "5G NSA" ? "#B6FF5C" : ni.NetworkType == "LTE" ? "#FFD24C" : "#9AD0FF";
                 sb.Clear();
-                sb.Append($"<size=34><b><color={badgeColor}>{ni.NetworkType}</color></b></size>   slice: <b>{ni.SliceStatus}</b>\n");
+                sb.Append($"<size=30><b><color={badgeColor}>{ni.NetworkType}</color></b></size>   slice: <b>{ni.SliceStatus}</b>\n");
                 sb.Append($"RTT avg <b>{s.RttAvg:F1}</b>  p95 <b>{s.RttP95:F1}</b>  jitter {s.Jitter:F1} ms\n");
                 sb.Append($"Server tick {s.ServerTick}   snapshots {s.SnapshotRate:F0}/s\n");
                 sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps\n");

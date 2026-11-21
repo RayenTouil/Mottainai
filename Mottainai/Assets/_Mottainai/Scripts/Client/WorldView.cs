@@ -117,7 +117,7 @@ namespace Mottainai.Client
         {
             double nowTicks = Time.unscaledTimeAsDouble * NetConst.TickRate;
             if (f.tick > LatestTick) LatestTick = f.tick;
-            if (f.hasRaft)
+            if (f.hasRaft && Time.unscaledDeltaTime < 0.1f) // ignore frame hitches (loading) in the jitter estimate
             {
                 float o = (float)(f.tick - nowTicks);
                 offsets[offHead] = o;
@@ -135,6 +135,9 @@ namespace Mottainai.Client
                     float p5 = sortBuf[Mathf.Clamp(Mathf.FloorToInt(offCount * 0.05f), 0, offCount - 1)];
                     jitterTicks = (float)(baseOffset - p5);
                 }
+            }
+            if (f.hasRaft)
+            {
                 raft[raftHead] = new RaftSample { tick = f.tick, x = f.raft.x, z = f.raft.z, heading = f.raft.heading, shield = f.raft.shieldLeft };
                 raftHead = (raftHead + 1) % raft.Length;
                 raftCount = Mathf.Min(raftCount + 1, raft.Length);
