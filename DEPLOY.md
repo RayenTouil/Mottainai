@@ -6,8 +6,8 @@
 | Server | `build_server.bat` | `./build_server.sh` |
 | Android APK | `build_android.bat` (add `-dev` for a development build) | `./build_android.sh` |
 
-Outputs: `Mottainai/Builds/Server/Windows/MottainaiServer.exe`, `Mottainai/Builds/Android/Mottainai.apk`. Logs in `Builds/*.log`.
-Install on a phone: `adb install -r Mottainai/Builds/Android/Mottainai.apk`.
+Outputs: `Mottainai/Builds/Server/Windows/MottainaiServer.exe`, `Builds/Mottainai.apk`. Logs in `Builds/*.log`.
+Install on a phone: `adb install -r Builds/Mottainai.apk`.
 
 ## 2. Run the server
 ```

@@ -209,7 +209,7 @@ namespace Mottainai.EditorTools
             EditorUserBuildSettings.buildAppBundle = false;
             var opts = HasArg("-dev") ? BuildOptions.Development : BuildOptions.None;
             if (HasArg("-run")) opts |= BuildOptions.AutoRunPlayer;
-            Build(BuildTarget.Android, BuildTargetGroup.Android, Arg("-out", "Builds/Android/Mottainai.apk"), opts, 0, null);
+            Build(BuildTarget.Android, BuildTargetGroup.Android, Arg("-out", "../Builds/Mottainai.apk"), opts, 0, null);
         }
 
         [MenuItem("Mottainai/Build/Android APK + Run on Phone")]
@@ -217,7 +217,7 @@ namespace Mottainai.EditorTools
         {
             SetupProject();
             EditorUserBuildSettings.buildAppBundle = false;
-            Build(BuildTarget.Android, BuildTargetGroup.Android, "Builds/Android/Mottainai.apk", BuildOptions.AutoRunPlayer, 0, null);
+            Build(BuildTarget.Android, BuildTargetGroup.Android, "../Builds/Mottainai.apk", BuildOptions.AutoRunPlayer, 0, null);
         }
 
         static bool ServerModule(string engineFolder, string variationPrefix)

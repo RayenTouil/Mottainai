@@ -47,6 +47,13 @@ namespace Mottainai.Client
         void BuildUi()
         {
             UIKit.EnsureEventSystem();
+            // persistent background camera so menus never show "No cameras rendering"; the world camera draws over it
+            var uiCam = new GameObject("UICamera").AddComponent<Camera>();
+            DontDestroyOnLoad(uiCam.gameObject);
+            uiCam.clearFlags = CameraClearFlags.SolidColor;
+            uiCam.backgroundColor = new Color(0.07f, 0.22f, 0.27f);
+            uiCam.cullingMask = 0;
+            uiCam.depth = -100;
             mainCanvas = UIKit.Canvas("UI_Main", 10);
             hudCanvas = UIKit.Canvas("UI_Hud", 5);
             hudCanvas.GetComponent<GraphicRaycaster>().enabled = false;
@@ -76,8 +83,10 @@ namespace Mottainai.Client
         {
             var p = Panel(UiScreen.Login, new Color(0.07f, 0.24f, 0.28f));
             var col = Column(p.transform, 1000, 1000);
-            var title = UIKit.Size(UIKit.Text(col, "MOTTAINAI", 150, new Color(0.55f, 0.95f, 0.6f)), 170);
+            var title = UIKit.Size(UIKit.Text(col, "MOTTAINAI", 130, new Color(0.55f, 0.95f, 0.6f)), 150);
             title.fontStyle = FontStyles.Bold;
+            title.textWrappingMode = TextWrappingModes.NoWrap;
+            title.overflowMode = TextOverflowModes.Overflow;
             title.characterSpacing = 12;
             UIKit.Size(UIKit.Text(col, "\"What a waste!\"  -  paddle together, clean the river", 38, UIKit.TextLight), 60);
             nameInput = UIKit.Size(UIKit.Input(col, "Your name", playerName), 92);
