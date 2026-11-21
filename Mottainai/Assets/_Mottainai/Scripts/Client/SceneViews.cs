@@ -26,10 +26,13 @@ namespace Mottainai.Client
         void Build(ContentService content)
         {
             var t = transform;
-            hullRenderer = VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.27f, 1.38f), VisualFactory.Lit(new Color(1f, 0.55f, 0.2f)), new Vector3(0, 0.24f, 0), Vector3.one, default, "hull").GetComponent<MeshRenderer>();
-            ApplyContent(content);
-            VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.06f, 1.38f, 40, 6), VisualFactory.Lit(new Color(0.95f, 0.95f, 0.9f)), new Vector3(0, 0.52f, 0), Vector3.one, default, "rope");
-            VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.2f, 0.3f, 0.42f)), new Vector3(0, 0.1f, 0), new Vector3(1.95f, 0.05f, 2.65f), default, "floor");
+            if (VisualFactory.Model("Raft/raft", t, 3.4f, new Vector3(0, 0.22f, 0), Vector3.zero, "hull", false, true) == null)
+            {
+                hullRenderer = VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.27f, 1.38f), VisualFactory.Lit(new Color(1f, 0.55f, 0.2f)), new Vector3(0, 0.24f, 0), Vector3.one, default, "hull").GetComponent<MeshRenderer>();
+                ApplyContent(content);
+                VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.06f, 1.38f, 40, 6), VisualFactory.Lit(new Color(0.95f, 0.95f, 0.9f)), new Vector3(0, 0.52f, 0), Vector3.one, default, "rope");
+                VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.2f, 0.3f, 0.42f)), new Vector3(0, 0.1f, 0), new Vector3(1.95f, 0.05f, 2.65f), default, "floor");
+            }
             VisualFactory.Part(t, VisualFactory.Cube, VisualFactory.Lit(new Color(1f, 0.85f, 0.2f), 0.4f), new Vector3(0, 0.5f, 1.58f), new Vector3(0.5f, 0.12f, 0.12f), default, "bow");
             VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Transparent(new Color(0f, 0.08f, 0.12f, 0.3f)), new Vector3(0, 0.05f, 0), new Vector3(2.9f, 0.01f, 3.7f), default, "blobShadow");
 
@@ -71,7 +74,7 @@ namespace Mottainai.Client
         /// Raft skin from the downloaded Content Pack.
         public void ApplyContent(ContentService content)
         {
-            if (skinApplied || content == null) return;
+            if (skinApplied || content == null || hullRenderer == null) return;
             var skin = ContentService.LoadRaw(content.RaftSkin, false);
             if (skin == null) return;
             var m = new Material(hullRenderer.sharedMaterial);
@@ -99,8 +102,12 @@ namespace Mottainai.Client
             tool.localPosition = new Vector3(side * 0.25f, 0.45f, 0);
             if (side != 0)
             {
-                VisualFactory.Part(tool, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.6f, 0.4f, 0.2f)), new Vector3(side * 0.35f, -0.25f, 0), new Vector3(0.06f, 0.6f, 0.06f), new Vector3(0, 0, side * 40f));
-                VisualFactory.Part(tool, VisualFactory.Cube, VisualFactory.Lit(new Color(0.95f, 0.9f, 0.2f)), new Vector3(side * 0.72f, -0.68f, 0), new Vector3(0.05f, 0.35f, 0.22f), new Vector3(0, 0, side * 40f));
+                // CC0 paddle (blade down, see ModelImportRules) over the same span as the primitive shaft + blade
+                if (VisualFactory.Model("Raft/paddle", tool, 1.34f, new Vector3(side * 0.4f, -0.3f, 0), new Vector3(0, 0, side * 40f), "paddle") == null)
+                {
+                    VisualFactory.Part(tool, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.6f, 0.4f, 0.2f)), new Vector3(side * 0.35f, -0.25f, 0), new Vector3(0.06f, 0.6f, 0.06f), new Vector3(0, 0, side * 40f));
+                    VisualFactory.Part(tool, VisualFactory.Cube, VisualFactory.Lit(new Color(0.95f, 0.9f, 0.2f)), new Vector3(side * 0.72f, -0.68f, 0), new Vector3(0.05f, 0.35f, 0.22f), new Vector3(0, 0, side * 40f));
+                }
             }
             else
             {

@@ -5,6 +5,8 @@ Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler log
 - C1 code: NGO/UTP + Server assembly + local-server scripts removed; Net/WsClient (ClientWebSocket, backoff), Net/Codecs (PROTOCOL v2), NetClient, ContentService (server_config.json, /api/*, /pack sha256), NetworkLab (edge/room RTT, down/up, telemetry), screens Title(5-tap URL)/Pack/Menu/Lobby/Game/Results, Net HUD (edge/room colo). `tools/compile_check.sh` OK.
 ## Done (S1)
 - server/src/sim.ts full sim + bots + lag comp + scoring; RoomDO lobby/countdown/run/results/rematch, bot takeover/reconnect; real 36 MB pack (genpack.mjs); lab + telemetry endpoints. Tests: `npm run simcheck` (0/20 crashes), `node tools/fakeclient.ts` (full match on Cloudflare: 60 snap/s, ~200 kbps, RTT ~60 ms).
+## Done (P1 models, early)
+- CC0 models in Resources/Models + glTFast + ModelImportRules + VisualFactory mapping (primitive fallback). Open Unity once to import, check raft/paddle/shark orientation.
 ## In progress
 - C1/C2 build: Unity editor must be CLOSED -> build_android.bat -> install_phone.bat (phones on 5G SA, Wi-Fi OFF).
 ## Exact next step

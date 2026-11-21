@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 using UnityEngine.Rendering;
 
 namespace Mottainai.Client
@@ -99,21 +101,131 @@ namespace Mottainai.Client
             return go;
         }
 
-        static GameObject TryModel(string name, Transform parent, float targetSize)
+        static readonly Dictionary<string, GameObject> prefabCache = new Dictionary<string, GameObject>();
+        static readonly Dictionary<Material, Material> toonOf = new Dictionary<Material, Material>();
+        static readonly Dictionary<string, AnimationClip> clipCache = new Dictionary<string, AnimationClip>();
+
+        static GameObject LoadPrefab(string path)
         {
-            var prefab = Resources.Load<GameObject>("Models/" + name);
+            if (!prefabCache.TryGetValue(path, out var p)) prefabCache[path] = p = Resources.Load<GameObject>("Models/" + path);
+            return p;
+        }
+
+        /// Toon copy of an imported material (URP Lit, Standard or glTFast), keeping its color and texture.
+        static Material ToonFrom(Material src)
+        {
+            if (src == null) return Lit(Color.white);
+            if (toonOf.TryGetValue(src, out var m)) return m;
+            Color c = src.HasProperty("_BaseColor") ? src.GetColor("_BaseColor")
+                : src.HasProperty("baseColorFactor") ? src.GetColor("baseColorFactor")
+                : src.HasProperty("_Color") ? src.GetColor("_Color") : Color.white;
+            Texture tex = null;
+            foreach (var p in new[] { "_BaseMap", "baseColorTexture", "_MainTex" })
+                if (tex == null && src.HasProperty(p)) tex = src.GetTexture(p);
+            if (tex == null) m = Lit(c);
+            else
+            {
+                toon ??= Shader.Find("Mottainai/Toon") ?? Shader.Find("Universal Render Pipeline/Simple Lit");
+                m = new Material(toon) { enableInstancing = true, name = "Toon_" + src.name };
+                m.SetColor("_BaseColor", c);
+                m.SetTexture("_BaseMap", tex);
+            }
+            toonOf[src] = m;
+            return m;
+        }
+
+        static AnimationClip LoopClip(string path)
+        {
+            if (clipCache.TryGetValue(path, out var clip)) return clip;
+            foreach (var c in Resources.LoadAll<AnimationClip>("Models/" + path))
+            {
+                if (c.name.StartsWith("__preview__")) continue;
+                if (clip == null || c.name.ToLowerInvariant().Contains("swim")) clip = c;
+            }
+            return clipCache[path] = clip;
+        }
+
+        /// CC0 model from Resources/Models/<path>: toon materials, no colliders/shadows, fitted so its largest side = targetSize.
+        static GameObject TryModel(string path, Transform parent, float targetSize, bool center = false, bool animate = false)
+        {
+            var prefab = LoadPrefab(path);
             if (prefab == null) return null;
             var go = Object.Instantiate(prefab, parent, false);
             foreach (var c in go.GetComponentsInChildren<Collider>()) Object.Destroy(c);
             var rs = go.GetComponentsInChildren<Renderer>();
+            foreach (var r in rs)
+            {
+                var mats = r.sharedMaterials;
+                for (int i = 0; i < mats.Length; i++) mats[i] = ToonFrom(mats[i]);
+                r.sharedMaterials = mats;
+                r.shadowCastingMode = ShadowCastingMode.Off;
+                r.receiveShadows = false;
+                r.lightProbeUsage = LightProbeUsage.Off;
+                r.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            }
+            var anim = go.GetComponentInChildren<Animator>();
+            var clip = animate && anim != null ? LoopClip(path) : null;
+            if (clip != null) go.AddComponent<ModelLoop>().Play(anim, clip);
+            else foreach (var a in go.GetComponentsInChildren<Animator>()) Object.Destroy(a);
             if (rs.Length > 0)
             {
-                var b = rs[0].bounds;
-                foreach (var r in rs) { b.Encapsulate(r.bounds); r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false; }
+                var b = WorldBounds(rs);
                 float s = Mathf.Max(b.size.x, b.size.y, b.size.z);
                 if (s > 0.001f) go.transform.localScale *= targetSize / s;
+                if (center) go.transform.position += parent.position - WorldBounds(rs).center;
             }
             return go;
+        }
+
+        static Bounds WorldBounds(Renderer[] rs)
+        {
+            var b = rs[0].bounds;
+            foreach (var r in rs) b.Encapsulate(r.bounds);
+            return b;
+        }
+
+        /// Model centered in a new child pivot (fitted while unrotated, then placed), or null if the model is missing.
+        public static Transform Model(string path, Transform parent, float size, Vector3 pos, Vector3 euler, string name = "model", bool animate = false, bool longAxisZ = false)
+        {
+            if (LoadPrefab(path) == null) return null;
+            var pivot = new GameObject(name).transform;
+            pivot.SetParent(parent, false);
+            var go = TryModel(path, pivot, size, true, animate);
+            var rot = Quaternion.Euler(euler);
+            if (longAxisZ)
+            {
+                var rs = go.GetComponentsInChildren<Renderer>();
+                if (rs.Length > 0) { var b = WorldBounds(rs); if (b.size.x > b.size.z) rot *= Quaternion.Euler(0, 90, 0); }
+            }
+            pivot.localPosition = pos;
+            pivot.localRotation = rot;
+            return pivot;
+        }
+
+        static readonly string[][] WasteModels =
+        {
+            new[] { "Waste/plastic_bottle" },                     // Plastic
+            null,                                                 // Paper
+            new[] { "Waste/glass_bottle" },                       // Glass
+            null,                                                 // Organic
+            new[] { "Waste/metal_can", "Waste/metal_can_broken" },  // Metal
+            null,                                                 // Valuable
+            new[] { "Waste/toxic_propane_tank", "Waste/battery" }, // Toxic
+        };
+
+        static GameObject TryWasteModel(WasteType t, Transform root, float size)
+        {
+            var opts = WasteModels[(int)t];
+            if (opts != null)
+            {
+                int start = Random.Range(0, opts.Length);
+                for (int i = 0; i < opts.Length; i++)
+                {
+                    var go = TryModel(opts[(start + i) % opts.Length], root, size);
+                    if (go != null) return go;
+                }
+            }
+            return TryModel("waste_" + t.ToString().ToLowerInvariant(), root, size);
         }
 
         /// Root object for an entity code; child 0 = body, optional child "fin" for sharks.
@@ -150,7 +262,8 @@ namespace Mottainai.Client
                     Part(root, Triangle, Lit(Color.white, 0.8f), new Vector3(0, -0.1f, 0), new Vector3(0.5f, 0.35f, 1f), new Vector3(0, 0, 180));
                     break;
                 default:
-                    Part(root, Cube, Lit(c, 0.8f), Vector3.zero, new Vector3(0.45f, 0.55f, 0.12f), new Vector3(0, 0, 45), "core");
+                    if (Model("Pickups/first_aid_kit", root, 0.6f, Vector3.zero, Vector3.zero, "core") == null)
+                        Part(root, Cube, Lit(c, 0.8f), Vector3.zero, new Vector3(0.45f, 0.55f, 0.12f), new Vector3(0, 0, 45), "core");
                     break;
             }
         }
@@ -158,7 +271,9 @@ namespace Mottainai.Client
         static void BuildWaste(Transform root, WasteType t)
         {
             Color c = WasteCatalog.Colors[(int)t];
-            var model = TryModel("waste_" + t.ToString().ToLowerInvariant(), root, 0.8f);
+            var model = TryWasteModel(t, root, 0.8f);
+            if (model != null && t == WasteType.Toxic)
+                Part(root, Triangle, Lit(new Color(1f, 0.85f, 0f), 0.6f), new Vector3(0, 1.0f, 0), Vector3.one * 0.45f, default, "billboard");
             if (model == null)
             {
                 switch (t)
@@ -203,6 +318,12 @@ namespace Mottainai.Client
         static void BuildObstacle(Transform root, ObstacleType t)
         {
             float r = ObstacleCatalog.Radius[(int)t], hl = ObstacleCatalog.HalfLen[(int)t];
+            if (t == ObstacleType.Shark && Model("Obstacles/shark", root, 2.4f, new Vector3(0, -0.05f, 0), Vector3.zero, "body", true, true) != null)
+            {
+                var sharkFin = Part(root, Cone, Lit(new Color(0.35f, 0.4f, 0.48f)), new Vector3(0, 0.25f, 0), new Vector3(0.12f, 0.75f, 0.6f), default, "fin");
+                sharkFin.transform.SetAsLastSibling();
+                return;
+            }
             var model = TryModel("obstacle_" + t.ToString().ToLowerInvariant(), root, (r + hl) * 2f);
             if (model != null) { if (t == ObstacleType.Shark) model.name = "body"; return; }
             switch (t)
@@ -251,5 +372,20 @@ namespace Mottainai.Client
                     break;
             }
         }
+    }
+    /// Loops one clip on an imported model through a PlayableGraph (no AnimatorController asset needed).
+    public class ModelLoop : MonoBehaviour
+    {
+        PlayableGraph graph;
+
+        public void Play(Animator a, AnimationClip clip)
+        {
+            a.applyRootMotion = false;
+            a.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            var p = AnimationPlayableUtilities.PlayClip(a, clip, out graph);
+            p.SetTime(Random.value * clip.length);
+        }
+
+        void OnDestroy() { if (graph.IsValid()) graph.Destroy(); }
     }
 }
