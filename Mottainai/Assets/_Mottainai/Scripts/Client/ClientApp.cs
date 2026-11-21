@@ -33,6 +33,7 @@ namespace Mottainai.Client
         int hudScore; float hudTimeLeft; MatchPhase hudPhase; bool hudCombo; float hudShield;
         bool reconnecting;
         int syncStreak; float lastSyncTime;
+        float magnetUntil, turboUntil;
         RoomInfo[] roomList = new RoomInfo[0];
 
         public static ClientApp Create()
@@ -265,6 +266,8 @@ namespace Mottainai.Client
             net.TickRate = info.tickRate;
             world.raftView.SetLocalRole(myRole);
             world.Attract = false;
+            magnetUntil = turboUntil = 0f;
+            world.SetPowers(0f, 0f);
             world.AimAssist = myRole == Role.Collector;
             input.role = myRole;
             input.active = true;
@@ -366,6 +369,21 @@ namespace Mottainai.Client
                         break;
                     case EvType.ShieldOn: world.Collect(e.entity); Big("SHIELD!", new Color(0.4f, 0.9f, 1f), 0.8f); sfx.Play(Sfx.Id.Shield); break;
                     case EvType.ShieldOff: Toast("Shield off"); break;
+                    case EvType.PowerOn:
+                    {
+                        world.Collect(e.entity);
+                        float dur = e.value / 10f;
+                        if ((PowerUp)e.extra == PowerUp.Magnet) { magnetUntil = Time.time + dur; Big("MAGNET NET!", new Color(1f, 0.45f, 0.9f), 0.9f); }
+                        else { turboUntil = Time.time + dur; Big("TURBO!", new Color(1f, 0.65f, 0.2f), 0.9f); world.SyncKick(); }
+                        world.SetPowers(magnetUntil, turboUntil);
+                        sfx.Play(Sfx.Id.Shield);
+                        NetworkInfo.Provider.Vibrate(40);
+                        break;
+                    }
+                    case EvType.PowerOff:
+                        if ((PowerUp)e.extra == PowerUp.Magnet) magnetUntil = 0f; else turboUntil = 0f;
+                        world.SetPowers(magnetUntil, turboUntil);
+                        break;
                     case EvType.GameOver:
                         var reason = (EndReason)e.value;
                         if (reason == EndReason.TimeUp) raft.Cheer();

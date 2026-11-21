@@ -41,10 +41,28 @@ namespace Mottainai.Client
             highlight = VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(1f, 0.85f, 0.2f), 1f), Vector3.zero, new Vector3(0.5f, 0.02f, 0.5f), default, "you").transform;
             highlight.gameObject.SetActive(false);
 
+            magnetRing = VisualFactory.Part(t, ProceduralMeshes.Torus(1.75f, 0.05f, 1.2f, 40, 6), VisualFactory.Lit(new Color(1f, 0.3f, 0.85f), 1.2f), new Vector3(0, 0.35f, 0), Vector3.one, default, "magnetRing").transform;
+            magnetRing.gameObject.SetActive(false);
+            var jetMat = VisualFactory.Lit(new Color(1f, 0.55f, 0.1f), 1.6f);
+            for (int j = 0; j < 2; j++)
+            {
+                jets[j] = VisualFactory.Part(t, VisualFactory.Cone, jetMat, new Vector3(j == 0 ? -0.55f : 0.55f, 0.3f, -1.55f), new Vector3(0.25f, 0.7f, 0.25f), new Vector3(-90f, 0f, 0f), "turboJet").transform;
+                jets[j].gameObject.SetActive(false);
+            }
             bubble = VisualFactory.Part(t, VisualFactory.Sphere, VisualFactory.Transparent(new Color(0.35f, 0.85f, 1f, 0.22f), 2.5f), new Vector3(0, 0.6f, 0), new Vector3(3.6f, 2.6f, 4.4f), default, "shield");
             bubbleRenderer = bubble.GetComponent<MeshRenderer>();
             bubbleProps = new MaterialPropertyBlock();
             bubble.SetActive(false);
+        }
+
+        Transform magnetRing;
+        readonly Transform[] jets = new Transform[2];
+        bool magnetOn, turboOn;
+
+        public void SetPowers(bool magnet, bool turbo)
+        {
+            if (magnet != magnetOn) { magnetOn = magnet; magnetRing.gameObject.SetActive(magnet); }
+            if (turbo != turboOn) { turboOn = turbo; foreach (var j in jets) j.gameObject.SetActive(turbo); }
         }
 
         MeshRenderer hullRenderer;
@@ -157,6 +175,14 @@ namespace Mottainai.Client
                 c.localPosition = crewBase[i] + Vector3.up * (Mathf.Sin(idleT * 2.2f + ph) * 0.025f + jump);
                 c.localRotation = Quaternion.Euler(Mathf.Sin(idleT * 1.6f + ph) * 3f + lean * 18f, 0f, Mathf.Sin(idleT * 1.3f + ph) * 4f);
             }
+            if (magnetOn)
+            {
+                magnetRing.localRotation = Quaternion.Euler(0f, idleT * 120f, 0f);
+                magnetRing.localPosition = new Vector3(0f, 0.35f + Mathf.Sin(idleT * 4f) * 0.08f, 0f);
+            }
+            if (turboOn)
+                for (int j = 0; j < 2; j++)
+                    jets[j].localScale = new Vector3(0.25f, 0.55f + Mathf.PerlinNoise(idleT * 18f, j * 3.1f) * 0.5f, 0.25f);
             Animate(leftPaddle, ref leftAnim, leftBack, 1f);
             Animate(rightPaddle, ref rightAnim, rightBack, 1f);
             if (armAnim >= 0f)

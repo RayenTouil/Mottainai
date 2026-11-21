@@ -4,6 +4,7 @@ namespace Mottainai
     public enum EntityKind : byte { None = 0, Waste = 1, Obstacle = 2, Shield = 3 }
     public enum WasteType : byte { Plastic, Paper, Glass, Organic, Metal, Valuable, Toxic }
     public enum ObstacleType : byte { Rock, BigRock, Iceberg, Wreck, Log, Shark }
+    public enum PowerUp : byte { Shield = 0, Magnet = 1, Turbo = 2 }
     public enum MatchPhase : byte { Lobby, Countdown, Running, Finished }
     public enum EndReason : byte { None, TimeUp, Crashed, Aborted }
 

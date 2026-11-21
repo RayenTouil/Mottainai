@@ -24,18 +24,22 @@ namespace Mottainai.Gameplay
         {
             x = o.x; z = o.z; heading = o.heading; vx = o.vx; vz = o.vz; yawRate = o.yawRate;
             lastLeft = o.lastLeft; lastRight = o.lastRight; lastLeftBack = o.lastLeftBack; lastRightBack = o.lastRightBack;
+            maxSpeedBonus = o.maxSpeedBonus;
         }
 
         public float ForwardSpeed => vx * Mathf.Sin(heading) + vz * Mathf.Cos(heading);
         public float LastStroke(bool left) => left ? lastLeft : lastRight;
 
-        public bool Stroke(bool left, float power, bool back, float now, TuningData t)
+        public float maxSpeedBonus; // Turbo power-up
+
+        public bool Stroke(bool left, float power, bool back, float now, TuningData t, float boost = 1f)
         {
             float other = left ? lastRight : lastLeft;
             bool otherBack = left ? lastRightBack : lastLeftBack;
             bool sync = now - other <= t.syncWindow && otherBack == back;
 
             float imp = t.strokeImpulse * power * (back ? -t.backStrokeFactor : 1f) * (sync ? t.syncBoost : 1f);
+            imp *= boost;
             vx += Mathf.Sin(heading) * imp;
             vz += Mathf.Cos(heading) * imp;
 
@@ -68,9 +72,10 @@ namespace Mottainai.Gameplay
             Vector2 flow = FlowField.Sample(seed, x, z, t);
             float wx = vx + flow.x, wz = vz + flow.y;
             float sp = Mathf.Sqrt(wx * wx + wz * wz);
-            if (sp > t.maxSpeed)
+            float vmax = t.maxSpeed + maxSpeedBonus;
+            if (sp > vmax)
             {
-                float k = t.maxSpeed / sp;
+                float k = vmax / sp;
                 wx *= k; wz *= k;
                 vx = wx - flow.x; vz = wz - flow.y;
             }

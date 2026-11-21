@@ -77,6 +77,9 @@ namespace Mottainai.Gameplay
                     team.brain.Step(this, team, rng);
                     team.raft.Step(dt, Seed, T);
                     if (team.shieldActive && Time >= team.shieldUntil) { team.shieldActive = false; Emit(EvType.ShieldOff, team.id); }
+                    if (team.magnetActive && Time >= team.magnetUntil) { team.magnetActive = false; Emit(EvType.PowerOff, team.id, extra: (byte)PowerUp.Magnet); }
+                    if (team.turboActive && Time >= team.turboUntil) { team.turboActive = false; Emit(EvType.PowerOff, team.id, extra: (byte)PowerUp.Turbo); }
+                    team.raft.maxSpeedBonus = team.turboActive ? T.turboMaxSpeedBonus : 0f;
                     Collide(team);
                 }
                 ResolveNets();
@@ -189,9 +192,24 @@ namespace Mottainai.Gameplay
                     if (dx * dx + dz * dz < (T.raftRadius + e.radius + 0.4f) * (T.raftRadius + e.radius + 0.4f))
                     {
                         e.alive = false;
-                        team.shieldActive = true;
-                        team.shieldUntil = Time + T.shieldDuration;
-                        Emit(EvType.ShieldOn, team.id, entity: e.id, x: e.x, z: e.z);
+                        switch ((PowerUp)e.sub)
+                        {
+                            case PowerUp.Magnet:
+                                team.magnetActive = true;
+                                team.magnetUntil = Time + T.magnetDuration;
+                                Emit(EvType.PowerOn, team.id, entity: e.id, value: Mathf.RoundToInt(T.magnetDuration * 10f), extra: e.sub, x: e.x, z: e.z);
+                                break;
+                            case PowerUp.Turbo:
+                                team.turboActive = true;
+                                team.turboUntil = Time + T.turboDuration;
+                                Emit(EvType.PowerOn, team.id, entity: e.id, value: Mathf.RoundToInt(T.turboDuration * 10f), extra: e.sub, x: e.x, z: e.z);
+                                break;
+                            default:
+                                team.shieldActive = true;
+                                team.shieldUntil = Time + T.shieldDuration;
+                                Emit(EvType.ShieldOn, team.id, entity: e.id, x: e.x, z: e.z);
+                                break;
+                        }
                     }
                 }
                 else if (e.kind == EntityKind.Obstacle && e.Dangerous)
@@ -214,7 +232,7 @@ namespace Mottainai.Gameplay
             if (Time < team.strokeReady[(int)role]) return false;
             team.strokeReady[(int)role] = Time + T.strokeCooldown;
             power = Mathf.Clamp(power, T.minStrokePower, T.maxStrokePower);
-            bool sync = team.raft.Stroke(role == Role.LeftPaddler, power, back, Time, T);
+            bool sync = team.raft.Stroke(role == Role.LeftPaddler, power, back, Time, T, team.turboActive ? T.turboImpulseScale : 1f);
             Emit(EvType.Stroke, team.id, role, value: Mathf.RoundToInt(power * 100), extra: (byte)(back ? 1 : 0));
             if (sync) Emit(EvType.Sync, team.id, value: Mathf.RoundToInt(T.syncBoost * 100), x: team.raft.x, z: team.raft.z);
             return true;
@@ -271,12 +289,13 @@ namespace Mottainai.Gameplay
                 nets.RemoveAt(n);
                 var team = Teams[net.team];
                 int caught = 0;
-                int s = LowerBound(net.z - 3f);
-                for (int i = s; i < Count && E[i].z < net.z + 3f; i++)
+                float netR = T.netRadius * (team.magnetActive ? T.magnetRadiusScale : 1f);
+                int s = LowerBound(net.z - 4f);
+                for (int i = s; i < Count && E[i].z < net.z + 4f; i++)
                 {
                     ref var e = ref E[i];
                     if (!e.alive || e.kind != EntityKind.Waste) continue;
-                    float rr = (T.netRadius + e.radius) * T.hitRadiusScale;
+                    float rr = (netR + e.radius) * T.hitRadiusScale;
                     float dx = e.x - net.x, dz = e.z - net.z;
                     if (dx * dx + dz * dz > rr * rr) continue;
                     e.alive = false;

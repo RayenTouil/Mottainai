@@ -331,7 +331,12 @@ namespace Mottainai.Client
         double srvRecv;
         bool havePred, srvRunning;
         readonly RaftSim pred = new RaftSim();
-        struct LocalStroke { public double t; public bool left, back; public float power; }
+        struct LocalStroke { public double t; public bool left, back; public float power, boost; }
+        float magnetUntil, turboUntil;
+
+        /// Power-up timers (local clock) for raft effects + Turbo-aware prediction.
+        public void SetPowers(float magnetUntilTime, float turboUntilTime) { magnetUntil = magnetUntilTime; turboUntil = turboUntilTime; }
+        bool TurboOn => Time.time < turboUntil;
         readonly List<LocalStroke> localStrokes = new List<LocalStroke>(16);
         Vector3 predErr, lastDisplayed;
         float predErrH, lastDisplayedH;
@@ -340,7 +345,7 @@ namespace Mottainai.Client
         /// Register a stroke sent by this client so the raft reacts this frame instead of after a round trip.
         public void PredictStroke(bool left, float power, bool back)
         {
-            localStrokes.Add(new LocalStroke { t = Time.unscaledTimeAsDouble, left = left, back = back, power = power });
+            localStrokes.Add(new LocalStroke { t = Time.unscaledTimeAsDouble, left = left, back = back, power = power, boost = TurboOn ? GameTuning.Current.turboImpulseScale : 1f });
             if (localStrokes.Count > 12) localStrokes.RemoveAt(0);
         }
 
@@ -352,6 +357,7 @@ namespace Mottainai.Client
             float lead = Mathf.Clamp((float)(now - srvRecv) + oneWay, 0f, 0.25f);
             PredictionLeadMs = lead * 1000f;
             pred.SetFromServer(srv, srvZ, srvH, srvVx, srvVz, srvYaw, Seed, t);
+            pred.maxSpeedBonus = TurboOn ? t.turboMaxSpeedBonus : 0f;
             double t0 = now - lead; // local-clock time matching the server state
             double ackBefore = srvRecv - 2f * oneWay; // strokes older than this are already in the server state
             for (int i = localStrokes.Count - 1; i >= 0; i--) if (localStrokes[i].t < now - 1.0) localStrokes.RemoveAt(i);
@@ -365,7 +371,7 @@ namespace Mottainai.Client
                 {
                     var s = localStrokes[next];
                     if (s.t > simT + dt) break;
-                    if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t);
+                    if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t, s.boost);
                 }
                 pred.Step(dt, Seed, t);
                 simT += dt;
@@ -373,7 +379,7 @@ namespace Mottainai.Client
             for (; next < localStrokes.Count; next++)
             {
                 var s = localStrokes[next];
-                if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t);
+                if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t, s.boost);
             }
             var p = new Vector3(pred.x, 0f, pred.z);
             float dtf = Time.unscaledDeltaTime;
@@ -528,6 +534,7 @@ namespace Mottainai.Client
             if (shake > 0f) { camT.position += Random.insideUnitSphere * shake * 0.35f; shake = Mathf.Max(0f, shake - dt * 2.5f); }
             if (sky != null) sky.position = camT.position;
             postFx.ShieldLeft = ShieldLeft;
+            raftView.SetPowers(Time.time < magnetUntil, TurboOn);
             UpdateHighlight();
             UpdateWakeSpray(dt);
         }
@@ -555,6 +562,7 @@ namespace Mottainai.Client
             if (highlight.gameObject.activeSelf) highlight.gameObject.SetActive(false);
             raftView.SetShield(0f, 1f);
             postFx.ShieldLeft = 0f;
+            raftView.SetPowers(false, false);
             attractT += Time.deltaTime;
             RaftPos += new Vector3(0f, 0f, GameTuning.Current.currentSpeed * Time.deltaTime);
             RaftPos = new Vector3(Mathf.Sin(attractT * 0.25f) * 3f, 0f, RaftPos.z);
@@ -606,7 +614,7 @@ namespace Mottainai.Client
             sprayTimer -= dt;
             if (sprayTimer > 0f) return;
             float sp = Attract ? 2.5f : smoothSpeed;
-            sprayTimer = Mathf.Lerp(0.25f, 0.05f, Mathf.InverseLerp(1f, 7f, sp));
+            sprayTimer = Mathf.Lerp(0.25f, 0.05f, Mathf.InverseLerp(1f, 7f, sp)) * (TurboOn && !Attract ? 0.4f : 1f);
             var back = new Vector3(Mathf.Sin(RaftHeading), 0f, Mathf.Cos(RaftHeading));
             var side = new Vector3(back.z, 0f, -back.x);
             var pos = RaftPos - back * 1.6f + side * Random.Range(-0.9f, 0.9f) + Vector3.up * 0.15f;

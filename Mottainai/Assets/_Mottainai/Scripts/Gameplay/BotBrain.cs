@@ -33,7 +33,7 @@ namespace Mottainai.Gameplay
                 for (int i = 0; i < Policies.Length; i++)
                 {
                     var p = Policies[i];
-                    float cost = Evaluate(m, team.raft, p, interval);
+                    float cost = Evaluate(m, team.raft, p, interval, team.turboActive ? t.turboImpulseScale : 1f);
                     if (cost < bestAll) { bestAll = cost; pAll = p; }
                     bool feasible = (lb || ((p.first | p.rest) & L) == 0) && (rb || ((p.first | p.rest) & R) == 0);
                     if (feasible && cost < bestFeasible) { bestFeasible = cost; pFeasible = p; }
@@ -59,7 +59,7 @@ namespace Mottainai.Gameplay
             if (team.IsBot(Role.Collector) && now >= nextNet) Collect(m, team, rng);
         }
 
-        float Evaluate(MatchSim m, RaftSim raft, Policy p, float interval)
+        float Evaluate(MatchSim m, RaftSim raft, Policy p, float interval, float boost)
         {
             var t = m.T;
             probe.CopyFrom(raft);
@@ -74,8 +74,8 @@ namespace Mottainai.Gameplay
                     byte a = first ? p.first : p.rest;
                     first = false;
                     bool back = (a & B) != 0;
-                    if ((a & L) != 0) probe.Stroke(true, 0.9f, back, m.Time + tau, t);
-                    if ((a & R) != 0) probe.Stroke(false, 0.9f, back, m.Time + tau, t);
+                    if ((a & L) != 0) probe.Stroke(true, 0.9f, back, m.Time + tau, t, boost);
+                    if ((a & R) != 0) probe.Stroke(false, 0.9f, back, m.Time + tau, t, boost);
                     nextStroke += interval;
                 }
                 probe.Step(StepDt, m.Seed, t);

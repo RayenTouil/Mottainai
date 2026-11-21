@@ -117,6 +117,17 @@ namespace Mottainai.Gameplay
                 sz += t.shieldSpacing * R(0.85f, 1.15f);
             }
 
+            // Magnet / Turbo power-ups, interleaved halfway between shields
+            float pz = Mathf.Max(t.shieldMinTime * t.expectedAvgSpeed, 100f) + t.shieldSpacing * 0.5f;
+            for (int k = 0; pz < end; k++)
+            {
+                int c = Mathf.Clamp((int)(pz / t.chunkLength), 0, chunks - 1);
+                float px = laneCenters[c] + R(-2.5f, 2.5f);
+                byte sub = (byte)(k % 2 == 0 ? PowerUp.Magnet : PowerUp.Turbo);
+                list.Add(new SimEntity { kind = EntityKind.Shield, sub = sub, alive = true, x = px, baseX = px, z = pz, radius = 0.8f, phase = R(0f, 6f) });
+                pz += t.shieldSpacing * R(0.85f, 1.15f);
+            }
+
             list.Sort((a, b) => a.z.CompareTo(b.z));
             var arr = list.ToArray();
             for (int i = 0; i < arr.Length; i++) arr[i].id = (ushort)i;

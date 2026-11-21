@@ -111,6 +111,8 @@ namespace Mottainai.Gameplay
         public readonly BotBrain brain = new BotBrain();
         public float shieldUntil = -1f, netReadyAt, startZ;
         public bool shieldActive;
+        public float magnetUntil = -1f, turboUntil = -1f;
+        public bool magnetActive, turboActive;
         public readonly List<int> pendingNets = new List<int>();
 
         public TeamState(int id, int hits, float startX)

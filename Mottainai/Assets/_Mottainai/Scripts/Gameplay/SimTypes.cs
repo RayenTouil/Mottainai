@@ -15,7 +15,7 @@ namespace Mottainai.Gameplay
         public bool Dangerous => kind == EntityKind.Obstacle && (sub != (byte)ObstacleType.Shark || flags == 2);
     }
 
-    public enum EvType : byte { Countdown, Go, Stroke, Sync, NetThrow, Catch, Miss, Hit, ShieldOn, ShieldOff, GameOver, Combo, BotTakeover }
+    public enum EvType : byte { Countdown, Go, Stroke, Sync, NetThrow, Catch, Miss, Hit, ShieldOn, ShieldOff, GameOver, Combo, BotTakeover, PowerOn, PowerOff }
 
     public struct MatchEvent
     {

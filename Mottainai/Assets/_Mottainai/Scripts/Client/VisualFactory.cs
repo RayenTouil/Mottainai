@@ -126,12 +126,33 @@ namespace Mottainai.Client
             {
                 case EntityKind.Waste: BuildWaste(root, (WasteType)sub); break;
                 case EntityKind.Obstacle: BuildObstacle(root, (ObstacleType)sub); break;
-                case EntityKind.Shield:
-                    Part(root, Sphere, Transparent(new Color(0.3f, 0.9f, 1f, 0.35f), 2f), Vector3.zero, Vector3.one * 1.3f, default, "bubble");
-                    Part(root, Cube, Lit(new Color(0.3f, 0.85f, 1f), 0.8f), Vector3.zero, new Vector3(0.45f, 0.55f, 0.12f), new Vector3(0, 0, 45), "core");
-                    break;
+                case EntityKind.Shield: BuildPowerUp(root, (PowerUp)sub); break;
             }
             return root.gameObject;
+        }
+
+        /// Floating power-up bubble: Shield (cyan diamond), Magnet (magenta U-magnet), Turbo (orange chevrons).
+        static void BuildPowerUp(Transform root, PowerUp p)
+        {
+            Color c = p == PowerUp.Magnet ? new Color(1f, 0.3f, 0.85f) : p == PowerUp.Turbo ? new Color(1f, 0.6f, 0.15f) : new Color(0.3f, 0.85f, 1f);
+            Part(root, Sphere, Transparent(new Color(c.r, c.g, c.b, 0.33f), 2f), Vector3.zero, Vector3.one * 1.35f, default, "bubble");
+            switch (p)
+            {
+                case PowerUp.Magnet:
+                    Part(root, Cube, Lit(c, 0.7f), new Vector3(-0.18f, 0.02f, 0), new Vector3(0.12f, 0.42f, 0.12f));
+                    Part(root, Cube, Lit(c, 0.7f), new Vector3(0.18f, 0.02f, 0), new Vector3(0.12f, 0.42f, 0.12f));
+                    Part(root, Cube, Lit(c, 0.7f), new Vector3(0f, -0.17f, 0), new Vector3(0.48f, 0.12f, 0.12f));
+                    Part(root, Cube, Lit(Color.white, 0.8f), new Vector3(-0.18f, 0.26f, 0), new Vector3(0.13f, 0.1f, 0.13f));
+                    Part(root, Cube, Lit(Color.white, 0.8f), new Vector3(0.18f, 0.26f, 0), new Vector3(0.13f, 0.1f, 0.13f));
+                    break;
+                case PowerUp.Turbo:
+                    Part(root, Triangle, Lit(c, 0.8f), new Vector3(0, 0.12f, 0), new Vector3(0.5f, 0.35f, 1f), new Vector3(0, 0, 180));
+                    Part(root, Triangle, Lit(Color.white, 0.8f), new Vector3(0, -0.1f, 0), new Vector3(0.5f, 0.35f, 1f), new Vector3(0, 0, 180));
+                    break;
+                default:
+                    Part(root, Cube, Lit(c, 0.8f), Vector3.zero, new Vector3(0.45f, 0.55f, 0.12f), new Vector3(0, 0, 45), "core");
+                    break;
+            }
         }
 
         static void BuildWaste(Transform root, WasteType t)

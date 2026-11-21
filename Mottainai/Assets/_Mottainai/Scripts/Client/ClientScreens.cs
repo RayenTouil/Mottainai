@@ -411,7 +411,7 @@ namespace Mottainai.Client
             timerText.fontStyle = FontStyles.Bold;
             UIKit.Place(timerText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -20), new Vector2(400, 90));
             shieldText = UIKit.Text(root, "", 36, new Color(0.5f, 0.9f, 1f), TextAlignmentOptions.TopRight);
-            UIKit.Place(shieldText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -110), new Vector2(500, 50));
+            UIKit.Place(shieldText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -110), new Vector2(950, 50));
 
             bigText = UIKit.Text(root, "", 160, Color.white);
             bigText.fontStyle = FontStyles.Bold;
@@ -550,7 +550,11 @@ namespace Mottainai.Client
                 if (hudPhase == MatchPhase.Countdown) timerText.text = $"{Mathf.CeilToInt(hudTimeLeft)}";
                 else { int s = Mathf.CeilToInt(hudTimeLeft); timerText.text = $"{s / 60}:{s % 60:00}"; }
                 timerText.color = hudPhase == MatchPhase.Running && hudTimeLeft < 15f ? new Color(1f, 0.5f, 0.4f) : Color.white;
-                shieldText.text = hudShield > 0.05f ? $"SHIELD {hudShield:F1}s" : "";
+                string pw = hudShield > 0.05f ? $"SHIELD {hudShield:F1}s  " : "";
+                float ml = magnetUntil - Time.time, tl = turboUntil - Time.time;
+                if (ml > 0f) pw += $"<color=#FF6FD8>MAGNET {ml:F1}s</color>  ";
+                if (tl > 0f) pw += $"<color=#FFA53A>TURBO {tl:F1}s</color>";
+                shieldText.text = pw;
                 hintPanel.SetActive(Time.time < hintUntil);
             }
 
