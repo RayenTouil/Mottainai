@@ -6,7 +6,7 @@ Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler log
 - dev v2 art dropped (v3 wins): ParkKit/SceneLook removed, Toon/WaterFx/Sky/Water/UI = v3. Unused v2 models stay in Resources.
 - Merge check (2026-11-22): compile OK; Windows autoplay 60 fps, nodelay on; phone R5CY30BPV8B full match TimeUp, 60.1 fps avg, worst 33.2 ms, no crash (Docs/art_v3/merge_phone.png).
 - Backups: tags backup/before-merge-{main,artv3,dev}; branches art/v3, dev, wip/* kept.
-- Pitch: Pitch/MOTTAINAI_Pitch.pptx + .pdf + SCRIPT.md (rebuild: header of Pitch/build_deck.js).
+- Pitch: final deck Pitch/MOTTAINAI_Final.pptx + .pdf + FINAL_GUIDE.md (rebuild: header of Pitch/build_final.js); first draft MOTTAINAI_Pitch.* kept.
 ## In progress
 - I1 (5G SA, Wi-Fi OFF, 3 full matches in a row) never formally run. A4 (teammate readability) open.
 - Voice chat task (feature/voice) paused: audit not delivered yet.

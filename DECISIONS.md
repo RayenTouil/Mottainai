@@ -87,3 +87,5 @@
 - pitch: deck built from Pitch/build_deck.js (pptxgenjs + HTML twin printed to PDF by Edge, no LibreOffice/PowerPoint on this PC); titles Fredoka SemiBold, body Calibri (Nunito Sans not in repo).
 - pitch: architecture slide shows the real v2 stack (wss -> Cloudflare edge MRS -> Durable Object room 60 Hz), not README's UDP 7777; voice chat and eco-facts marked Next (not in code); 5G SA latency marked Next (no measurement yet).
 - pitch: speakers Yassine (1-2), Wajdi (3-5), Rayen (demo, 7-8), Med Amine (9-12); demo ends by steering into a rock to reach results at ~40 s.
+- pitch final: Pitch/MOTTAINAI_Final.pptx merges the Nov 2 application deck (B, French, solo-runner concept) with MOTTAINAI_Pitch (A); code wins on every contradiction (co-op raft, 7 bins, 1 hit, shield 6 s); runner ideas (sorting center, eco-tips, worlds) moved to Next/Later.
+- pitch final: palette #073B43/#19B8B0/#63CDE0/#72C78A/#E9F7F2 + sun/coral accents; Fredoka titles + Calibri body (repo Nunito Sans TTFs have non-standard family names); fade transitions added by XML post-process; 10 slides + hidden backup, 4:10 planned.
