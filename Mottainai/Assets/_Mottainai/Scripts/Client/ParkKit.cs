@@ -131,6 +131,22 @@ namespace Mottainai.Client
             return t;
         }
 
+        /// Flowering bush: soft green mounds with a few pink/yellow/white blossoms.
+        public static Transform Bush()
+        {
+            var t = Root("bush");
+            P(t, VisualFactory.Sphere, L(Leaf), new Vector3(0, 0.35f, 0), new Vector3(1.5f, 0.9f, 1.2f));
+            P(t, VisualFactory.Sphere, L(LeafLight), new Vector3(0.55f, 0.3f, 0.25f), new Vector3(1.0f, 0.75f, 0.9f));
+            P(t, VisualFactory.Sphere, L(LeafLight), new Vector3(-0.6f, 0.25f, -0.15f), new Vector3(0.9f, 0.6f, 0.8f));
+            var cols = new[] { new Color(1f, 0.55f, 0.72f), new Color(1f, 0.88f, 0.3f), Color.white, new Color(1f, 0.55f, 0.72f), new Color(0.75f, 0.55f, 1f) };
+            for (int i = 0; i < 5; i++)
+            {
+                float a = i * 1.3f;
+                P(t, VisualFactory.Sphere, L(cols[i], 0.15f), new Vector3(Mathf.Cos(a) * 0.55f, 0.62f + (i % 2) * 0.12f, Mathf.Sin(a) * 0.4f), Vector3.one * 0.16f);
+            }
+            return t;
+        }
+
         /// Round cartoon tree: brown trunk + 2-3 soft spheres (variant 0..2: round, double, tall oval).
         public static Transform RoundTree(int variant)
         {

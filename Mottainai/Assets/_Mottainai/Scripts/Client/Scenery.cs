@@ -89,7 +89,7 @@ namespace Mottainai.Client
             {
                 var root = new GameObject("prop").transform;
                 root.SetParent(transform, false);
-                var v = new[] { ParkKit.BinPair(), ParkKit.Bench(), ParkKit.Lamp(), ParkKit.BannerPole(), ParkKit.Sign(), ParkKit.Fence(3.2f) };
+                var v = new[] { ParkKit.BinPair(), ParkKit.Bench(), ParkKit.Lamp(), ParkKit.BannerPole(), ParkKit.Sign(), ParkKit.Fence(3.2f), ParkKit.Bush() };
                 foreach (var p in v) { p.SetParent(root, false); p.gameObject.SetActive(false); }
                 props[i] = v; propRoots[i] = root;
             }
@@ -251,7 +251,7 @@ namespace Mottainai.Client
                 bool near = (h % 10) < 2;
                 float off = near ? 2.0f + ((h >> 4) % 100) / 100f * 0.4f : 8.5f + ((h >> 4) % 100) / 100f * 11f;
                 var root = treeRoots[idx];
-                bool land = z < seaZ + (near ? 0f : 25f);
+                bool land = z < seaZ + (near ? 0f : 25f) && (Quality.High || near || (c & 2) == 0); // Low: half the far trees
                 Show(root, land);
                 if (!land) continue;
                 int v = TreeVariant(c, z);
@@ -269,9 +269,9 @@ namespace Mottainai.Client
                 uint h = Hash(c * 17 + 29);
                 float side = (h & 1) == 0 ? -1f : 1f;
                 float z = c * PropSpacing + ((h >> 5) % 100) / 100f * 2f;
-                int kind = (int)((h >> 8) % 9); // 0 bins, 1 bench, 2 lamp, 3 banner, 4 sign, 5 fence; 6-8 = lamp/fence/bins again
-                if (kind == 6) kind = 2; else if (kind == 7) kind = 5; else if (kind == 8) kind = 0;
-                bool on = z < seaZ && z > 6f;
+                int kind = (int)((h >> 8) % 10); // 0 bins, 1 bench, 2 lamp, 3 banner, 4 sign, 5 fence, 6 bush; 7-9 = bush/lamp/bins again
+                if (kind == 7) kind = 6; else if (kind == 8) kind = 2; else if (kind == 9) kind = 0;
+                bool on = z < seaZ && z > 6f && (Quality.High || (c & 1) == 0); // Low: half the props
                 var root = propRoots[idx];
                 Show(root, on);
                 if (!on) continue;
@@ -294,7 +294,8 @@ namespace Mottainai.Client
             // lighthouse island + sailboat ride the horizon, then hold still near the end so the raft approaches them
             float L = GameTuning.Current.courseLength;
             float iz = Mathf.Max(raft.z + 150f, L + 75f);
-            island.localPosition = new Vector3(34f, 0f, iz);
+            island.localPosition = new Vector3(22f, 0f, iz);
+            island.localScale = Vector3.one * 1.35f;
             boat.localPosition = new Vector3(-24f + Mathf.Sin(Time.time * 0.05f) * 6f, Mathf.Sin(Time.time * 0.9f) * 0.15f, iz - 14f);
             boat.localRotation = Quaternion.Euler(Mathf.Sin(Time.time * 0.7f) * 3f, 75f, Mathf.Sin(Time.time * 0.9f) * 4f);
 

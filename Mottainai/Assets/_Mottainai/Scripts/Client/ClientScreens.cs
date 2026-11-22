@@ -135,7 +135,7 @@ namespace Mottainai.Client
         void BuildLogin()
         {
             var p = Panel(UiScreen.Login, Color.clear);
-            Shade(p.transform, 0.62f, 0.12f);
+            Shade(p.transform, 0.42f, 0.08f);
             var logo = UIKit.Rect("Logo", p.transform);
             UIKit.Place(logo, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -50), new Vector2(1300, 230));
             logoText = UIKit.Title(logo, "MOTTAINAI", 168, Color.white);
@@ -158,13 +158,13 @@ namespace Mottainai.Client
             UIKit.Place(tag.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -275), new Vector2(1200, 70));
             tag.outlineWidth = 0.12f; tag.outlineColor = new Color32(0x24, 0x4A, 0x53, 200);
 
-            var col = Column(p.transform, 760, 470, -120);
+            var col = Column(p.transform, 860, 470, -120);
             nameInput = UIKit.Size(UIKit.Input(col, "Your name", playerName, 40), 86);
             UIKit.Size(UIKit.Button(col, "PLAY", Tk.playTop, Tk.playBottom, () => StartLogin(true), 78), 140);
             var row = Row(col, 86);
-            UIKit.Button(row, "NETWORK LAB", UIKit.Secondary, () => Show(UiScreen.Lab), 30);
-            UIKit.Button(row, "FRIENDS", UIKit.Utility, () => StartLogin(false), 30);
-            UIKit.Button(row, "SETTINGS", UIKit.Utility, OpenSettings, 30);
+            UIKit.Button(row, "NETWORK LAB", UIKit.Secondary, () => Show(UiScreen.Lab), 27);
+            UIKit.Button(row, "FRIENDS", UIKit.Utility, () => StartLogin(false), 27);
+            UIKit.Button(row, "SETTINGS", UIKit.Utility, OpenSettings, 27);
             loginStatus = UIKit.Size(UIKit.Bold(col, "", 30, Tk.reward), 56);
 
             var foot = UIKit.Rect("Footer", p.transform);
