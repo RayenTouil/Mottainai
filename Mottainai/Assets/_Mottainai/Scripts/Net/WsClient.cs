@@ -60,7 +60,61 @@ namespace Mottainai.Net
         readonly ConcurrentQueue<Action> mainActions = new ConcurrentQueue<Action>();
         CancellationTokenSource cts;
         int generation;
-        volatile ClientWebSocket current;
+        volatile Conn current;
+        /// v4: own RFC 6455 client with TCP_NODELAY (default). Falls back to ClientWebSocket after 2 failed raw handshakes.
+        public static bool UseRawSocket = true;
+        int rawFailures;
+        public volatile string Transport = "-";
+        /// Voice frames (S2C 0x88/0x89) go here on the socket thread, never through the main-thread inbox (backlogMs).
+        public Action<byte[], double> VoiceSink;
+
+        abstract class Conn
+        {
+            public abstract bool IsOpen { get; }
+            public abstract Task Connect(Uri u, CancellationToken ct);
+            public abstract Task Send(byte[] b, CancellationToken ct);
+            public abstract Task<byte[]> Receive(CancellationToken ct); // null = closed
+            public abstract void Abort();
+            public abstract Task Close();
+            public bool NoDelay;
+        }
+        sealed class RawConn : Conn
+        {
+            readonly RawWebSocket ws = new RawWebSocket();
+            public override bool IsOpen => ws.Open;
+            public override async Task Connect(Uri u, CancellationToken ct) { await ws.ConnectAsync(u, ct).ConfigureAwait(false); NoDelay = ws.NoDelay; }
+            public override Task Send(byte[] b, CancellationToken ct) => ws.SendBinaryAsync(b, ct);
+            public override Task<byte[]> Receive(CancellationToken ct) => ws.ReceiveAsync(ct);
+            public override void Abort() => ws.Abort();
+            public override Task Close() => ws.CloseAsync();
+        }
+        sealed class CwsConn : Conn
+        {
+            readonly ClientWebSocket ws = new ClientWebSocket();
+            byte[] buf = new byte[64 * 1024];
+            public override bool IsOpen => ws.State == WebSocketState.Open;
+            public override async Task Connect(Uri u, CancellationToken ct)
+            {
+                ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+                await ws.ConnectAsync(u, ct).ConfigureAwait(false);
+                NoDelay = DisableNagle(ws);
+            }
+            public override Task Send(byte[] b, CancellationToken ct) => ws.SendAsync(new ArraySegment<byte>(b), WebSocketMessageType.Binary, true, ct);
+            public override async Task<byte[]> Receive(CancellationToken ct)
+            {
+                int len = 0;
+                for (;;)
+                {
+                    var res = await ws.ReceiveAsync(new ArraySegment<byte>(buf, len, buf.Length - len), ct).ConfigureAwait(false);
+                    if (res.MessageType == WebSocketMessageType.Close) return null;
+                    len += res.Count;
+                    if (!res.EndOfMessage) { if (len == buf.Length) Array.Resize(ref buf, buf.Length * 2); continue; }
+                    var m = new byte[len]; Buffer.BlockCopy(buf, 0, m, 0, len); return m;
+                }
+            }
+            public override void Abort() { try { ws.Abort(); } catch { } }
+            public override async Task Close() { try { if (ws.State == WebSocketState.Open) await ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None).ConfigureAwait(false); } catch { } }
+        }
         volatile bool suspended;
         volatile string forceCause;
         long lastRecvBits, mainAliveBits;
@@ -152,22 +206,26 @@ namespace Mottainai.Net
                     try { await resumeSignal.WaitAsync(250, ct).ConfigureAwait(false); } catch { break; }
                 }
                 if (ct.IsCancellationRequested || gen != generation) break;
-                using (var ws = new ClientWebSocket())
+                bool raw = UseRawSocket && rawFailures < 2;
+                Conn ws = raw ? (Conn)new RawConn() : new CwsConn();
                 using (var conn = CancellationTokenSource.CreateLinkedTokenSource(ct))
                 {
                     current = ws;
                     forceCause = null;
-                    ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
                     state = State.Connecting;
+                    bool opened = false;
                     try
                     {
                         using (var to = CancellationTokenSource.CreateLinkedTokenSource(ct))
                         {
                             to.CancelAfter(Fast ? 5000 : 8000);
-                            await ws.ConnectAsync(new Uri(Url), to.Token).ConfigureAwait(false);
+                            await ws.Connect(new Uri(Url), to.Token).ConfigureAwait(false);
                         }
                         if (suspended) throw new OperationCanceledException("app paused");
-                        NoDelay = DisableNagle(ws);
+                        opened = true;
+                        if (raw) rawFailures = 0;
+                        NoDelay = ws.NoDelay;
+                        Transport = raw ? "raw socket" : "ClientWebSocket";
                         Stamp(ref lastRecvBits);
                         state = State.Open;
                         attempt = 0;
@@ -178,10 +236,15 @@ namespace Mottainai.Net
                         finally { conn.Cancel(); outSignal.Release(); }
                         try { await sendTask.ConfigureAwait(false); } catch { }
                         try { await beatTask.ConfigureAwait(false); } catch { }
-                        LastError = forceCause ?? ws.CloseStatusDescription ?? "closed";
+                        LastError = forceCause ?? "closed";
                     }
-                    catch (Exception e) { LastError = forceCause ?? e.InnerException?.Message ?? e.Message; }
-                    try { if (ws.State == WebSocketState.Open) await ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None).ConfigureAwait(false); } catch { }
+                    catch (Exception e)
+                    {
+                        LastError = forceCause ?? e.InnerException?.Message ?? e.Message;
+                        if (raw && !opened && forceCause == null && !suspended) { rawFailures++; Debug.LogWarning("[Ws] raw socket failed (" + rawFailures + "): " + LastError); }
+                    }
+                    try { await ws.Close().ConfigureAwait(false); } catch { }
+                    ws.Abort();
                     current = null;
                 }
                 if (ct.IsCancellationRequested || gen != generation) break;
@@ -196,9 +259,9 @@ namespace Mottainai.Net
             }
         }
 
-        async Task Heartbeat(ClientWebSocket ws, CancellationToken ct)
+        async Task Heartbeat(Conn ws, CancellationToken ct)
         {
-            while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            while (ws.IsOpen && !ct.IsCancellationRequested)
             {
                 var f = HeartbeatFrame;
                 if (f != null && NetTime.Ms - MainAliveMs < MainStallMs) Send(f());
@@ -206,32 +269,20 @@ namespace Mottainai.Net
             }
         }
 
-        async Task RecvLoop(ClientWebSocket ws, CancellationToken ct)
+        async Task RecvLoop(Conn ws, CancellationToken ct)
         {
-            var buf = new byte[64 * 1024];
-            int len = 0;
-            while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            while (ws.IsOpen && !ct.IsCancellationRequested)
             {
-                var seg = new ArraySegment<byte>(buf, len, buf.Length - len);
-                var res = await ws.ReceiveAsync(seg, ct).ConfigureAwait(false);
-                if (res.MessageType == WebSocketMessageType.Close) break;
-                len += res.Count;
-                if (!res.EndOfMessage)
-                {
-                    if (len == buf.Length) Array.Resize(ref buf, buf.Length * 2);
-                    continue;
-                }
-                if (res.MessageType == WebSocketMessageType.Binary && len > 0)
-                {
-                    var m = new byte[len];
-                    Buffer.BlockCopy(buf, 0, m, 0, len);
-                    double t = NetTime.Ms;
-                    inbox.Enqueue(new Inbound { data = m, recvMs = t });
-                    Interlocked.Exchange(ref lastRecvBits, BitConverter.DoubleToInt64Bits(t));
-                    Interlocked.Add(ref BytesRecv, len);
-                    Interlocked.Increment(ref MsgsRecv);
-                }
-                len = 0;
+                var m = await ws.Receive(ct).ConfigureAwait(false);
+                if (m == null) break;
+                if (m.Length == 0) continue;
+                double t = NetTime.Ms;
+                Interlocked.Exchange(ref lastRecvBits, BitConverter.DoubleToInt64Bits(t));
+                Interlocked.Add(ref BytesRecv, m.Length);
+                Interlocked.Increment(ref MsgsRecv);
+                var vs = VoiceSink;
+                if (vs != null && (m[0] == 0x88 || m[0] == 0x89)) { try { vs(m, t); } catch (Exception e) { Debug.LogWarning("[Voice] " + e.Message); } continue; }
+                inbox.Enqueue(new Inbound { data = m, recvMs = t });
             }
         }
 
@@ -275,14 +326,14 @@ namespace Mottainai.Net
             return null;
         }
 
-        async Task SendLoop(ClientWebSocket ws, CancellationToken ct)
+        async Task SendLoop(Conn ws, CancellationToken ct)
         {
-            while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            while (ws.IsOpen && !ct.IsCancellationRequested)
             {
                 await outSignal.WaitAsync(ct).ConfigureAwait(false);
                 while (outbox.TryDequeue(out var m))
                 {
-                    await ws.SendAsync(new ArraySegment<byte>(m), WebSocketMessageType.Binary, true, ct).ConfigureAwait(false);
+                    await ws.Send(m, ct).ConfigureAwait(false);
                     Interlocked.Add(ref BytesSent, m.Length);
                     Interlocked.Increment(ref MsgsSent);
                 }

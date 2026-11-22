@@ -1,12 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
 
-const COLS = ["ts", "device", "netType", "edgeColo", "roomColo", "edgeRttAvg", "edgeRttP95", "edgeJitter", "roomRttAvg", "roomRttP95", "roomJitter", "downMbps", "upMbps", "downMB", "upMB", "note"];
+const COLS = ["ts", "device", "netType", "edgeColo", "roomColo", "edgeRttAvg", "edgeRttP95", "edgeJitter", "roomRttAvg", "roomRttP95", "roomJitter", "downMbps", "upMbps", "downMB", "upMB", "note", "voiceE2eAvg", "voiceE2eP95", "voiceJitter", "voiceLossPct"];
 
 /** Stores Network Lab runs in SQLite; exports CSV. */
 export class TelemetryDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY AUTOINCREMENT, ${COLS.map(c => `${c} TEXT`).join(", ")})`);
+    const have = new Set(ctx.storage.sql.exec(`PRAGMA table_info(runs)`).toArray().map((r: any) => r.name));
+    for (const c of COLS) if (!have.has(c)) ctx.storage.sql.exec(`ALTER TABLE runs ADD COLUMN ${c} TEXT`); // v4 voice columns
   }
 
   async fetch(req: Request): Promise<Response> {

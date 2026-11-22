@@ -265,7 +265,8 @@ namespace Mottainai.EditorTools
         static readonly string[] Permissions =
         {
             "android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.CHANGE_NETWORK_STATE",
-            "android.permission.READ_PHONE_STATE", "android.permission.VIBRATE", "android.permission.ACCESS_WIFI_STATE"
+            "android.permission.READ_PHONE_STATE", "android.permission.VIBRATE", "android.permission.ACCESS_WIFI_STATE",
+            "android.permission.RECORD_AUDIO", "android.permission.MODIFY_AUDIO_SETTINGS"
         };
 
         public void OnPostGenerateGradleAndroidProject(string path)
@@ -285,6 +286,26 @@ namespace Mottainai.EditorTools
                 var el = doc.CreateElement("uses-permission");
                 el.SetAttribute("name", ns, perm);
                 root.PrependChild(el);
+            }
+            // Android 14+: apps asking for NET_CAPABILITY_PRIORITIZE_LATENCY must self-certify it (property + XML)
+            var app = root.SelectSingleNode("application") as XmlElement;
+            if (app != null)
+            {
+                bool has = false;
+                foreach (XmlNode n in app.SelectNodes("property"))
+                    if (n.Attributes?["android:name"]?.Value == "android.net.PROPERTY_SELF_CERTIFIED_NETWORK_CAPABILITIES") has = true;
+                if (!has)
+                {
+                    var prop = doc.CreateElement("property");
+                    prop.SetAttribute("name", ns, "android.net.PROPERTY_SELF_CERTIFIED_NETWORK_CAPABILITIES");
+                    prop.SetAttribute("resource", ns, "@xml/network_capabilities");
+                    app.AppendChild(prop);
+                }
+                var xmlDir = Path.Combine(path, "src", "main", "res", "xml");
+                Directory.CreateDirectory(xmlDir);
+                File.WriteAllText(Path.Combine(xmlDir, "network_capabilities.xml"),
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<network-capabilities-declaration xmlns:android=\"http://schemas.android.com/apk/res/android\">\n" +
+                    "    <uses-network-capability android:name=\"NET_CAPABILITY_PRIORITIZE_LATENCY\"/>\n</network-capabilities-declaration>\n");
             }
             doc.Save(manifest);
         }

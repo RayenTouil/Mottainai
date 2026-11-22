@@ -21,6 +21,7 @@ interface Player {
   ws: WebSocket | null; leftAt: number; backlogMs: number; fps: number; rttMs: number; netType: number;
   lastMsgAt: number;
   teamId: number; teamName: string; inviteTeamId: number; inviteExp: number;
+  micOn?: boolean; talking?: boolean; lastVoiceAt?: number; vWin?: number; vCount?: number; vDropped?: number; vRelayed?: number;
 }
 const INVITE_MS = 60_000;
 
@@ -133,6 +134,7 @@ export class RoomDO extends DurableObject {
     this.broadcastLobby();
     this.startLoop();
     this.loadTeam(p);
+    for (const x of this.players) if (x !== p && x.ws && x.micOn) this.sendVoiceState(p, x);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -259,6 +261,9 @@ export class RoomDO extends DurableObject {
         }
         case C2S.READY: { const on = r.u8() !== 0; if (this.inLobby) p.ready = on; this.broadcastLobby(); break; }
         case C2S.START: this.tryStart(p); break;
+        case C2S.VOICE:
+        case C2S.VOICE_ECHO: this.relayVoice(p, ws, msg, id === C2S.VOICE_ECHO); break;
+        case C2S.VOICE_STATE: { p.micOn = r.u8() !== 0; if (!p.micOn) p.talking = false; this.broadcastVoiceState(p); break; }
         case C2S.CONTINUE_BOT: this.continueWithBots(p); break;
         case C2S.TEAM_CREATE: await this.teamCreate(p, r.str()); break;
         case C2S.TEAM_ANSWER: await this.teamAnswer(p, r.u8() !== 0); break;
@@ -479,6 +484,27 @@ export class RoomDO extends DurableObject {
     } catch (e) { this.log({ ev: "team_claim_failed", err: String(e) }); }
   }
 
+  // ---------------- voice: pure relay (never decoded), sent at once from the message handler (no snapshot work in between) ----------------
+  relayVoice(p: Player, ws: WebSocket, msg: ArrayBuffer, echo: boolean) {
+    const now = Date.now();
+    if (!ROOM_CFG.voiceEnabled || msg.byteLength > ROOM_CFG.voiceMaxBytes || msg.byteLength < 9) { p.vDropped = (p.vDropped ?? 0) + 1; return; }
+    if (now - (p.vWin ?? 0) >= 1000) { p.vWin = now; p.vCount = 0; }
+    p.vCount = (p.vCount ?? 0) + 1;
+    if (p.vCount > ROOM_CFG.voiceMaxMsgPerS) { p.vDropped = (p.vDropped ?? 0) + 1; return; }
+    const out = new Uint8Array(msg.byteLength + 1);
+    out[0] = S2C.VOICE; out[1] = p.id; out.set(new Uint8Array(msg, 1), 2); // u8 speakerId + the client's seq/captureMs/frames
+    if (echo) { try { ws.send(out); } catch {} return; } // loopback: back to the sender only
+    if (!p.role) return; // spectators neither talk nor listen: voice stays inside the room team
+    for (const q of this.players) if (q !== p && q.ws && q.role) { try { q.ws.send(out); } catch {} }
+    p.vRelayed = (p.vRelayed ?? 0) + 1;
+    p.lastVoiceAt = now;
+    if (!p.talking) { p.talking = true; this.broadcastVoiceState(p); }
+  }
+
+  voiceStateBytes(x: Player) { const w = this.w.reset(); w.u8w(S2C.VOICE_STATE).u8w(x.id).u8w(x.micOn ? 1 : 0).u8w(x.talking ? 1 : 0); return w.bytes(); }
+  sendVoiceState(to: Player, x: Player) { try { to.ws?.send(this.voiceStateBytes(x)); } catch {} }
+  broadcastVoiceState(x: Player) { const b = this.voiceStateBytes(x); for (const q of this.players) if (q !== x && q.ws && q.role) { try { q.ws.send(b); } catch {} } }
+
   log(o: Record<string, unknown>) { console.log(JSON.stringify({ room: this.code, ...o })); }
 
   // ---------------- loop ----------------
@@ -506,6 +532,7 @@ export class RoomDO extends DurableObject {
       try { ws.close(4001, "timeout"); } catch {}
       this.drop(ws, "timeout");
     }
+    for (const p of this.players) if (p.talking && now - (p.lastVoiceAt ?? 0) > ROOM_CFG.voiceTalkingHoldMs) { p.talking = false; this.broadcastVoiceState(p); }
     if (this.players.some(p => p.ws)) this.lastHumanAt = now;
     else if (!this.pause && now - this.lastHumanAt > IDLE_STOP_MS) {
       this.sim?.abort(); this.sim = null;
@@ -538,7 +565,7 @@ export class RoomDO extends DurableObject {
       if (!this.resultsSent) {
         this.resultsSent = true;
         for (const p of this.players) { p.ready = false; if (p.ws) this.sendResults(p.ws); } // rematch needs READY again
-        this.log({ ev: "match_end", reason: sim.results?.reason, ...this.mstats });
+        this.log({ ev: "match_end", reason: sim.results?.reason, ...this.mstats, voice: this.players.map(x => ({ n: x.name, relayed: x.vRelayed ?? 0, dropped: x.vDropped ?? 0 })) });
         if (sim.results && sim.results.reason !== 3) this.reportMatch(sim.seed, sim.results.total);
         this.broadcastLobby();
       }

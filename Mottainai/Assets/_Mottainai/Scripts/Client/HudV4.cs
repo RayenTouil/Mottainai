@@ -95,6 +95,9 @@ namespace Mottainai.Client
             var mb = UIKit.Button(root, "II", UIKit.Muted, () => SetLeaveMenu(true), 40, "MenuBtn");
             UIKit.Place((RectTransform)mb.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-336, -18), new Vector2(88, 88));
             menuBtn = mb.gameObject;
+            var mic = UIKit.Button(root, "MIC OFF", UIKit.Muted, ToggleMic, 26, "MicBtn");
+            UIKit.Place((RectTransform)mic.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-540, -18), new Vector2(150, 88));
+            micBtn = mic;
 
             // --- bottom legend bar: 7 waste icons, score, live count
             var bar = Box(root, new Vector2(0.5f, 0), new Vector2(0, 12), new Vector2(1180, 132), new Color(0.12f, 0.16f, 0.2f, 0.7f), "LegendBar");
@@ -297,7 +300,7 @@ namespace Mottainai.Client
         {
             if (v4Canvas == null || !v4Canvas.gameObject.activeSelf) return false;
             if (leaveMenu.activeSelf || leaveConfirm.activeSelf || pauseCard.activeSelf) return true;
-            foreach (var g in new[] { helpBtn, menuBtn })
+            foreach (var g in new[] { helpBtn, menuBtn, micBtn.gameObject })
                 if (g.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint((RectTransform)g.transform, pos, null)) return true;
             foreach (var g in new[] { roleCard, legendPop })
                 if (g.activeSelf) foreach (var b in g.GetComponentsInChildren<Button>())
@@ -352,6 +355,10 @@ namespace Mottainai.Client
         void V4OnGo() => legendPop.SetActive(false);
         void V4OnCatch(WasteType t) { int i = (int)t; if (i >= 0 && i < 7) hudCounts[i]++; }
 
+        Button micBtn;
+        VoiceEngine voice;
+        void ToggleMic() { if (voice != null) voice.SetMic(!voice.MicOn, Toast); }
+
         void SetLeaveMenu(bool on) { if (leaveMenu == null) return; leaveMenu.SetActive(on); leaveConfirm.SetActive(false); }
 
         void LeaveMatch()
@@ -369,7 +376,9 @@ namespace Mottainai.Client
             if (!game && !lobbyS) roleCard.SetActive(false);
             v4Canvas.gameObject.SetActive(game || (lobbyS && roleCard.activeSelf));
             UpdatePauseCard();
-            helpBtn.SetActive(game); menuBtn.SetActive(game); legendBar.SetActive(game);
+            helpBtn.SetActive(game); menuBtn.SetActive(game);
+            micBtn.gameObject.SetActive(game && VoiceEngine.Enabled);
+            if (voice != null) { UIKit.Label(micBtn).text = voice.MicOn ? (voice.Voiced ? "MIC ))" : "MIC ON") : "MIC OFF"; var fc = micBtn.transform.Find("Face")?.GetComponent<Image>(); if (fc != null) fc.color = voice.MicOn ? UIKit.Accent : UIKit.Muted; } legendBar.SetActive(game);
             // safe area (notches / punch holes) for every v4 widget
             var sa = Screen.safeArea; float k = 1080f / Mathf.Max(1, Screen.height);
             v4Safe.offsetMin = new Vector2(sa.xMin * k, sa.yMin * k);

@@ -88,12 +88,15 @@ namespace Mottainai.Client
                 if (cli[i] == "-suspendat" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendAt);
                 if (cli[i] == "-suspendfor" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendFor);
                 if (cli[i] == "-shotsat" && i + 1 < cli.Length) shotsAt = cli[i + 1];
+                if (cli[i] == "-voiceloop") autoVoiceLoop = true;
                 if (cli[i] == "-teamname" && i + 1 < cli.Length) autoTeam = cli[i + 1];
                 if (cli[i] == "-role" && i + 1 < cli.Length && int.TryParse(cli[i + 1], out int ar)) preferredRole = (Role)ar;
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
             }
 
             world = WorldView.Create(null); // live river behind the menus (attract mode)
+            if (VoiceEngine.Enabled) voice = VoiceEngine.Create(net);
+            net.OnWelcome += w => { if (voice != null) { voice.MyId = w.playerId; voice.RestoreMic(Toast); } };
             BuildUi();
             Show(UiScreen.Login);
             if (autoplay) StartCoroutine(AutoPlay());
@@ -105,7 +108,7 @@ namespace Mottainai.Client
         int perfFrames; float perfTime, perfWorst;
         string shotsDir;
         float quitAfter, suspendAt, suspendFor = 5f; // -suspendat: simulate app background (same path as a screen lock)
-        string shotsAt, autoTeam; // -teamname: create a team, screenshot TEAM + LEADERBOARD, play, leave the team at the end
+        string shotsAt, autoTeam; bool autoVoiceLoop; // -teamname: create a team, screenshot TEAM + LEADERBOARD, play, leave the team at the end
         int shotIndex;
 
         void Shot(string label)
@@ -137,6 +140,18 @@ namespace Mottainai.Client
             while (screen != UiScreen.Menu && Time.realtimeSinceStartup - t0 < 90f) yield return null;
             if (screen != UiScreen.Menu) { Debug.LogError("[AUTOPLAY] FAIL: never reached menu. " + loginStatus.text); Application.Quit(2); yield break; }
             Debug.Log($"[AUTOPLAY] menu; content {content.BytesTotal / 1048576f:F1} MB at {content.Mbps:F1} MB/s cached={content.FromCache}");
+            if (autoVoiceLoop)
+            {
+                // voice loopback through the v4 room server (no mic): encode -> VOICE_ECHO -> server -> jitter buffer
+                var lws = new WsClient(); lws.Connect(NetClient.WsUrl(content.BaseUrl, "VL" + Random.Range(1000, 9999), "vl" + token, "vl", Role.None));
+                float tw = Time.realtimeSinceStartup; while (!lws.IsOpen && Time.realtimeSinceStartup - tw < 8f) yield return null;
+                lws.HeartbeatFrame = () => new ByteWriter().Begin(Msg.Ping).F64(NetTime.Ms).ToArray();
+                AudioSettings.GetDSPBufferSize(out int dl, out int dn);
+                var lb = new VoiceLoopback(); var th = new System.Threading.Thread(() => lb.Run(lws, 1000f * dl * dn / AudioSettings.outputSampleRate)); th.Start();
+                while (!lb.Done) { lws.Poll((m, t) => { }); yield return null; }
+                Debug.Log($"[VOICE] loopback transport={lws.Transport} nodelay={lws.NoDelay} sent={lb.Sent} got={lb.Got} e2e avg={lb.E2eAvg:F0} p95={lb.E2eP95:F0} jitter={lb.E2eP95 - 0:F0}/{lb.Jitter:F0} ms loss={lb.LossPct:F1}% dsp={dl}x{dn}");
+                lws.Close();
+            }
             if (!string.IsNullOrEmpty(autoTeam))
             {
                 Show(UiScreen.Team);
@@ -510,6 +525,7 @@ namespace Mottainai.Client
         void OnApplicationPause(bool paused)
         {
             if (paused) net.Suspend(); else net.Resume();
+            voice?.OnAppPause(paused);
         }
 
         void OnApplicationFocus(bool focus)

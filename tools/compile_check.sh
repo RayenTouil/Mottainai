@@ -9,6 +9,8 @@ OUT="$ROOT/Builds/compile_check"; mkdir -p "$OUT"
 RSP="$OUT/refs.rsp"; : > "$RSP"
 echo "-r:\"$(cygpath -w "$E/NetStandard/ref/2.1.0/netstandard.dll")\"" >> "$RSP"
 for f in "$E"/Managed/UnityEngine/*.dll; do echo "-r:\"$(cygpath -w "$f")\"" >> "$RSP"; done
+for f in "$E"/NetStandard/compat/2.1.0/shims/netstandard/System.Runtime.dll; do echo "-r:\"$(cygpath -w "$f")\"" >> "$RSP"; done
+for f in "$PROJ"/Assets/_Mottainai/Plugins/*/*.dll; do echo "-r:\"$(cygpath -w "$f")\"" >> "$RSP"; done
 for f in "$PROJ"/Library/ScriptAssemblies/*.dll; do
   case "$(basename "$f")" in Mottainai.*|*CodeGen*|*Tests*) continue;; esac
   echo "-r:\"$(cygpath -w "$f")\"" >> "$RSP"
