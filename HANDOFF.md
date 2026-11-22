@@ -1,15 +1,15 @@
-# HANDOFF (v2 Cloudflare)
+# HANDOFF (v2 Cloudflare) — branch `dev` (main = last known-good)
 Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler login` once per PC)
 ## Done
-- S0: PROTOCOL.md v2, server/ Worker + RoomDO (WELCOME/LOBBY/PING/PONG/fake snapshots) + TelemetryDO. Smoke: `node server/tools/smoke.ts`.
-- C1 code: NGO/UTP + Server assembly + local-server scripts removed; Net/WsClient (ClientWebSocket, backoff), Net/Codecs (PROTOCOL v2), NetClient, ContentService (server_config.json, /api/*, /pack sha256), NetworkLab (edge/room RTT, down/up, telemetry), screens Title(5-tap URL)/Pack/Menu/Lobby/Game/Results, Net HUD (edge/room colo). `tools/compile_check.sh` OK.
-## Done (S1)
-- server/src/sim.ts full sim + bots + lag comp + scoring; RoomDO lobby/countdown/run/results/rematch, bot takeover/reconnect; real 36 MB pack (genpack.mjs); lab + telemetry endpoints. Tests: `npm run simcheck` (0/20 crashes), `node tools/fakeclient.ts` (full match on Cloudflare: 60 snap/s, ~200 kbps, RTT ~60 ms).
-## Done (P1 models, early)
-- CC0 models in Resources/Models + glTFast + ModelImportRules + VisualFactory mapping (primitive fallback). Open Unity once to import, check raft/paddle/shark orientation.
+- S0/S1/C1/C2: Worker + RoomDO sim/bots/lag comp, content pack, lab/telemetry, Unity WS client (see git log).
+- NET (dev): drift-free DO tick loop (server jitter p95 14.7 -> 0.7 ms), immediate event flush, early-input deferral; client TCP_NODELAY, socket-thread RTT, tick-timeline prediction + event-acked strokes, entity extrapolation, adaptive buffer. Probe: `node server/tools/jitter.ts`.
+- ART P1-P6 (dev): lighting/sky/post + Quality High/Low; water v2 (caustics, foam, ripples, bow wave, sea end); toy crew/raft; park kit (ground shader, stone edges, trees, props, bridges, lighthouse); waste prop kit; UI restyle (Fredoka/Nunito, title, settings overlay, HUD, onboarding, results).
+- FIX: content-pack textures never loaded before (mip chain) -> water normal maps + raft skin now applied.
 ## In progress
-- C1/C2 build: Unity editor must be CLOSED -> build_android.bat -> install_phone.bat (1 phone only: R5CY30BPV8B, 5G SA, Wi-Fi OFF).
+- I1 not yet passed: phone R5CY30BPV8B on 5G SA (Wi-Fi OFF), 1 human + 2 bots, 3 full matches in a row (LEFT PADDLER, then COLLECTOR).
+- P8 polish/acceptance (reference compare, FPS High/Low on phone).
 ## Exact next step
-- I1 (1 phone): Quick Play, 1 human + 2 bots. Human = LEFT PADDLER, then COLLECTOR. Pass = 3 full matches in a row over 5G SA. Then Network Lab on Wi-Fi + 5G SA -> /api/telemetry.csv.
+- Plug phone -> `bash tools/build_copy.sh android` -> `install_phone.bat` -> I1 runs; read Net HUD (5G SA, colos, RTT, buffer).
 ## Resume commands
-- `git pull --rebase --autostash` ; `deploy_server.bat` ; `build_android.bat` ; `install_phone.bat`
+- `git pull --rebase --autostash` ; `bash tools/build_copy.sh android|win` (works with the editor open) ; `install_phone.bat`
+- Visual check: `Builds/Win/Mottainai.exe -autoplay -room SH1234 -role 3 -shots <dir> -quitafter 24`
