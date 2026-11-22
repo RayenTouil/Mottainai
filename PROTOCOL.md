@@ -19,8 +19,8 @@ Quantization: positions `i16` cm (x) / `i16` cm relative to `originZ` (z), angle
 | id | name | payload |
 |---|---|---|
 | 0x01 | ROLE | u8 role |
-| 0x02 | READY | u8 ready(0/1) |
-| 0x03 | START | — (lobby → countdown; also REMATCH from END) |
+| 0x02 | READY | u8 ready(0/1) — ignored outside the lobby; reset for everyone on match start and on match end. ROLE is refused while READY. |
+| 0x03 | START | — host only, lobby only, every connected human READY; else NOTICE ("Only the host can start" / "Waiting for: A, B" / "Match already running"). Also REMATCH from END. |
 | 0x04 | LEAVE | — (v3: voluntary leave, bot takes the role immediately, no reconnect slot) |
 | 0x10 | STROKE | u8 side(0 L,1 R), u8 power(0..255 = 0..1), f32 clientTime |
 | 0x11 | BACKPADDLE | u8 side, u8 power, f32 clientTime |
@@ -34,7 +34,7 @@ Quantization: positions `i16` cm (x) / `i16` cm relative to `originZ` (z), angle
 | id | name | payload |
 |---|---|---|
 | 0x80 | WELCOME | u16 protocolVersion, u8 playerId, str roomCode, str roomColo, u32 serverTick, u8 tickRate, u8 snapshotHz |
-| 0x81 | LOBBY | u8 phase, u8 n, n × {u8 playerId, str name, u8 role, u8 flags(1 ready, 2 connected)}, u8 roleOwner[3] (L,R,C: playerId or 0xFF = bot) |
+| 0x81 | LOBBY | u8 phase, u8 n, n × {u8 playerId, str name, u8 role, u8 flags(1 ready, 2 connected)}, u8 roleOwner[3] (L,R,C: playerId or 0xFF = bot), u8 hostId (v3) |
 | 0x82 | MATCH_START | u32 seed, u8 yourRole, u8 team, u16 durationS, u16 countdownMs, u8 tickRate |
 | 0x83 | SNAPSHOT | see below |
 | 0x84 | EVENTS | u8 n, n × {u8 type, u8 team, u8 role, u16 entity, i16 value, u8 extra, i16 x cm, f32 z} |
@@ -60,3 +60,6 @@ Rate: 60 Hz, 30 Hz when any client reports `backlogMs > 100`.
 
 ### Phases
 0 Lobby, 1 Countdown, 2 Running, 3 Finished. End reasons: 1 TimeUp, 2 Crashed, 3 Aborted.
+
+### Lobby rules (v3)
+Host = first connected human in join order; sticky while connected, then the next connected human. Bots need no READY; a single human can READY + START alone.

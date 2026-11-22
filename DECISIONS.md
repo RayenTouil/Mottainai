@@ -89,3 +89,6 @@
 - v4/A: "?" + pause buttons left of the timer; HUD and v4 overlay follow Screen.safeArea (likely cause of the unseen score on notched phones); score label "TEAM" at 84 px.
 - v4/A: countdown strip = existing role hint panel (moved above the legend bar); collect/avoid pop-up opens on MATCH_START, closes on GO.
 - v4/A: LEAVE 0x04 = drop() + remove player (no reconnect slot); Android Back / Esc opens the pause overlay.
+- v4/B: host = first connected human (join order), sticky while connected; sent as trailing u8 in LOBBY. START/REMATCH = host + lobby + all connected humans READY, else NOTICE. Players inside the 60 s reconnect window are not waited for.
+- v4/B: READY ignored outside the lobby; reset on match start and when RESULTS are sent. ROLE refused while READY.
+- v4/B: client REMATCH = back to lobby + READY (the host still presses START); START shown to the host only, enabled at N/N ready.

@@ -134,6 +134,8 @@ namespace Mottainai.Client
             yield return new WaitForSecondsRealtime(0.8f);
             Shot("lobby");
             Debug.Log($"[AUTOPLAY] room {lobby.code} role {myRole}, starting");
+            net.SetReady(true);
+            yield return new WaitForSecondsRealtime(0.5f);
             net.StartMatch();
             float logT = 0, throwT = 0, gameT = 0;
             int nextShot = 0;

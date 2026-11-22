@@ -7,6 +7,7 @@ Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler log
 - Merge check (2026-11-22): compile OK; Windows autoplay 60 fps, nodelay on; phone R5CY30BPV8B full match TimeUp, 60.1 fps avg, worst 33.2 ms, no crash (Docs/art_v3/merge_phone.png).
 - Backups: tags backup/before-merge-{main,artv3,dev}; branches art/v3, dev, wip/* kept.
 ## In progress
+- v4 Phase B done: host + READY/START rules on the server (tools/lobbytest.ts: 18/18 PASS on mottainai-v4).
 - v4 Phase A (feature/v4, server mottainai-v4): onboarding cards, collect/avoid pop-up, legend bar, safe-area score, pause/LEAVE. Windows checked; phone test pending (phone not connected).
 - I1 (5G SA, Wi-Fi OFF, 3 full matches in a row) never formally run. A4 (teammate readability) open.
 - Voice chat task (feature/voice) paused: audit not delivered yet.

@@ -54,6 +54,7 @@ namespace Mottainai.Net
         public string code = "", message = "";
         public MatchPhase phase;
         public ulong creator;
+        public byte hostId; // v3: START/REMATCH only from the host
         public readonly List<LobbyPlayer> players = new List<LobbyPlayer>();
         public readonly byte[] roleOwner = { 0xFF, 0xFF, 0xFF };
         public bool IsBot(Role r) => r >= Role.LeftPaddler && r <= Role.Collector && roleOwner[(int)r - 1] == 0xFF;
@@ -187,6 +188,7 @@ namespace Mottainai.Net
                 s.players.Add(p);
             }
             for (int i = 0; i < 3; i++) s.roleOwner[i] = r.U8();
+            if (r.Left > 0) s.hostId = r.U8();
             return s;
         }
 

@@ -30,6 +30,7 @@ export class RoomDO extends DurableObject {
   lastSnapTick = -99;
   snapshotHz = 60;
   resultsSent = false;
+  hostId = 0; // first connected human; sticky while connected, then the next connected human in join order
   deferred: Deferred[] = [];
   w = new Writer(8192);
 
@@ -109,12 +110,38 @@ export class RoomDO extends DurableObject {
     return p ? p.id : BOT;
   }
 
+  get inLobby() { return !this.sim || this.sim.phase === Phase.Finished; }
+
+  updateHost() {
+    if (this.players.some(x => x.id === this.hostId && x.ws)) return;
+    this.hostId = this.players.find(x => x.ws)?.id ?? 0;
+  }
+
+  notice(p: Player, text: string) {
+    if (!p.ws) return;
+    const w = this.w.reset();
+    w.u8w(S2C.NOTICE).str(text);
+    try { p.ws.send(w.bytes()); } catch {}
+  }
+
+  /** START / REMATCH: host only, in lobby only, every connected human READY (bots need none). */
+  tryStart(p: Player) {
+    if (!this.inLobby) return this.notice(p, "Match already running");
+    this.updateHost();
+    if (p.id !== this.hostId) return this.notice(p, "Only the host can start");
+    const waiting = this.players.filter(x => x.ws && !x.ready);
+    if (waiting.length) return this.notice(p, "Waiting for: " + waiting.map(x => x.name).join(", "));
+    this.startMatch();
+  }
+
   broadcastLobby() {
+    this.updateHost();
     const w = this.w.reset();
     const live = this.players.filter(x => this.live(x));
     w.u8w(S2C.LOBBY).u8w(this.phase).u8w(live.length);
     for (const p of live) w.u8w(p.id).str(p.name).u8w(p.role).u8w((p.ready ? 1 : 0) | (p.ws ? 2 : 0));
     for (const r of [1, 2, 3]) w.u8w(this.roleOwner(r));
+    w.u8w(this.hostId); // v3
     this.broadcast(w.bytes());
   }
 
@@ -175,12 +202,12 @@ export class RoomDO extends DurableObject {
         case C2S.ROLE: {
           const want = r.u8();
           const busy = this.sim && this.sim.phase !== Phase.Finished;
-          if (!busy && this.pickRole(want, p) === want) { p.role = want; this.attach(p); }
+          if (!busy && !p.ready && this.pickRole(want, p) === want) { p.role = want; this.attach(p); } // locked while READY
           this.broadcastLobby();
           break;
         }
-        case C2S.READY: p.ready = r.u8() !== 0; this.broadcastLobby(); break;
-        case C2S.START: this.startMatch(); break;
+        case C2S.READY: { const on = r.u8() !== 0; if (this.inLobby) p.ready = on; this.broadcastLobby(); break; }
+        case C2S.START: this.tryStart(p); break;
         case C2S.LEAVE: { // voluntary: bot takes the role now, no reconnect slot
           this.drop(ws);
           this.players = this.players.filter(x => x !== p);
@@ -269,7 +296,7 @@ export class RoomDO extends DurableObject {
     if (sim.phase === Phase.Finished) {
       if (!this.resultsSent) {
         this.resultsSent = true;
-        for (const p of this.players) if (p.ws) this.sendResults(p.ws);
+        for (const p of this.players) { p.ready = false; if (p.ws) this.sendResults(p.ws); } // rematch needs READY again
         this.broadcastLobby();
       }
       return;

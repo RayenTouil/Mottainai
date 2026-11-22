@@ -243,14 +243,27 @@ namespace Mottainai.Client
                 roleButtons[i].image.color = mine ? UIKit.Accent : holder == null ? UIKit.Panel : UIKit.Muted;
             }
             var me = lobby.players.Find(x => x.clientId == net.ClientId);
-            readyButton.image.color = me != null && me.ready ? UIKit.Accent : UIKit.Muted;
-            UIKit.Label(readyButton).text = me != null && me.ready ? "READY!" : "READY?";
+            bool ready = me != null && me.ready, isHost = lobby.hostId != 0 && lobby.hostId == net.ClientId;
+            int humans = 0, readyN = 0;
+            foreach (var pl in lobby.players) if (pl.connected) { humans++; if (pl.ready) readyN++; }
+            bool inMatch = lobby.phase == MatchPhase.Running || lobby.phase == MatchPhase.Countdown;
+            // READY state comes only from the server LOBBY; the pill face shows it (green = ready, blue = not yet)
+            var face = readyButton.transform.Find("Face")?.GetComponent<Image>();
+            if (face != null) face.color = ready ? UIKit.Accent : UIKit.Accent2;
+            UIKit.Label(readyButton).text = ready ? "READY!  (tap to cancel)" : "TAP WHEN READY";
+            readyButton.interactable = !inMatch;
+            foreach (var rb in roleButtons) rb.interactable = !ready && !inMatch;
+            startButton.gameObject.SetActive(isHost);
+            startButton.interactable = isHost && !inMatch && humans > 0 && readyN == humans;
             sb.Clear();
             sb.Append("Crew: ");
             foreach (var pl in lobby.players) if (pl.connected) sb.Append(pl.name).Append("   ");
-            sb.Append("\n<size=26>Tap a role to take it. Empty roles are played by bots. Anyone can press START.</size>");
+            var host = lobby.players.Find(x => x.clientId == lobby.hostId);
+            sb.Append($"\n<size=26>Empty roles are played by bots.  {readyN}/{humans} ready.  ");
+            sb.Append(isHost ? "You are the host: START when everyone is ready." : $"Waiting for host {(host != null ? host.name : "")}...");
+            sb.Append("</size>");
             lobbyPlayers.text = sb.ToString();
-            UIKit.Label(startButton).text = lobby.phase == MatchPhase.Running || lobby.phase == MatchPhase.Countdown ? "IN MATCH..." : "START";
+            UIKit.Label(startButton).text = inMatch ? "IN MATCH..." : $"START  {readyN}/{humans}";
         }
 
         void BuildResults()
@@ -280,7 +293,7 @@ namespace Mottainai.Client
             var row = UIKit.Rect("Buttons", p.transform);
             UIKit.Place(row, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(1500, 110));
             UIKit.HLayout(row, 24, 0);
-            UIKit.Button(row, "REMATCH", UIKit.Accent, () => net.StartMatch(), 44);
+            UIKit.Button(row, "REMATCH", UIKit.Accent, () => { Show(UiScreen.Lobby); net.SetReady(true); RefreshLobbyUi(); }, 44); // v3: rematch = lobby + READY; host starts
             UIKit.Button(row, "LOBBY", UIKit.Accent2, () => { Show(UiScreen.Lobby); RefreshLobbyUi(); }, 44);
             UIKit.Button(row, "NETWORK LAB", UIKit.Muted, () => Show(UiScreen.Lab), 40);
         }
