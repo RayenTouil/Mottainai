@@ -1,0 +1,2 @@
+Fredoka (c) The Fredoka Project Authors; Nunito Sans (c) The Nunito Sans Project Authors.
+Both licensed under the SIL Open Font License 1.1 (https://openfontlicense.org). Latin subsets via fontsource (Google Fonts).

@@ -1,7 +1,7 @@
 # MOTTAINAI — ART DIRECTION v3 (replaces ART_DIRECTION.md / v2)
 
 Target: jury demo today. Unity 6 URP, Android mid-range, landscape, ≥55 FPS.
-North star: Docs/reference_v3_master.png (cozy toy-bright river, turquoise water, ringed waste, bean crew on yellow raft).
+North star: docs/reference_v3_master.png (cozy toy-bright river, turquoise water, ringed waste, bean crew on yellow raft).
 Hard rule: do NOT touch gameplay, physics, networking, or Net HUD data sources. Visual layers only (materials, shaders, meshes, VFX, lighting, UI styling, camera params).
 
 ---
@@ -206,7 +206,7 @@ No depth texture (too expensive on Low). Edge effects come from river-mesh UVs: 
 ---
 
 ## 11. Acceptance tests
-Capture on the phone (`adb exec-out screencap -p`) at the same moment: 20 s into a match, raft mid-river. Compare side by side with Docs/reference_v3_master.png.
+Capture on the phone (`adb exec-out screencap -p`) at the same moment: 20 s into a match, raft mid-river. Compare side by side with docs/reference_v3_master.png.
 
 | # | Test | Pass criterion |
 |---|---|---|

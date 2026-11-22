@@ -1,171 +1,205 @@
 <div align="center">
 
-<img src="Docs/media/mottainai_banner.gif" alt="MOTTAINAI — Paddle, Collect, Recycle" width="100%">
-
-<sub><i>Concept art — target art direction</i></sub>
+<img src="docs/media/mottainai_banner.gif" alt="MOTTAINAI: Paddle, Collect, Recycle" width="100%">
 
 # MOTTAINAI
 
-### *もったいない — "What a waste!"*
+### もったいない · *What a waste!*
 
-**A cooperative 3D mobile game where three players share one raft to clean a polluted river, in real time over 5G.**
+**Paddle · Collect · Recycle**
 
-`Unity 6 LTS` · `C#` · `URP` · `Netcode for GameObjects` · `Dedicated Server` · `Android` · `5G SA`
-
-*Built for the **Green Hackathon 2026**, Swedish-Tunisian Games and Innovation Days*
+![3rd place](https://img.shields.io/badge/🥉_3rd_place-Green_Hackathon_2026-cd7f32)
+![Unity 6](https://img.shields.io/badge/Unity-6-000000?logo=unity)
+![C#](https://img.shields.io/badge/C%23-239120?logo=csharp&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
+![Multiplayer 60 Hz](https://img.shields.io/badge/Multiplayer-60_Hz-1f8acb)
 
 </div>
 
 ---
 
-## 🌊 The game
+## 🏆 Award
 
-Three kids. One inflatable raft. A river full of waste, and **2 minutes** to clean it.
+**🥉 3rd place at the Green Hackathon 2026**, Swedish-Tunisian Games and Innovation Days, 21–22 November 2026, Pôle Technologique El Ghazala, Tunisia.
 
-MOTTAINAI is a co-op arcade game for kids aged 7 to 12. Each player controls **one part of the raft**, so nobody can win alone:
+> *« Rien ne se jette, tout s'invente »*: nothing is thrown away, everything is invented.
+
+## 🌊 The problem
+
+The Mediterranean, right now:
+
+- **33,800** plastic bottles' worth of plastic pour into the Mediterranean **every minute**.
+- That is **570,000 t** of plastic **every year**, into the sea we swim in every summer.
+  <sub>Source: WWF, *Stop the Flood of Plastic* (2019)</sub>
+
+And it's not just one sea:
+
+| | |
+|---|---|
+| **353 Mt** | of plastic waste thrown away in one year (2019) |
+| **9 %** | recycled. The other 91 % is burned, buried or leaks |
+| **109 Mt** | already sitting in rivers, on their way to the sea |
+| **×3 by 2060** | plastic waste almost triples if nothing changes (1,014 Mt) |
+
+<sub>Source: OECD, *Global Plastics Outlook* (2022)</sub>
+
+The generation that will inherit it is **7–12 years old**, the age when habits take shape. Sorting is taught on a blackboard… and rarely practised. Meanwhile, **3.4 B** people play video games <sub>(Newzoo, *Global Games Market Report* 2024)</sub>.
+
+**What if the lesson lived where kids already play?**
+
+## 💡 The idea
+
+*Mottainai* (もったいない) is a Japanese word for the regret of wasting something precious: **"What a waste!"** That word became our game.
+
+> **A real-time co-op mobile game: 3 players share 1 raft to clean a polluted river.**
+
+## 🎮 Gameplay
+
+Three players. One raft. Each phone controls one part of it, so nobody wins alone.
 
 | Role | What you do | Gesture |
 |---|---|---|
-| 🚣 **Left paddler** | Paddles on the left side: pushes forward and turns right | Swipe **down** to paddle, swipe **up** to brake |
-| 🚣 **Right paddler** | Paddles on the right side: pushes forward and turns left | Swipe **down** to paddle, swipe **up** to brake |
-| 🥅 **Collector** | Throws the net to catch floating waste | **Tap** a waste item, or swipe toward it |
+| 🚣 **Left paddler** | Paddles on the left side | Swipe **↓** to paddle · **↑** to brake |
+| 🚣 **Right paddler** | Paddles on the right side | Swipe **↓** to paddle · **↑** to brake |
+| 🥅 **Collector** | Throws the net at floating waste | **Tap** a waste item |
 
-> ⚡ **SYNC BOOST:** when both paddlers stroke within 0.25 s of each other, the raft goes straight with **+30 % thrust**. Coordination is the whole game.
+> ⚡ **SYNC BOOST:** both strokes within **0.25 s** → **+30 %** thrust. Cooperation is the controller.
 
-Missing players? **Bots** take the empty roles instantly, so the game works with 1, 2 or 3 phones.
+Missing a friend? **Bots** fill empty seats: play with 1, 2 or 3 phones.
 
-## 🎯 Rules
+**Rules**
 
-- ⏱️ **2:00** per run. Catch as much waste as you can.
-- 🪨 Dodge rocks, icebergs, wrecks, floating logs and **sharks** (the fin appears 1.5 s before one enters your lane). **One hit = game over.**
+- ⏱️ **2:00** per run, instant rematch.
+- 🦈 Dodge rocks, icebergs and **sharks**. **1 hit = game over.**
 - 🫧 **Shield** pickup: immune to obstacles for 6 s.
-- 🔥 **Combo:** 3 clean catches within 3 s give ×1.5 on the next catch.
+- 🔥 **Combo:** 3 catches within 3 s → **×1.5** on the next catch.
 
-| Waste | Bin color | Points |
+| Waste | Bin colour | Points |
 |---|---|---|
 | 🧴 Plastic | 🟡 Yellow | +10 |
-| 📦 Paper / Cardboard | 🔵 Blue | +10 |
+| 📦 Paper / cardboard | 🔵 Blue | +10 |
 | 🫙 Glass | 🟢 Green | +15 |
 | 🍌 Organic | 🟤 Brown | +5 |
 | 🥫 Metal | ⚪ Grey | +20 |
 | 💍 Valuable (rare) | ⭐ Gold | +100 |
-| ☢️ Toxic / Hazardous | 🔴 Red | −30 at the end |
+| ☢️ Toxic | 🔴 Red | −30 |
 
-At the end of each run, the **results screen** shows your score, waste per category, accuracy, distance and how much river you cleaned. Each caught item also teaches a short **eco-fact**.
+At the end of each run: waste per bin, accuracy, and the **kilos of river you cleaned**.
 
-## 🧠 Why it matters
+## ⚖️ Learn × Play
 
-- **Learn sorting by playing:** every waste type uses its real recycling bin color.
-- **Cooperation over competition:** the raft only moves well when the team is in sync.
-- **Visible impact:** the river gets clearer as you clean it.
+Learning and fun, in perfect balance.
 
-## 📡 The tech differentiator: real-time multiplayer over 5G
-
-MOTTAINAI is built to show what **low-latency mobile networks** make possible.
-
-- **Server-authoritative dedicated server** running at a **60 Hz tick**. Inputs are sent every tick, and catches are validated with **lag compensation**.
-- **Full world snapshots at 60 Hz** (raft, 150–300 floating entities, shark, water flow) in a custom compact serializer.
-- **Adaptive interpolation** and **client-side prediction**, so your own strokes feel instant.
-- **Content pack download at login,** with a live MB/s progress bar.
-- **5G SA detection** on Android, plus a request for a **low-latency network slice** on Android 13+ when the network supports it.
-- **Net HUD** (3-finger tap): network type, RTT average / p95, jitter, packet loss, tick rate, bandwidth and FPS.
-- **Network Lab:** ping burst and throughput tests exported to CSV, to compare **Wi-Fi vs 4G vs 5G NSA vs 5G SA** and **local edge vs cloud**.
-
-```
- Phones (Android)  ──UDP 7777 (game, 60 Hz)──▶  Dedicated server
-                   ──TCP 8080 (login, content, telemetry)──▶  (laptop / edge)
-```
-
-## 🛠️ Tech stack
-
-| Layer | Choice |
+| 📚 Learn | 🎮 Play |
 |---|---|
-| Engine | Unity 6 LTS (6000.3), URP mobile renderer |
-| Language | C# |
-| Networking | Netcode for GameObjects 2.x + Unity Transport (UDP) |
-| Server | Headless dedicated server (Windows / Linux), built-in HTTP listener |
-| Input | New Input System (EnhancedTouch) |
-| UI | TextMeshPro |
-| Target | Android (min API 26, IL2CPP, ARM64), landscape |
+| 7 real recycling-bin colours | Co-op raft with a sync boost |
+| Toxic waste = −30: a safety reflex | Combos ×1.5 & power-ups |
+| Kilos of river cleaned, every run | Sharks, rocks & icebergs |
+| Teamwork & coordination | 2-minute runs, instant rematch |
 
-## 🚀 Getting started
+> **Kids play for the score, and leave with the habit.**
 
-### Requirements
-- Unity Hub + **Unity 6 LTS** with **Android Build Support** (OpenJDK + Android SDK & NDK Tools) and **Dedicated Server** modules.
-- Git.
+## 🚀 What makes it different
 
-### Setup
+1. **Cooperation is the controller.** Sync your strokes within 0.25 s and the raft surges +30 %. The raft needs the whole crew.
+2. **Real-time multiplayer on phones.** One authoritative game room per match, 60 Hz, on Cloudflare's edge.
+3. **Built for 5G.** 5G SA / NSA detection, and a request for a low-latency network slice (Android 13+).
+4. **A network lab inside the game.** Measures latency, jitter and bandwidth on every network, exported as CSV.
+
+> **read · answer · forget → paddle · catch · remember**
+
+## 🛠️ Under the hood
+
+```mermaid
+flowchart LR
+    A["📱 Phone A<br/>left paddler · Unity"] -- "gestures ↑" --> E
+    B["📱 Phone B<br/>collector · Unity"] -- "gestures ↑" --> E
+    E["☁️ Cloudflare edge<br/>Marseille · TLS · routing"] --> R["🎲 Game room · 60 Hz<br/>server decides · bots<br/>lag compensation"]
+    R -- "60 snapshots/s ↓ (WebSocket · TLS)" --> A
+    R -- "60 snapshots/s ↓" --> B
+```
+
+Phones only send gestures; the server decides everything (Cloudflare Worker + Durable Object per room).
+
+| Measured | Value | Date |
+|---|---|---|
+| Snapshots to each phone | **60 /s** | 22 Nov 2026 (test match on Cloudflare) |
+| Bandwidth per phone | **~226 kbps** | 22 Nov 2026 (test match on Cloudflare) |
+| Round trip | **43–71 ms** | 22 Nov 2026 (phone Network Lab, Wi-Fi) |
+| Frame rate | **60 fps** (60.1 avg) | 22 Nov 2026 (full match on our test phone) |
+
+**Stack:** Unity 6 · C# · Android · Cloudflare Workers + Durable Objects (TypeScript) · WebSocket.
+
+## 🎬 Demo
+
+[![Demo](docs/media/demo_preview.gif)](docs/media/MOTTAINAI_Demo.mp4)
+
+▶️ [Watch the full demo video (MP4)](docs/media/MOTTAINAI_Demo.mp4)
+
+🎤 **Pitch presentation:** [rayentouil.github.io/Mottainai/presentation](https://rayentouil.github.io/Mottainai/presentation/) · source: [`docs/presentation/index.html`](docs/presentation/index.html)
+<sub>Keys: Enter to start · Space / → next · F fullscreen · P presenter view · ? help</sub>
+
+## ▶️ Run it
+
+**Requirements:** Unity 6 (6000.x) with Android Build Support, Node.js, a free Cloudflare account, Windows (build scripts are `.bat`).
+
 ```bash
 git clone https://github.com/RayenTouil/Mottainai.git
+cd Mottainai
 ```
-1. Open the project in Unity Hub.
-2. Run **Mottainai → Setup Project** from the menu (it generates the scenes, prefabs and player settings).
 
-### Run the server
+**1. Server (Cloudflare Worker + Durable Objects)**
+
 ```bash
-build_server.bat
-run_server.bat        # -port 7777 -http 8080 -tick 60 -log
+cd server && npx wrangler login   # once per PC
+cd .. && deploy_server.bat         # builds the content pack, deploys, writes the URL
+                                   # into Mottainai/Assets/_Mottainai/Resources/server_config.json
 ```
-On startup, the server prints its IP addresses. Open **UDP 7777** and **TCP 8080** in the firewall, and set the Wi-Fi network profile to *Private*.
 
-### Build the Android client
+- Local dev server: `cd server && npm run dev`
+- Live logs: `cd server && npx wrangler tail`
+- Checks: `node server/tools/smoke.ts` (connect + RTT) · `node server/tools/fakeclient.ts` (full 2:00 match) · `cd server && npm run simcheck` (20 bot matches offline)
+
+**2. Android app**
+
 ```bash
-build_android.bat     # → Builds/Mottainai.apk
+build_android.bat    # close the Unity editor first → Builds\Mottainai.apk
+install_phone.bat    # installs + launches on every USB-connected phone
 ```
-Install the APK, enter your name and the server IP, then press **PLAY**.
 
-> 💡 **Lowest latency:** put the server and the phones on the **same local network** (Wi-Fi, hotspot or a 5G edge network). See `DEPLOY.md`.
-
-## 📁 Project structure
-
-```
-Assets/_Mottainai/
-├── Scripts/
-│   ├── Core/          # game modes, config, events
-│   ├── Gameplay/      # raft physics, spawner, scoring, waste, obstacles
-│   ├── Net/           # snapshots, serialization, lag compensation
-│   ├── Server/        # dedicated server, HTTP listener, bots
-│   ├── Client/        # interpolation, prediction, Net HUD
-│   ├── Input/         # swipe & tap gestures
-│   ├── UI/            # menus, HUD, results
-│   ├── Platform/Android/  # 5G detection, network slicing
-│   └── EditorTools/   # Setup Project, build tools
-├── Shaders/           # stylized water
-└── Resources/         # models, textures, tuning
-```
+In the app: name → **PLAY** → content pack download → **QUICK PLAY**. Three-finger tap shows the Net HUD.
+More details: [`DEPLOY.md`](DEPLOY.md) and [`PROTOCOL.md`](PROTOCOL.md).
 
 ## 🗺️ Roadmap
 
-- [x] Co-op raft, 3 roles + bots
-- [x] Dedicated server at 60 Hz, rooms and lobby
-- [x] Net HUD and Network Lab
-- [ ] Stylized water, environment kit and art polish
-- [ ] Waste collection album and cosmetic rewards
-- [ ] **Battle mode:** several rafts and teams, 5 min, raft-vs-raft collisions
+| ✅ Now | ⏭️ Next | 🔭 Later |
+|---|---|---|
+| **Working prototype** | **Classroom pilot** | **Grow** |
+| Co-op raft · 3 roles + bots · 60 Hz edge server | Quiz before / after · eco-tip per catch · sorting center · 5G SA test | New rivers & worlds · school leaderboards · team-vs-team battle mode |
 
-## 👥 Team
+**How we'll prove impact:** sorting accuracy per bin · quiz before vs after · sync rate.
+
+## 👥 Team "5le9a Deyra"
+
+SUP'COM engineering students.
 
 | Member | Role |
 |---|---|
-| **Rayen TOUIL** | `[role]` |
-| **Yassine AFFES** | `[role]` |
-| **Med Amine CHAKROUN** | `[role]` |
-| **Wajdi ZENTANI** | `[role]` |
-
-Engineering students at **SUP'COM** (École Supérieure des Communications de Tunis).
+| **Rayen TOUIL** | Pitch deck & presentation, README, 3D asset integration |
+| **Yassine AFFES** | Lead developer, main codebase (game, server, networking) |
+| **Med Amine CHAKROUN** | Local server version & playit.gg hosting |
+| **Wajdi ZENTANI** | [role] |
 
 ## 🙏 Credits
 
-- 3D models: [Quaternius](https://quaternius.com) (CC0), [Kenney](https://kenney.nl) (CC0), and models from [Poly Pizza](https://poly.pizza) (see `CREDITS.md`; CC-BY authors are credited there).
-- Sounds and icons: [Kenney](https://kenney.nl) (CC0).
-- Fonts: [Fredoka](https://fonts.google.com/specimen/Fredoka), [Nunito Sans](https://fonts.google.com/specimen/Nunito+Sans) (OFL).
+- **3D models** from [Poly Pizza](https://poly.pizza): [Quaternius](https://quaternius.com) (CC0); *Soda Can* by jeremy, *Elm tree* and *Palm tree* by Poly by Google, *Pine Tree* by Danni Bittman, *Iceberg 1* by S. Paul Michael ([CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/)). Full list: [`CREDITS.md`](Mottainai/Assets/_Mottainai/Resources/Models/CREDITS.md).
+- **Fonts:** [Fredoka](https://fonts.google.com/specimen/Fredoka), [Nunito Sans](https://fonts.google.com/specimen/Nunito+Sans) ([SIL OFL](docs/presentation/assets/fonts/OFL.txt)).
+- **Data:** WWF, *Stop the Flood of Plastic* (2019) · OECD, *Global Plastics Outlook* (2022) · Newzoo, *Global Games Market Report* (2024).
 
 ---
 
 <div align="center">
 
 **Every paddle counts. Every piece matters.** 💚
-
-<sub>Made during the Green Hackathon 2026, Pôle Technologique El Ghazala, Tunisia</sub>
 
 </div>

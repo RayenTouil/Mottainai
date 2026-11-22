@@ -69,7 +69,7 @@ Tests (write them first, in `server/tools/`, runnable with `node`):
 - T5 all humans gone → Aborted, no score.
 - T6 voluntary LEAVE → immediate bot, no pause.
 - T7 the sim time and raft position are identical before PAUSE and after RESUME (the sim did not advance).
-- Phone test: 3 phones in a match; toggle airplane mode on one phone for 10 s, then on two phones; lock one screen for 20 s; switch Wi-Fi → 5G mid-match. Record the results in `Docs/v4/reconnect.md`.
+- Phone test: 3 phones in a match; toggle airplane mode on one phone for 10 s, then on two phones; lock one screen for 20 s; switch Wi-Fi → 5G mid-match. Record the results in `docs/v4/reconnect.md`.
 
 ## Phase D [high effort] — teams + leaderboard
 Identity: the device's stable token (PlayerPrefs, already used for reconnect) is the player account. No password. Default = **guest**.
@@ -88,11 +88,11 @@ Identity: the device's stable token (PlayerPrefs, already used for reconnect) is
 - Tests: fakeclient scenarios for create/join/leave, uniqueness, 4th member rejected, guest match not counted, team match counted once (no double count after reconnect/rematch), aborted not counted.
 
 ## Phase E [MAX] — voice chat per team
-Follow `Docs/prompts/VOICE.md` exactly. Voice goes only to the humans of the same room team. A mic ON/OFF button on the HUD + in the lobby (default OFF).
+Follow `docs/prompts/VOICE.md` exactly. Voice goes only to the humans of the same room team. A mic ON/OFF button on the HUD + in the lobby (default OFF).
 
 ## Phase F [high effort] — integration on 3 phones
 - `build_android.bat` → `install_phone.bat` on the 3 phones. Mobile data on 5G SA where possible, plus one run on Wi-Fi.
-- Scripted checklist in `Docs/v4/TEST_PLAN.md`, results + screenshots in `Docs/v4/`:
+- Scripted checklist in `docs/v4/TEST_PLAN.md`, results + screenshots in `docs/v4/`:
   - onboarding shown; legend correct;
   - leave works;
   - READY/START rules;

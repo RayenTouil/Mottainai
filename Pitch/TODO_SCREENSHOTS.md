@@ -1,6 +1,6 @@
 # Screenshots to capture before the pitch
 
-The deck already uses the real build screenshots in `Docs/art_v3/` (PC check) and the concept art. These would make it stronger:
+The deck already uses the real build screenshots in `docs/art_v3/` (PC check) and the concept art. These would make it stronger:
 
 1. **Phone gameplay over 5G SA** with the Net HUD on (3-finger tap): network badge "5G SA", RTT, Edge/Room colo. To replace the PC gameplay shot on slide 6b.
 2. **Phone lobby + results screens** (landscape, same match). To replace the PC lobby/results shots on slide 6b.

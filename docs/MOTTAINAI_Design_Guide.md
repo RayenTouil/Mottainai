@@ -1,8 +1,8 @@
 # MOTTAINAI — ART DIRECTION IMPLEMENTATION PROMPT
 
 > Before starting, read these 2 files (they are the source of truth):
-> - `Docs/MOTTAINAI_Design_Guide.md` — palette, typography, UI rules, assets, roadmap.
-> - `Docs/reference_gameplay.jpg` — the target in-game look. Open and study it.
+> - `docs/MOTTAINAI_Design_Guide.md` — palette, typography, UI rules, assets, roadmap.
+> - `docs/reference_gameplay.jpg` — the target in-game look. Open and study it.
 >
 > Goal: make the game look as close as possible to the reference image, following the design guide.
 
@@ -179,7 +179,7 @@ Check every screen against the guide's acceptance checklist:
 - low-poly style everywhere, no photorealism;
 - ≥ 55 FPS on High, ≥ 60 FPS on Low.
 
-Then take a gameplay screenshot from the default camera. Compare it with `Docs/reference_gameplay.jpg` and list the 5 biggest remaining differences. Fix them if they are cheap.
+Then take a gameplay screenshot from the default camera. Compare it with `docs/reference_gameplay.jpg` and list the 5 biggest remaining differences. Fix them if they are cheap.
 
 ---
 

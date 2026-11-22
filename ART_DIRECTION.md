@@ -1,8 +1,8 @@
 # MOTTAINAI — ART DIRECTION (single source for visuals)
 
 > Sources of truth, read first:
-> - `Docs/MOTTAINAI_Design_Guide.md` — palette, typography, UI rules, assets, roadmap.
-> - `Docs/reference_gameplay.jpg` — target in-game look. Open and study it.
+> - `docs/MOTTAINAI_Design_Guide.md` — palette, typography, UI rules, assets, roadmap.
+> - `docs/reference_gameplay.jpg` — target in-game look. Open and study it.
 > - `art_inbox/LIST.md` + `art_inbox/*.glb|*.fbx` — imported models (§4).
 > Goal: look as close as possible to the reference image, following the guide.
 
@@ -93,6 +93,6 @@ TRANSITION         = 150–250 ms
 
 **☆ Phase 7 — Collection screen (post-demo):** item cards (3D render-texture thumbnail, name, family, discovered/silhouette, set progress); rewards (badges, raft palettes, cap colors, titles). Results "New item discovered!" only once this exists.
 
-**★ Phase 8 — Polish & acceptance:** main action understood < 1 s; items recognizable; text readable on phone; palette respected; HUD never hides waste/obstacles; feedback visible not aggressive; low-poly everywhere; ≥ 55 FPS High, ≥ 60 FPS Low. Take a gameplay screenshot from the default camera, compare with `Docs/reference_gameplay.jpg`, list the 5 biggest differences, fix the cheap ones.
+**★ Phase 8 — Polish & acceptance:** main action understood < 1 s; items recognizable; text readable on phone; palette respected; HUD never hides waste/obstacles; feedback visible not aggressive; low-poly everywhere; ≥ 55 FPS High, ≥ 60 FPS Low. Take a gameplay screenshot from the default camera, compare with `docs/reference_gameplay.jpg`, list the 5 biggest differences, fix the cheap ones.
 
 Start with Phase 1.

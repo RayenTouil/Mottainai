@@ -106,7 +106,7 @@ Planned time: **4:10** for 10 slides. Script at 140 words/min: 453 spoken words 
   - What if kids could fix it — by playing?
   - Source: WWF, Stop the Flood of Plastic (2019)
 - **Visual composition:** Full-bleed MOTTAINAI concept art (river flowing to the sea) under a 78 % deep-teal veil; huge white number top-left, coral sub-line, question at mid-height with 'by playing?' in green.
-- **Images:** Docs/reference_v3_master.jpg
+- **Images:** docs/reference_v3_master.jpg
 - **Animation / transition:** Fade in. Optional: number appears first, question on click.
 - **Speaker notes:** Every year, five hundred seventy thousand tonnes of plastic enter the Mediterranean. That's almost thirty-four thousand bottles every minute, right on our doorstep. We are 5le9a Deyra, four telecom engineering students from SUP'COM. And we asked one question: what if kids could fix this, by playing? [CLICK]
 
@@ -133,7 +133,7 @@ Planned time: **4:10** for 10 slides. Script at 140 words/min: 453 spoken words 
   - How the idea evolved: Application — solo runner → Prototype — 3-player co-op raft
   - Concept art (target look)
 - **Visual composition:** Deep-teal slide. Left: wordmark, Japanese meaning, one-liner, evolution chips. Right: the animated banner GIF (concept art) with bin-color dots under it.
-- **Images:** Docs/media/mottainai_banner.gif
+- **Images:** docs/media/mottainai_banner.gif
 - **Animation / transition:** Fade. The GIF animates in PowerPoint.
 - **Speaker notes:** So we built MOTTAINAI. In Japanese, it means 'what a waste!'. Our first idea was a solo runner. We turned it into a cooperative game, because cleaning a river is teamwork. Three players share one raft. Nobody wins alone. [CLICK]
 
@@ -148,7 +148,7 @@ Planned time: **4:10** for 10 slides. Script at 140 words/min: 453 spoken words 
   - Missing players? Bots fill the seats.
   - Caption: Real phone during a full match (collector view)
 - **Visual composition:** Left: real phone screenshot of a match. Right: three role rows (icon circle, name, gesture). Bottom: deep-teal band with the +30 % sync boost and the bot note.
-- **Images:** Docs/art_v3/merge_phone.png
+- **Images:** docs/art_v3/merge_phone.png
 - **Animation / transition:** Fade. Optional: role rows appear one by one on click.
 - **Speaker notes:** Here's how it plays. The left paddler swipes down to push forward and turn right. The right paddler does the opposite. The collector taps floating waste to throw a net. When both paddlers stroke within a quarter second, the raft gets a sync boost: thirty percent more thrust. Missing a friend? A bot takes the seat. [CLICK]
 
@@ -186,7 +186,7 @@ Planned time: **4:10** for 10 slides. Script at 140 words/min: 453 spoken words 
   - Gameplay · Lobby · Results (real screenshots)
   - Backup video: Pitch/media/demo_backup.mp4
 - **Visual composition:** Hidden slide: big phone gameplay shot, lobby and results shots, chips labelling each.
-- **Images:** Docs/art_v3/merge_phone.png, Docs/art_v3/P5_pc_lobby.png, Docs/art_v3/P5_pc_results.png
+- **Images:** docs/art_v3/merge_phone.png, docs/art_v3/P5_pc_lobby.png, docs/art_v3/P5_pc_results.png
 - **Animation / transition:** None.
 - **Speaker notes:** Plan B only. The network is not on our side today, so here is the same match: the lobby where each phone picks a role, the river in play, and the results with waste per bin and kilos cleaned. [type 8 + Enter]
 
@@ -246,7 +246,7 @@ Planned time: **4:10** for 10 slides. Script at 140 words/min: 453 spoken words 
   - Rayen TOUIL · Yassine AFFES · Med Amine CHAKROUN · Wajdi ZENTANI
   - github.com/RayenTouil/Mottainai
 - **Visual composition:** Concept art under a strong deep-teal veil; centered wordmark, green tagline, statement, team block.
-- **Images:** Docs/reference_v3_master.jpg
+- **Images:** docs/reference_v3_master.jpg
 - **Animation / transition:** Fade (slow).
 - **Speaker notes:** MOTTAINAI is more than an idea: it's a working, real-time co-op game with a mission. Every paddle counts. Every piece matters. Thank you.
 
