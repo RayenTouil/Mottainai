@@ -218,6 +218,8 @@ namespace Mottainai.Client
 
         public void PickRole(Role r) => ws.Send(w.Begin(Msg.Role).U8((int)r).ToArray());
         public void SetReady(bool ready) => ws.Send(w.Begin(Msg.Ready).U8(ready ? 1 : 0).ToArray());
+        /// v3: voluntary leave (bot takes the role immediately).
+        public void SendLeave() => ws.Send(w.Begin(Msg.Leave).ToArray());
         public void StartMatch() => ws.Send(w.Begin(Msg.Start).ToArray());
     }
 }

@@ -85,3 +85,7 @@
 - ART P8: Low quality halves far trees + path props (draw calls); flowering bushes added to the bank kit; lighthouse island moved to x=22 so it shows at the horizon.
 - merge (2026-11-22): main = art/v3 + dev. Visual conflicts -> v3; netcode (f9a81bc) re-applied on v3 ClientApp/ClientScreens/WorldView; BuildWindows = dev (Mono). Dev v2 ParkKit/SceneLook removed (did not compile vs v3, unused).
 - v4: wrangler env v4 = separate Worker mottainai-v4 (own DOs); deploy_server.bat v4; PROTOCOL_VERSION 3 (stub, no new messages yet).
+- v4/A: icons = real VisualFactory objects rendered once to 128 px RenderTextures (transparent rings/shadows hidden); glyphs ✓✗★ missing in Fredoka -> "+", "X", "!".
+- v4/A: "?" + pause buttons left of the timer; HUD and v4 overlay follow Screen.safeArea (likely cause of the unseen score on notched phones); score label "TEAM" at 84 px.
+- v4/A: countdown strip = existing role hint panel (moved above the legend bar); collect/avoid pop-up opens on MATCH_START, closes on GO.
+- v4/A: LEAVE 0x04 = drop() + remove player (no reconnect slot); Android Back / Esc opens the pause overlay.

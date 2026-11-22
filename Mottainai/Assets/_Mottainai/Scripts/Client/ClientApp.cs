@@ -244,7 +244,7 @@ namespace Mottainai.Client
         {
             lobby = s;
             var me = s.players.Find(p => p.clientId == net.ClientId);
-            if (me != null && screen != UiScreen.Game) myRole = me.role;
+            if (me != null && screen != UiScreen.Game) { myRole = me.role; V4OnLobbyRole(myRole); }
             if (screen == UiScreen.Lobby) RefreshLobbyUi();
         }
 
@@ -268,6 +268,7 @@ namespace Mottainai.Client
             results = null;
             Show(UiScreen.Game);
             SetRoleBadge(myRole);
+            V4OnMatchStart();
         }
 
         void OnSnapshot(SnapshotFrame f)
@@ -305,7 +306,7 @@ namespace Mottainai.Client
                 switch (e.type)
                 {
                     case EvType.Countdown: Big(e.value.ToString(), Color.white, 0.9f); sfx.Play(Sfx.Id.Beep); break;
-                    case EvType.Go: Big("PADDLE!", new Color(0.5f, 1f, 0.6f), 1f); sfx.Play(Sfx.Id.Go); break;
+                    case EvType.Go: V4OnGo(); Big("PADDLE!", new Color(0.5f, 1f, 0.6f), 1f); sfx.Play(Sfx.Id.Go); break;
                     case EvType.Stroke:
                         if (e.role == myRole) world.AckLocalStroke(); // prediction: this stroke is now in the server state
                         bool mine = e.role == myRole && Time.time - lastLocalStroke < 0.6f;
@@ -337,6 +338,7 @@ namespace Mottainai.Client
                     {
                         var type = (WasteType)(e.extra & 0x7F);
                         bool combo = (e.extra & 0x80) != 0;
+                        V4OnCatch(type);
                         var pos = world.EntityPosition(e.entity, new Vector3(e.x, 0.2f, e.z));
                         world.Collect(e.entity);
                         Color c = WasteCatalog.Colors[(int)type];
@@ -448,6 +450,7 @@ namespace Mottainai.Client
         {
             float dt = Time.unscaledDeltaTime;
             bool inMatch = screen == UiScreen.Game;
+            UpdateV4();
             if (world != null)
             {
                 var st = net.stats;

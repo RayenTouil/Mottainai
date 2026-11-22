@@ -11,7 +11,7 @@ namespace Mottainai.Net
     {
         public const int ProtocolVersion = 3;
         // client -> server
-        public const byte Role = 0x01, Ready = 0x02, Start = 0x03, Stroke = 0x10, BackPaddle = 0x11, Net = 0x12, Ping = 0x20, Stats = 0x21;
+        public const byte Role = 0x01, Ready = 0x02, Start = 0x03, Leave = 0x04, Stroke = 0x10, BackPaddle = 0x11, Net = 0x12, Ping = 0x20, Stats = 0x21;
         // server -> client
         public const byte Welcome = 0x80, Lobby = 0x81, MatchStart = 0x82, Snapshot = 0x83, Events = 0x84, Results = 0x85, Pong = 0x86, Notice = 0x87;
     }

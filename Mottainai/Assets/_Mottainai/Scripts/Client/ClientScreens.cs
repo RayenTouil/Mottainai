@@ -66,7 +66,7 @@ namespace Mottainai.Client
             hudCanvas.GetComponent<GraphicRaycaster>().enabled = false;
             netCanvas = UIKit.Canvas("UI_NetHud", 30);
             netCanvas.GetComponent<GraphicRaycaster>().enabled = false;
-            BuildLogin(); BuildDownload(); BuildMenu(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud();
+            BuildLogin(); BuildDownload(); BuildMenu(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud(); BuildV4();
         }
 
         GameObject Panel(UiScreen s, Color bg)
@@ -367,9 +367,12 @@ namespace Mottainai.Client
             StartCoroutine(lab.Run(content, ni.NetworkType, "slice " + ni.SliceStatus));
         }
 
+        RectTransform hudSafe;
+
         void BuildHud()
         {
-            var root = hudCanvas.transform;
+            hudSafe = UIKit.Stretch(UIKit.Rect("Safe", hudCanvas.transform));
+            var root = (Transform)hudSafe;
             // v3 panels: score (top-left) and timer (top-right), ui.panel with a 2 px inner stroke at 15 % white
             var scoreBg = UIKit.Image(root, UIKit.Panel, null, "ScorePanel");
             scoreBg.raycastTarget = false;
@@ -379,8 +382,9 @@ namespace Mottainai.Client
             timerBg.raycastTarget = false;
             UIKit.Place(timerBg.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-22, -14), new Vector2(300, 96));
             var to = timerBg.gameObject.AddComponent<Outline>(); to.effectColor = new Color(1, 1, 1, 0.15f); to.effectDistance = new Vector2(2, -2);
-            scoreText = UIKit.Text(root, "0", 64, Color.white, TextAlignmentOptions.TopLeft);
-            UIKit.Place(scoreText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -24), new Vector2(600, 90));
+            scoreText = UIKit.Text(root, "0", 84, Color.white, TextAlignmentOptions.TopLeft);
+            UIKit.Place(scoreText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -16), new Vector2(600, 100));
+            scoreText.outlineWidth = 0.2f;
             scoreText.fontStyle = FontStyles.Bold;
             comboText = UIKit.Text(root, "", 34, new Color(1f, 0.85f, 0.3f), TextAlignmentOptions.TopLeft);
             UIKit.Place(comboText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -110), new Vector2(600, 50));
@@ -421,7 +425,7 @@ namespace Mottainai.Client
 
             var hp = UIKit.Image(root, new Color(0, 0, 0, 0.45f));
             hp.raycastTarget = false;
-            UIKit.Place(hp.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1500, 90));
+            UIKit.Place(hp.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 170), new Vector2(1500, 90));
             hintPanel = hp.gameObject;
             hintText = UIKit.Text(hp.transform, "", 40, Color.white);
             UIKit.Stretch(hintText.rectTransform, 20, 5, 20, 5);
@@ -561,7 +565,7 @@ namespace Mottainai.Client
             }
             else if (screen == UiScreen.Game)
             {
-                scoreText.text = $"<size=30>SCORE</size>  {hudScore}";
+                scoreText.text = $"<size=34>TEAM</size>  {hudScore}";
                 comboText.text = hudCombo ? "COMBO READY x1.5" : "";
                 if (world != null)
                 {

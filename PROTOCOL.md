@@ -21,6 +21,7 @@ Quantization: positions `i16` cm (x) / `i16` cm relative to `originZ` (z), angle
 | 0x01 | ROLE | u8 role |
 | 0x02 | READY | u8 ready(0/1) |
 | 0x03 | START | — (lobby → countdown; also REMATCH from END) |
+| 0x04 | LEAVE | — (v3: voluntary leave, bot takes the role immediately, no reconnect slot) |
 | 0x10 | STROKE | u8 side(0 L,1 R), u8 power(0..255 = 0..1), f32 clientTime |
 | 0x11 | BACKPADDLE | u8 side, u8 power, f32 clientTime |
 | 0x12 | NET | u16 targetId (0xFFFF = directional), i16 dirX mm, i16 dirZ mm, f32 clientTime |

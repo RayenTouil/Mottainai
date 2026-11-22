@@ -181,6 +181,13 @@ export class RoomDO extends DurableObject {
         }
         case C2S.READY: p.ready = r.u8() !== 0; this.broadcastLobby(); break;
         case C2S.START: this.startMatch(); break;
+        case C2S.LEAVE: { // voluntary: bot takes the role now, no reconnect slot
+          this.drop(ws);
+          this.players = this.players.filter(x => x !== p);
+          this.broadcastLobby();
+          try { ws.close(1000, "leave"); } catch {}
+          break;
+        }
         case C2S.STROKE:
         case C2S.BACKPADDLE: {
           r.u8(); // side: the player's role is authoritative
