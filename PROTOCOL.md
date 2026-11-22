@@ -21,11 +21,12 @@ Quantization: positions `i16` cm (x) / `i16` cm relative to `originZ` (z), angle
 | 0x01 | ROLE | u8 role |
 | 0x02 | READY | u8 ready(0/1) — ignored outside the lobby; reset for everyone on match start and on match end. ROLE is refused while READY. |
 | 0x03 | START | — host only, lobby only, every connected human READY; else NOTICE ("Only the host can start" / "Waiting for: A, B" / "Match already running"). Also REMATCH from END. |
-| 0x04 | LEAVE | — (v3: voluntary leave, bot takes the role immediately, no reconnect slot) |
+| 0x04 | LEAVE | — (v3: voluntary leave, bot takes the role immediately, no pause, no reconnect slot) |
+| 0x05 | CONTINUE_BOT | — (v3: host only, while PAUSED: bots take every missing role, then RESUME) |
 | 0x10 | STROKE | u8 side(0 L,1 R), u8 power(0..255 = 0..1), f32 clientTime |
 | 0x11 | BACKPADDLE | u8 side, u8 power, f32 clientTime |
 | 0x12 | NET | u16 targetId (0xFFFF = directional), i16 dirX mm, i16 dirZ mm, f32 clientTime |
-| 0x20 | PING | f64 t (client ms) — every 500 ms |
+| 0x20 | PING | f64 t (client ms) — every 500 ms, sent by the socket thread while the game loop is alive (any message keeps the socket alive) |
 | 0x21 | STATS | u8 fps, u16 rttMs, u8 netType, u16 backlogMs — every 2 s |
 
 `netType`: 0 unknown, 1 Wi-Fi, 2 LTE, 3 5G NSA, 4 5G SA.
@@ -41,6 +42,8 @@ Quantization: positions `i16` cm (x) / `i16` cm relative to `originZ` (z), angle
 | 0x85 | RESULTS | u8 reason, i32 total, i32 catchScore, i32 toxicPenalty, u16 throws, u16 hits, u16 counts[7], f32 distance, f32 kg, f32 duration |
 | 0x86 | PONG | f64 t (echo), u32 serverTick, f32 serverMatchTime |
 | 0x87 | NOTICE | str text |
+| 0x8A | PAUSE | v3: u8 reason (1 = player disconnected), u8 n, n × {u8 playerId, str name, u8 role, u8 graceLeftS} — on every change and every 1 s while waiting |
+| 0x8B | RESUME | v3: u16 countdownMs — everyone is back (or replaced by a bot): the sim steps again after this 3-2-1 |
 
 ### SNAPSHOT 0x83 (full state, no deltas)
 ```
@@ -60,6 +63,18 @@ Rate: 60 Hz, 30 Hz when any client reports `backlogMs > 100`.
 
 ### Phases
 0 Lobby, 1 Countdown, 2 Running, 3 Finished. End reasons: 1 TimeUp, 2 Crashed, 3 Aborted.
+
+### Disconnection / reconnection (v3)
+- WS URL extras: `&match=<seed>` = the client thinks it is in that match (reconnect); `&spectate=1` = no role, never pauses (test watcher / jury screen).
+- Dead socket: no message from a player for `deadAfterMs` (1500) → the server closes it (code 4001) and treats it as a disconnect.
+- Involuntary disconnect of a human who plays a role in the running match (countdown or running) → PAUSE: the room stops stepping the sim
+  (no time, obstacle or collision advances), inputs are ignored, no snapshots are broadcast (PONG keeps the frozen match time).
+- Reconnect with the same token within `reconnectGraceS` (30) → MATCH_START + one fresh snapshot to that player; when nobody is missing any more → RESUME `resumeCountdownMs` (3000) to all.
+  A drop during the 3-2-1 cancels it (PAUSE again). Several missing players: the match waits for all of them.
+- Grace expires → BotTakeover for that role (then RESUME, or keep waiting for the others). Host CONTINUE_BOT skips the wait.
+- Nobody connected when the last grace expires → match aborted (RESULTS reason 3 Aborted, no score); kept for reconnecting players for 30 s.
+- Reconnect with `&match=` into a room without a match (Durable Object restarted) → NOTICE "Match lost (server restarted) - back to the lobby" + LOBBY phase 0.
+- Settings: `server/src/room_config.json` (room orchestration, not game tuning).
 
 ### Lobby rules (v3)
 Host = first connected human in join order; sticky while connected, then the next connected human. Bots need no READY; a single human can READY + START alone.

@@ -91,4 +91,13 @@
 - v4/A: LEAVE 0x04 = drop() + remove player (no reconnect slot); Android Back / Esc opens the pause overlay.
 - v4/B: host = first connected human (join order), sticky while connected; sent as trailing u8 in LOBBY. START/REMATCH = host + lobby + all connected humans READY, else NOTICE. Players inside the 60 s reconnect window are not waited for.
 - v4/B: READY ignored outside the lobby; reset on match start and when RESULTS are sent. ROLE refused while READY.
+- v4/C: root cause of "GAME OVER while my friend was disconnected" = silent mobile disconnects never fire webSocketClose: the player stayed "connected", no bot, the sim ran on with an idle paddler (reproduced: crash after 33 s, tools/reconnect.ts T0). Client side: ClientWebSocket keep-alive 15 s and OnApplicationPause only reconnected if the socket looked closed.
+- v4/C: server dead-socket rule 1.5 s without any message (PING every 500 ms) -> close + disconnect; settings in server/src/room_config.json (reconnectGraceS 30, deadAfterMs 1500, resumeCountdownMs 3000).
+- v4/C: pause = room.ts stops calling sim.step (sim.ts untouched); room tick keeps counting; no snapshots while paused, one fresh snapshot to a returning player; inputs ignored while paused and during the 3-2-1.
+- v4/C: client PING moved to the socket thread, gated on a live main thread (< 2 s): loading hitches do not cause false drops, a frozen app still disappears.
+- v4/C: client closes its socket on OnApplicationPause(true) (teammates pause at once instead of after 1.5 s) and reconnects immediately on resume; focus regained only reconnects an OPEN but silent socket (Android sends resume + focus back to back).
+- v4/C: client stall rule 1.0 s without snapshot or PONG in a match -> ForceReconnect; backoff 0/250/500/1000/2000 ms in a match, 5 s connect timeout.
+- v4/C: after a pause the client rebuilds its clock line on the first new snapshot (server tick froze, local time did not); while paused it renders the latest frozen state, no prediction.
+- v4/C: aborted match result kept 30 s for reconnecting players (idle stop no longer wipes it at once).
+- v4/C: `&spectate=1` join (no role) added for automated phone tests: an idle human paddler would crash the raft and hide the reconnect results.
 - v4/B: client REMATCH = back to lobby + READY (the host still presses START); START shown to the host only, enabled at N/N ready.

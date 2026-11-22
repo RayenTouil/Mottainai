@@ -59,7 +59,7 @@ namespace Mottainai.Client
             preferredRole = (Role)PlayerPrefs.GetInt("role", 0);
             NetworkInfo.Provider.Refresh();
 
-            net.OnWelcome += w => { if (net.ProtocolMismatch) Toast("Update app: protocol mismatch"); else Toast($"Connected to room {w.roomCode} (room colo {w.roomColo})"); };
+            net.OnWelcome += w => { if (net.ProtocolMismatch) Toast("Update app: protocol mismatch"); else if (screen != UiScreen.Game) Toast($"Connected to room {w.roomCode} (room colo {w.roomColo})"); };
             net.OnLobby += OnLobby;
             net.OnError += e => { Toast(e); SetStatus(e); };
             net.OnMatchStart += OnMatchStart;
@@ -88,6 +88,7 @@ namespace Mottainai.Client
                 if (cli[i] == "-suspendat" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendAt);
                 if (cli[i] == "-suspendfor" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendFor);
                 if (cli[i] == "-shotsat" && i + 1 < cli.Length) shotsAt = cli[i + 1];
+                if (cli[i] == "-role" && i + 1 < cli.Length && int.TryParse(cli[i + 1], out int ar)) preferredRole = (Role)ar;
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
             }
 

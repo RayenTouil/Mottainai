@@ -298,6 +298,7 @@ async function T10() {
   const r = report("T10 end-to-end with the Unity client (" + (process.env.E2E_MODE ?? "observe") + ")");
   const rm = process.env.E2E_ROOM!;
   const b = new P(rm, "NodeBen", 3);
+  if (process.env.E2E_MODE === "watch") b.extra = "&spectate=1"; // watcher holds no role (an idle human paddler would crash the raft)
   await b.connect(); await sleep(300); b.ready();
   r.info("waiting for the Unity client in room " + rm);
   const joined = await waitFor(() => (b.lobby?.players.filter(p => p.connected).length ?? 0) >= 2 && b.lobby!.players.every(p => p.ready || !p.connected), 90000, 200);

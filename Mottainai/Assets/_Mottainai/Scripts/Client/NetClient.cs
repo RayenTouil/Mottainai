@@ -258,7 +258,9 @@ namespace Mottainai.Client
         {
             if (!WantConnected) return;
             if (ws.Suspended) { downSince = NetTime.Ms; downCause = "app resumed"; ws.Resume(); }
-            else if (!ws.IsOpen || NetTime.Ms - ws.LastRecvMs > StallMs) { downSince = NetTime.Ms; downCause = "focus regained, link dead"; Welcomed = false; ws.ForceReconnect(downCause); }
+            // only an OPEN but silent socket is dead; a socket that is (re)connecting must not be aborted (Android sends
+            // resume + focus back to back: aborting the fresh connection made the room see a second drop)
+            else if (ws.IsOpen && NetTime.Ms - ws.LastRecvMs > StallMs) { downSince = NetTime.Ms; downCause = "focus regained, link dead"; Welcomed = false; ws.ForceReconnect(downCause); }
         }
     }
 }

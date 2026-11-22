@@ -15,21 +15,21 @@ ROOM="PR$(( RANDOM % 9000 + 1000 ))"
 mkdir -p Docs/v4
 [ "$NO_INSTALL" = 1 ] || "$ADB" install -r Builds/Mottainai.apk >/dev/null
 ACT="$("$ADB" shell cmd package resolve-activity --brief $PKG | tail -1 | tr -d '\r')"
-"$ADB" shell svc power stayon usb >/dev/null 2>&1 || true
 "$ADB" shell am force-stop --user 0 $PKG
 "$ADB" logcat -c
 ( cd server && E2E_ROOM=$ROOM E2E_MODE=watch E2E_SECONDS=$SECS node tools/reconnect.ts T10 > ../Builds/phone_reconnect_node.txt 2>&1 ) &
 NODE=$!
 sleep 2
-"$ADB" shell am start -n "$ACT" -e unity "'-autoplay -room $ROOM -name Phone'" --user 0 >/dev/null
+"$ADB" shell am start -n "$ACT" -e unity "'-autoplay -room $ROOM -name Phone -role 3'" --user 0 >/dev/null
 echo "room $ROOM - waiting for the match"
 for i in $(seq 1 120); do "$ADB" logcat -d -s Unity:I | grep -q "AUTOPLAY\] screen=Game\|SHOT20" && break; sleep 1; done
 sleep 4
 shot() { "$ADB" exec-out screencap -p > "Docs/v4/reconnect_$1.png"; echo "screenshot Docs/v4/reconnect_$1.png"; }
 airplane() {
-  echo "$(date +%T) airplane ON"; "$ADB" shell cmd connectivity airplane-mode enable
+  # Samsung keeps Wi-Fi ON in airplane mode ("Wi-Fi stays on"): turn Wi-Fi off too so every link really dies
+  echo "$(date +%T) airplane ON + Wi-Fi OFF"; "$ADB" shell cmd connectivity airplane-mode enable; "$ADB" shell svc wifi disable
   sleep 3; shot airplane_on; sleep 7
-  echo "$(date +%T) airplane OFF"; "$ADB" shell cmd connectivity airplane-mode disable
+  echo "$(date +%T) airplane OFF + Wi-Fi ON"; "$ADB" shell cmd connectivity airplane-mode disable; "$ADB" shell svc wifi enable
   sleep 6; shot airplane_back
 }
 wifi2data() {

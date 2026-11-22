@@ -78,6 +78,7 @@ export class RoomDO extends DurableObject {
     const token = url.searchParams.get("token") || crypto.randomUUID();
     const name = (url.searchParams.get("name") || "Player").slice(0, 16);
     const wantRole = Number(url.searchParams.get("role") || 0) | 0;
+    const spectate = url.searchParams.get("spectate") === "1"; // test watcher / jury screen: no role, never pauses the match
     const clientMatch = Number(url.searchParams.get("match") || 0); // seed of the match the client thinks it is in (reconnect)
     await this.ensureColo();
 
@@ -91,11 +92,11 @@ export class RoomDO extends DurableObject {
       const old = p.ws;
       p.ws = server; p.name = name; p.leftAt = 0; p.lastMsgAt = Date.now();
       if (old && old !== server) { try { old.close(4000, "replaced"); } catch {} }
-      if (!p.role) p.role = this.pickRole(wantRole, p);
+      if (!p.role && !spectate) p.role = this.pickRole(wantRole, p);
     } else {
       p = { id: this.nextId++, token, name, role: 0, ready: false, ws: server, leftAt: 0, backlogMs: 0, fps: 0, rttMs: 0, netType: 0, lastMsgAt: Date.now() };
       this.players.push(p);
-      p.role = this.pickRole(wantRole, p);
+      p.role = spectate ? 0 : this.pickRole(wantRole, p);
     }
     this.attach(p);
 
