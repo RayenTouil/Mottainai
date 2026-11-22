@@ -210,7 +210,7 @@ namespace Mottainai.Client
             null,                                                 // Organic
             new[] { "Waste/metal_can", "Waste/metal_can_broken" },  // Metal
             null,                                                 // Valuable
-            new[] { "Waste/toxic_propane_tank", "Waste/battery" }, // Toxic
+            null,                                                 // Toxic: v3 red barrel (procedural)
         };
 
         static GameObject TryWasteModel(WasteType t, Transform root, float size)
@@ -246,7 +246,7 @@ namespace Mottainai.Client
         /// Floating power-up bubble: Shield (cyan diamond), Magnet (magenta U-magnet), Turbo (orange chevrons).
         static void BuildPowerUp(Transform root, PowerUp p)
         {
-            Color c = p == PowerUp.Magnet ? new Color(1f, 0.3f, 0.85f) : p == PowerUp.Turbo ? new Color(1f, 0.6f, 0.15f) : new Color(0.3f, 0.85f, 1f);
+            Color c = p == PowerUp.Magnet ? ArtV3.NetBadge : p == PowerUp.Turbo ? ArtV3.HazardOrange : ArtV3.Hex("#7FE9FF");
             Part(root, Sphere, Transparent(new Color(c.r, c.g, c.b, 0.33f), 2f), Vector3.zero, Vector3.one * 1.35f, default, "bubble");
             switch (p)
             {
@@ -270,49 +270,81 @@ namespace Mottainai.Client
 
         static void BuildWaste(Transform root, WasteType t)
         {
+            // v3 §8: chunky silhouette x1.5 (visual only) on a thick category ring with glow; bob/drift/pulse via WasteFloat
             Color c = WasteCatalog.Colors[(int)t];
-            var model = TryWasteModel(t, root, 0.8f);
-            if (model != null && t == WasteType.Toxic)
-                Part(root, Triangle, Lit(new Color(1f, 0.85f, 0f), 0.6f), new Vector3(0, 1.0f, 0), Vector3.one * 0.45f, default, "billboard");
+            var vis = new GameObject("vis").transform;
+            vis.SetParent(root, false);
+            var body = new GameObject("body3d").transform;
+            body.SetParent(vis, false);
+            body.localScale = Vector3.one * 1.5f;
+            var fl = root.gameObject.AddComponent<WasteFloat>();
+            fl.vis = vis;
+            GameObject model = t == WasteType.Plastic || t == WasteType.Glass || t == WasteType.Metal ? TryWasteModel(t, body, 0.8f) : null;
             if (model == null)
             {
                 switch (t)
                 {
                     case WasteType.Plastic:
-                        Part(root, Capsule, Lit(c), new Vector3(0, 0.1f, 0), new Vector3(0.28f, 0.32f, 0.28f), new Vector3(0, 0, 90));
-                        Part(root, Cylinder, Lit(Color.white), new Vector3(0.38f, 0.1f, 0), new Vector3(0.12f, 0.05f, 0.12f), new Vector3(0, 0, 90));
+                        Part(body, Capsule, Lit(ArtV3.Hex("#BFE3FF"), 0.6f), new Vector3(0, 0.1f, 0), new Vector3(0.28f, 0.32f, 0.28f), new Vector3(0, 0, 90));
+                        Part(body, Cylinder, Lit(Color.white), new Vector3(0.38f, 0.1f, 0), new Vector3(0.12f, 0.05f, 0.12f), new Vector3(0, 0, 90));
                         break;
-                    case WasteType.Paper:
-                        Part(root, Cube, Lit(c), new Vector3(0, 0.12f, 0), new Vector3(0.5f, 0.3f, 0.4f), new Vector3(0, 15, 0));
-                        Part(root, Cube, Lit(new Color(0.75f, 0.6f, 0.4f)), new Vector3(0, 0.28f, 0), new Vector3(0.52f, 0.03f, 0.12f));
+                    case WasteType.Paper: // milk carton: white + blue panel
+                        Part(body, Cube, Lit(Color.white), new Vector3(0, 0.16f, 0), new Vector3(0.3f, 0.36f, 0.3f));
+                        Part(body, Cube, Lit(c), new Vector3(0, 0.14f, 0.152f), new Vector3(0.26f, 0.2f, 0.01f));
+                        Part(body, Cube, Lit(c), new Vector3(0, 0.14f, -0.152f), new Vector3(0.26f, 0.2f, 0.01f));
+                        Part(body, Triangle, Lit(Color.white), new Vector3(0, 0.4f, 0), new Vector3(0.3f, 0.14f, 0.3f));
+                        fl.tilt = 5f;
                         break;
                     case WasteType.Glass:
-                        Part(root, Cylinder, Lit(c, 0.25f), new Vector3(0, 0.1f, 0), new Vector3(0.22f, 0.22f, 0.22f), new Vector3(0, 0, 90));
-                        Part(root, Cylinder, Lit(c, 0.25f), new Vector3(0.3f, 0.1f, 0), new Vector3(0.09f, 0.1f, 0.09f), new Vector3(0, 0, 90));
+                        Part(body, Cylinder, Lit(ArtV3.Hex("#3FBF5F"), 0.6f), new Vector3(0, 0.1f, 0), new Vector3(0.22f, 0.22f, 0.22f), new Vector3(0, 0, 90));
+                        Part(body, Cylinder, Lit(ArtV3.Hex("#3FBF5F"), 0.6f), new Vector3(0.3f, 0.1f, 0), new Vector3(0.09f, 0.1f, 0.09f), new Vector3(0, 0, 90));
                         break;
-                    case WasteType.Organic:
-                        Part(root, Capsule, Lit(c), new Vector3(0, 0.08f, 0), new Vector3(0.18f, 0.3f, 0.18f), new Vector3(0, 0, 70));
-                        Part(root, Sphere, Lit(new Color(0.95f, 0.85f, 0.3f)), new Vector3(0.15f, 0.12f, 0), new Vector3(0.2f, 0.15f, 0.2f));
+                    case WasteType.Organic: // apple core
+                        Part(body, Sphere, Lit(ArtV3.Hex("#E8C9A0")), new Vector3(0, 0.13f, 0), new Vector3(0.2f, 0.26f, 0.2f));
+                        Part(body, Sphere, Lit(new Color(0.85f, 0.75f, 0.25f)), new Vector3(0, 0.27f, 0), new Vector3(0.26f, 0.1f, 0.26f));
+                        Part(body, Sphere, Lit(new Color(0.85f, 0.75f, 0.25f)), new Vector3(0, 0.01f, 0), new Vector3(0.26f, 0.1f, 0.26f));
+                        Part(body, Cylinder, Lit(c), new Vector3(0, 0.36f, 0), new Vector3(0.03f, 0.06f, 0.03f));
                         break;
-                    case WasteType.Metal:
-                        Part(root, Cylinder, Lit(c), new Vector3(0, 0.12f, 0), new Vector3(0.24f, 0.16f, 0.24f));
-                        Part(root, Cylinder, Lit(new Color(0.85f, 0.2f, 0.2f)), new Vector3(0, 0.12f, 0), new Vector3(0.25f, 0.06f, 0.25f));
+                    case WasteType.Metal: // tin can with darker rims
+                        Part(body, Cylinder, Lit(ArtV3.Hex("#B8C0C8"), 0.9f), new Vector3(0, 0.12f, 0), new Vector3(0.24f, 0.16f, 0.24f));
+                        Part(body, Cylinder, Lit(ArtV3.RockSide, 0.9f), new Vector3(0, 0.28f, 0), new Vector3(0.25f, 0.01f, 0.25f));
+                        Part(body, Cylinder, Lit(ArtV3.RockSide, 0.9f), new Vector3(0, -0.04f, 0), new Vector3(0.25f, 0.01f, 0.25f));
                         break;
-                    case WasteType.Valuable:
-                        Part(root, Cube, Lit(new Color(0.55f, 0.33f, 0.15f)), new Vector3(0, 0.15f, 0), new Vector3(0.55f, 0.32f, 0.38f));
-                        Part(root, Cube, Lit(c, 1.2f), new Vector3(0, 0.33f, 0), new Vector3(0.58f, 0.08f, 0.4f));
-                        Part(root, Sphere, Transparent(new Color(1f, 0.9f, 0.4f, 0.25f), 1.5f), new Vector3(0, 0.25f, 0), Vector3.one * 0.95f, default, "sparkle");
+                    case WasteType.Valuable: // faceted gem
+                        Part(body, ArtV3.Gem(), Lit(c, 1.1f), new Vector3(0, 0.25f, 0), Vector3.one * 0.42f);
+                        Part(body, ArtV3.Gem(), Lit(ArtV3.Hex("#C79BFF"), 1.3f), new Vector3(0.04f, 0.31f, 0.04f), Vector3.one * 0.2f);
+                        fl.spin = 60f;
                         break;
-                    case WasteType.Toxic:
-                        Part(root, Cylinder, Lit(c), new Vector3(0, 0.25f, 0), new Vector3(0.5f, 0.35f, 0.5f));
-                        Part(root, Cylinder, Lit(new Color(0.1f, 0.1f, 0.1f)), new Vector3(0, 0.25f, 0), new Vector3(0.52f, 0.04f, 0.52f));
-                        // hazard sign billboard
-                        Part(root, Triangle, Lit(new Color(1f, 0.85f, 0f), 0.6f), new Vector3(0, 0.75f, 0), Vector3.one * 0.45f, default, "billboard");
+                    case WasteType.Toxic: // red barrel, dark lid, black hazard symbol on a white plate
+                        Part(body, Cylinder, Lit(c), new Vector3(0, 0.22f, 0), new Vector3(0.36f, 0.24f, 0.36f));
+                        Part(body, Cylinder, Lit(new Color(0.12f, 0.12f, 0.13f)), new Vector3(0, 0.47f, 0), new Vector3(0.37f, 0.02f, 0.37f));
+                        Part(body, Cylinder, Lit(new Color(0.12f, 0.12f, 0.13f)), new Vector3(0, 0.22f, 0), new Vector3(0.37f, 0.015f, 0.37f));
+                        var sign = new GameObject("billboard").transform;
+                        sign.SetParent(body, false);
+                        sign.localPosition = new Vector3(0, 0.85f, 0);
+                        Part(sign, Triangle, Lit(Color.white, 0.6f), Vector3.zero, Vector3.one * 0.42f);
+                        Part(sign, Triangle, Lit(new Color(0.08f, 0.08f, 0.08f), 0.6f), new Vector3(0, -0.015f, -0.01f), Vector3.one * 0.28f);
                         break;
                 }
             }
-            // type-colored ring so kids can read the bin color at a glance
-            Part(root, Cylinder, Transparent(new Color(c.r, c.g, c.b, 0.45f)), new Vector3(0, -0.02f, 0), new Vector3(1.0f, 0.01f, 1.0f), default, "ring");
+            else if (t == WasteType.Metal) fl.roll = 10f;
+            if (t == WasteType.Metal && model == null) fl.roll = 10f;
+
+            // ring: inner 0.55 / outer 0.75 x (object radius x 1.6) with object radius x1.5 visual scale
+            float k = WasteCatalog.Radius[(int)t] * 1.5f * 1.6f;
+            var ring = new GameObject("ring").transform;
+            ring.SetParent(root, false);
+            ring.localPosition = new Vector3(0, 0.02f, 0);
+            ring.localScale = Vector3.one * 0.75f * k;
+            Part(ring, ArtV3.Ring(0.6f, 32), Transparent(new Color(c.r, c.g, c.b, 0.35f * 0.6f)), new Vector3(0, -0.004f, 0), Vector3.one * 1.45f, default, "glow");
+            if (t == WasteType.Organic || t == WasteType.Metal)
+            {
+                var o = t == WasteType.Organic ? ArtV3.Hex("#E8C9A0") : Color.white;
+                Part(ring, ArtV3.Ring(0.69f, 32), Transparent(new Color(o.r, o.g, o.b, 0.95f)), new Vector3(0, -0.002f, 0), Vector3.one * 1.06f, default, "outline");
+            }
+            Part(ring, ArtV3.Ring(0.55f / 0.75f, 32), Transparent(new Color(c.r, c.g, c.b, 0.9f)), Vector3.zero, Vector3.one, default, "band");
+            fl.ring = ring;
+            if (t == WasteType.Toxic) fl.pulseHz = 2f;
         }
 
         static void BuildObstacle(Transform root, ObstacleType t)
@@ -331,43 +363,45 @@ namespace Mottainai.Client
                 case ObstacleType.Rock:
                 {
                     int v = Random.Range(0, 4);
-                    Part(root, ProceduralMeshes.Rock(v), Lit(new Color(0.52f, 0.5f, 0.5f)), new Vector3(0, 0.05f, 0), new Vector3(2.1f * r, 1.5f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
-                    Part(root, ProceduralMeshes.Rock(v + 4), Lit(new Color(0.45f, 0.44f, 0.46f)), new Vector3(0.55f * r, 0f, -0.3f * r), new Vector3(0.9f * r, 0.7f * r, 0.9f * r));
+                    Part(root, ProceduralMeshes.Rock(v), Lit(ArtV3.RockTop), new Vector3(0, 0.05f, 0), new Vector3(2.1f * r, 1.5f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
+                    Part(root, ProceduralMeshes.Rock(v + 4), Lit(ArtV3.RockSide), new Vector3(0.55f * r, 0f, -0.3f * r), new Vector3(0.9f * r, 0.7f * r, 0.9f * r));
                     break;
                 }
                 case ObstacleType.BigRock:
                 {
                     int v = Random.Range(0, 4);
-                    Part(root, ProceduralMeshes.Rock(v + 8), Lit(new Color(0.44f, 0.43f, 0.46f)), new Vector3(0, 0.25f, 0), new Vector3(2.1f * r, 1.7f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
-                    Part(root, ProceduralMeshes.Blob(v), Lit(new Color(0.33f, 0.55f, 0.28f)), new Vector3(0.2f, 1.55f * r * 0.8f, 0.1f), new Vector3(1.6f, 0.55f, 1.4f));
-                    Part(root, ProceduralMeshes.Rock(v + 12), Lit(new Color(0.5f, 0.49f, 0.5f)), new Vector3(-0.8f * r, 0f, 0.5f * r), new Vector3(0.8f * r, 0.6f * r, 0.8f * r));
+                    Part(root, ProceduralMeshes.Rock(v + 8), Lit(ArtV3.RockSide), new Vector3(0, 0.25f, 0), new Vector3(2.1f * r, 1.7f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
+                    Part(root, ProceduralMeshes.Blob(v), Lit(ArtV3.Grass), new Vector3(0.2f, 1.55f * r * 0.8f, 0.1f), new Vector3(1.6f, 0.55f, 1.4f));
+                    Part(root, ProceduralMeshes.Rock(v + 12), Lit(ArtV3.RockTop), new Vector3(-0.8f * r, 0f, 0.5f * r), new Vector3(0.8f * r, 0.6f * r, 0.8f * r));
                     break;
                 }
                 case ObstacleType.Iceberg:
                 {
                     int v = Random.Range(0, 4);
-                    Part(root, ProceduralMeshes.Iceberg(v), Lit(new Color(0.9f, 0.97f, 1f), 0.25f), new Vector3(0, 0.3f, 0), new Vector3(2.4f, 2.4f, 2.4f), new Vector3(0, Random.Range(0, 360), 0));
-                    Part(root, ProceduralMeshes.Iceberg(v + 4), Lit(new Color(0.7f, 0.88f, 1f), 0.3f), new Vector3(0.7f, 0.1f, 0.4f), new Vector3(1.2f, 1.3f, 1.2f));
+                    Part(root, ProceduralMeshes.Iceberg(v), Lit(ArtV3.Hex("#E8F8FF"), 0.25f), new Vector3(0, 0.3f, 0), new Vector3(2.4f, 2.4f, 2.4f), new Vector3(0, Random.Range(0, 360), 0));
+                    Part(root, ProceduralMeshes.Iceberg(v + 4), Lit(ArtV3.Hex("#9FDDF2"), 0.3f), new Vector3(0.7f, 0.1f, 0.4f), new Vector3(1.2f, 1.3f, 1.2f));
                     break;
                 }
                 case ObstacleType.Wreck:
-                    Part(root, Capsule, Lit(new Color(0.45f, 0.28f, 0.15f)), new Vector3(0, 0.2f, 0), new Vector3(2f * r, (hl + r), 1.6f * r), new Vector3(0, 0, 90));
-                    Part(root, Cylinder, Lit(new Color(0.35f, 0.22f, 0.12f)), new Vector3(0.4f, 1.3f, 0), new Vector3(0.12f, 1.1f, 0.12f), new Vector3(0, 0, 12));
+                    Part(root, Capsule, Lit(ArtV3.Wood), new Vector3(0, 0.2f, 0), new Vector3(2f * r, (hl + r), 1.6f * r), new Vector3(0, 0, 90));
+                    Part(root, Cylinder, Lit(ArtV3.Bark), new Vector3(0.4f, 1.3f, 0), new Vector3(0.12f, 1.1f, 0.12f), new Vector3(0, 0, 12));
                     Part(root, Cube, Lit(new Color(0.85f, 0.85f, 0.75f)), new Vector3(0.6f, 1.6f, 0), new Vector3(0.05f, 0.8f, 0.7f), new Vector3(0, 0, 12));
                     break;
                 case ObstacleType.Log:
-                    Part(root, Cylinder, Lit(new Color(0.5f, 0.32f, 0.16f)), new Vector3(0, 0.05f, 0), new Vector3(2f * r, hl + r, 2f * r), new Vector3(0, 0, 90));
+                    Part(root, Cylinder, Lit(ArtV3.Bark), new Vector3(0, 0.05f, 0), new Vector3(2f * r, hl + r, 2f * r), new Vector3(0, 0, 90));
+                    Part(root, Cylinder, Lit(ArtV3.Cliff), new Vector3(hl + r + 0.01f, 0.05f, 0), new Vector3(2f * r * 0.85f, 0.01f, 2f * r * 0.85f), new Vector3(0, 0, 90));
+                    Part(root, Cylinder, Lit(ArtV3.Cliff), new Vector3(-hl - r - 0.01f, 0.05f, 0), new Vector3(2f * r * 0.85f, 0.01f, 2f * r * 0.85f), new Vector3(0, 0, 90));
                     break;
                 case ObstacleType.Shark:
                     var body = new GameObject("body").transform;
                     body.SetParent(root, false);
-                    Part(body, Capsule, Lit(new Color(0.45f, 0.5f, 0.58f)), new Vector3(0, -0.05f, 0), new Vector3(0.9f, 1.1f, 0.9f), new Vector3(90, 0, 0));
-                    Part(body, Cone, Lit(new Color(0.45f, 0.5f, 0.58f)), new Vector3(0, -0.05f, -1.0f), new Vector3(0.8f, 0.7f, 0.3f), new Vector3(-90, 0, 0));
-                    Part(body, Sphere, Lit(Color.white), new Vector3(0, -0.2f, 0.5f), new Vector3(0.6f, 0.2f, 0.4f));
-                    Part(body, Sphere, Lit(new Color(1f, 0.15f, 0.1f), 1.2f), new Vector3(0.28f, 0.12f, 0.75f), Vector3.one * 0.1f);
-                    Part(body, Sphere, Lit(new Color(1f, 0.15f, 0.1f), 1.2f), new Vector3(-0.28f, 0.12f, 0.75f), Vector3.one * 0.1f);
+                    Part(body, Capsule, Lit(ArtV3.Hex("#6F7D8C")), new Vector3(0, -0.05f, 0), new Vector3(0.9f, 1.1f, 0.9f), new Vector3(90, 0, 0));
+                    Part(body, Cone, Lit(ArtV3.Hex("#6F7D8C")), new Vector3(0, -0.05f, -1.0f), new Vector3(0.8f, 0.7f, 0.3f), new Vector3(-90, 0, 0));
+                    Part(body, Sphere, Lit(ArtV3.Hex("#EEF2F5")), new Vector3(0, -0.2f, 0.5f), new Vector3(0.6f, 0.2f, 0.4f));
+                    Part(body, Sphere, Lit(ArtV3.Eyes, 1.2f), new Vector3(0.28f, 0.12f, 0.75f), Vector3.one * 0.1f);
+                    Part(body, Sphere, Lit(ArtV3.Eyes, 1.2f), new Vector3(-0.28f, 0.12f, 0.75f), Vector3.one * 0.1f);
                     Part(body, Cube, Lit(Color.white, 0.4f), new Vector3(0, -0.12f, 0.95f), new Vector3(0.45f, 0.05f, 0.06f));
-                    var fin = Part(root, Cone, Lit(new Color(0.35f, 0.4f, 0.48f)), new Vector3(0, 0.25f, 0), new Vector3(0.12f, 0.75f, 0.6f), default, "fin");
+                    var fin = Part(root, Cone, Lit(ArtV3.Hex("#6F7D8C")), new Vector3(0, 0.25f, 0), new Vector3(0.12f, 0.75f, 0.6f), default, "fin");
                     fin.transform.SetAsLastSibling();
                     break;
             }

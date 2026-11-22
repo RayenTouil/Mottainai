@@ -24,6 +24,53 @@ namespace Mottainai.Client
         public static readonly Color UiPrimary = Hex("#4CC94C"), UiPrimaryShadow = Hex("#2E8A2E"), UiSecondary = Hex("#2F8BFF"), UiSecondaryShadow = Hex("#1E5FB3");
         public static readonly Color UiWarn = Hex("#FF7A1A"), NetBadge = Hex("#00C2A8");
 
+        static Mesh gem;
+        static readonly System.Collections.Generic.Dictionary<int, Mesh> rings = new System.Collections.Generic.Dictionary<int, Mesh>();
+
+        /// Flat annulus in XZ facing up, outer radius 1, inner radius = innerRatio (32 segments).
+        public static Mesh Ring(float innerRatio, int seg = 32)
+        {
+            int key = (int)(innerRatio * 1000) * 100 + seg;
+            if (rings.TryGetValue(key, out var m)) return m;
+            var v = new Vector3[seg * 2]; var uv = new Vector2[seg * 2]; var tri = new int[seg * 6];
+            for (int i = 0; i < seg; i++)
+            {
+                float a = i * Mathf.PI * 2f / seg;
+                var d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                v[i * 2] = d * innerRatio; v[i * 2 + 1] = d;
+                uv[i * 2] = new Vector2(0, 0); uv[i * 2 + 1] = new Vector2(1, 0);
+                int n = (i + 1) % seg;
+                int k = i * 6;
+                tri[k] = i * 2; tri[k + 1] = n * 2 + 1; tri[k + 2] = i * 2 + 1;
+                tri[k + 3] = i * 2; tri[k + 4] = n * 2; tri[k + 5] = n * 2 + 1;
+            }
+            m = new Mesh { name = "Ring", vertices = v, uv = uv, triangles = tri };
+            m.RecalculateNormals(); m.RecalculateBounds();
+            rings[key] = m;
+            return m;
+        }
+
+        /// Faceted gem (hexagonal bipyramid, 12 flat-shaded tris).
+        public static Mesh Gem()
+        {
+            if (gem != null) return gem;
+            var top = new Vector3(0, 0.55f, 0); var bot = new Vector3(0, -0.45f, 0);
+            var verts = new System.Collections.Generic.List<Vector3>();
+            for (int i = 0; i < 6; i++)
+            {
+                float a0 = i * Mathf.PI / 3f, a1 = (i + 1) * Mathf.PI / 3f;
+                var p0 = new Vector3(Mathf.Cos(a0) * 0.5f, 0.12f, Mathf.Sin(a0) * 0.5f);
+                var p1 = new Vector3(Mathf.Cos(a1) * 0.5f, 0.12f, Mathf.Sin(a1) * 0.5f);
+                verts.Add(top); verts.Add(p1); verts.Add(p0);
+                verts.Add(bot); verts.Add(p0); verts.Add(p1);
+            }
+            var tri = new int[verts.Count];
+            for (int i = 0; i < tri.Length; i++) tri[i] = i;
+            gem = new Mesh { name = "Gem", vertices = verts.ToArray(), triangles = tri };
+            gem.RecalculateNormals(); gem.RecalculateBounds();
+            return gem;
+        }
+
         static Texture2D caustics;
 
         /// Tileable 512 px caustic lines baked once from Voronoi (F2 - F1 edges).

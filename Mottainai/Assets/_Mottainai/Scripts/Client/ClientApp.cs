@@ -79,6 +79,7 @@ namespace Mottainai.Client
             for (int i = 0; i < cli.Length; i++)
             {
                 if (cli[i] == "-autoplay") autoplay = true;
+                if (cli[i] == "-room" && i + 1 < cli.Length) autoRoom = cli[i + 1];
                 if (cli[i] == "-connect" && i + 1 < cli.Length) content.SetBaseUrl(cli[i + 1]);
                 if (cli[i] == "-name" && i + 1 < cli.Length) playerName = cli[i + 1];
                 if (cli[i] == "-shots" && i + 1 < cli.Length) shotsDir = cli[i + 1];
@@ -93,6 +94,8 @@ namespace Mottainai.Client
 
         // ---------------- smoke test: -autoplay -connect <ip> ----------------
         bool autoplay;
+        string autoRoom = "DEMO";
+        int perfFrames; float perfTime, perfWorst;
         string shotsDir;
         float quitAfter;
         int shotIndex;
@@ -126,7 +129,7 @@ namespace Mottainai.Client
             while (screen != UiScreen.Menu && Time.realtimeSinceStartup - t0 < 90f) yield return null;
             if (screen != UiScreen.Menu) { Debug.LogError("[AUTOPLAY] FAIL: never reached menu. " + loginStatus.text); Application.Quit(2); yield break; }
             Debug.Log($"[AUTOPLAY] menu; content {content.BytesTotal / 1048576f:F1} MB at {content.Mbps:F1} MB/s cached={content.FromCache}");
-            JoinRoom("DEMO");
+            JoinRoom(autoRoom);
             while (screen != UiScreen.Lobby || lobby == null) yield return null;
             yield return new WaitForSecondsRealtime(0.8f);
             Shot("lobby");
@@ -138,7 +141,12 @@ namespace Mottainai.Client
             while (results == null)
             {
                 logT += Time.unscaledDeltaTime; throwT += Time.unscaledDeltaTime;
-                if (screen == UiScreen.Game) gameT += Time.unscaledDeltaTime;
+                if (screen == UiScreen.Game)
+                {
+                    if (gameT < 20f && gameT + Time.unscaledDeltaTime >= 20f) Debug.Log("[AUTOPLAY] SHOT20");
+                    gameT += Time.unscaledDeltaTime;
+                    if (gameT > 3f && hudPhase == MatchPhase.Running) { perfFrames++; perfTime += Time.unscaledDeltaTime; perfWorst = Mathf.Max(perfWorst, Time.unscaledDeltaTime); }
+                }
                 if (nextShot < shotTimes.Length && gameT >= shotTimes[nextShot]) Shot($"game_{shotTimes[nextShot++]:0}s");
                 if (quitAfter > 0 && gameT > quitAfter) { Debug.Log("[AUTOPLAY] quitafter reached"); Application.Quit(0); yield break; }
                 if (screen == UiScreen.Game && throwT > 0.7f && world != null && myRole == Role.Collector)
@@ -155,6 +163,7 @@ namespace Mottainai.Client
                 yield return null;
             }
             var r = results;
+            Debug.Log($"[PERF] avg {perfFrames / Mathf.Max(0.001f, perfTime):F1} fps, worst frame {perfWorst * 1000f:F1} ms, frames {perfFrames}");
             Debug.Log($"[AUTOPLAY] RESULT reason={r.reason} total={r.total} catch={r.catchScore} toxic=-{r.toxicPenalty} acc={r.Accuracy:P0} dist={r.distance:F0}m kg={r.kg:F1} dur={r.duration:F0}s counts={string.Join(",", r.counts)} rxMB={net.stats.TotalDownMB:F1}");
             yield return new WaitForSecondsRealtime(2.5f);
             Shot("results");

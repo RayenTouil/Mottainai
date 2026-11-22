@@ -242,6 +242,9 @@ namespace Mottainai.Client
             slots[last].listIndex = s.listIndex;
             active.RemoveAt(active.Count - 1);
             flyers.Add(new Flyer { go = go, code = s.code, from = go.transform.position, scale = go.transform.localScale });
+            var pos = go.transform.position + Vector3.up * 0.2f;
+            fx.Burst(pos, ArtV3.Foam, 12, 1.8f, 0.1f, 2.6f);
+            if (EntityCode.Kind(s.code) == EntityKind.Waste) fx.Burst(pos, WasteCatalog.Colors[EntityCode.Sub(s.code)], 6, 1.5f, 0.12f, 2.8f);
         }
 
         class Flyer { public GameObject go; public byte code; public Vector3 from, scale; public float t; }
@@ -254,7 +257,7 @@ namespace Mottainai.Client
             for (int i = flyers.Count - 1; i >= 0; i--)
             {
                 var f = flyers[i];
-                f.t += dt / 0.45f;
+                f.t += dt / 0.2f;
                 var tr = f.go.transform;
                 if (f.t >= 1f)
                 {
@@ -265,10 +268,8 @@ namespace Mottainai.Client
                     continue;
                 }
                 float k = f.t;
-                var mid = (f.from + target) * 0.5f + Vector3.up * 2.2f;
-                tr.position = Vector3.Lerp(Vector3.Lerp(f.from, mid, k), Vector3.Lerp(mid, target, k), k);
-                tr.localScale = f.scale * Mathf.Lerp(1.15f, 0.25f, k * k);
-                tr.Rotate(0f, 720f * dt, 360f * dt, Space.Self);
+                tr.position = f.from;
+                tr.localScale = f.scale * (k < 0.4f ? Mathf.Lerp(1f, 1.2f, k / 0.4f) : Mathf.Lerp(1.2f, 0f, (k - 0.4f) / 0.6f));
             }
         }
 

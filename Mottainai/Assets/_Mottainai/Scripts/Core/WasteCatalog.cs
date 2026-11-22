@@ -8,7 +8,7 @@ namespace Mottainai
         public static readonly Color32[] Colors =
         {
             new Color32(0xF2, 0xC2, 0x00, 255), new Color32(0x1E, 0x6F, 0xD9, 255), new Color32(0x2E, 0x9E, 0x44, 255),
-            new Color32(0x7A, 0x4A, 0x21, 255), new Color32(0x8C, 0x95, 0x9F, 255), new Color32(0xFF, 0xC8, 0x3D, 255),
+            new Color32(0x7A, 0x4A, 0x21, 255), new Color32(0x8C, 0x95, 0x9F, 255), new Color32(0x9B, 0x4D, 0xFF, 255), // v3: valuable = purple gem
             new Color32(0xD6, 0x28, 0x28, 255)
         };
         public static readonly float[] Kg = { 0.05f, 0.12f, 0.35f, 0.15f, 0.2f, 1.5f, 2.5f };
