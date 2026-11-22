@@ -84,3 +84,6 @@
 - ART P6: SYNC ring = time left in the partner's sync window (stroke now = boost); collector ring = net cooldown. Results thumbnail = one render of the world camera into a 560x315 RT.
 - ART P8: Low quality halves far trees + path props (draw calls); flowering bushes added to the bank kit; lighthouse island moved to x=22 so it shows at the horizon.
 - merge (2026-11-22): main = art/v3 + dev. Visual conflicts -> v3; netcode (f9a81bc) re-applied on v3 ClientApp/ClientScreens/WorldView; BuildWindows = dev (Mono). Dev v2 ParkKit/SceneLook removed (did not compile vs v3, unused).
+- pitch: deck built from Pitch/build_deck.js (pptxgenjs + HTML twin printed to PDF by Edge, no LibreOffice/PowerPoint on this PC); titles Fredoka SemiBold, body Calibri (Nunito Sans not in repo).
+- pitch: architecture slide shows the real v2 stack (wss -> Cloudflare edge MRS -> Durable Object room 60 Hz), not README's UDP 7777; voice chat and eco-facts marked Next (not in code); 5G SA latency marked Next (no measurement yet).
+- pitch: speakers Yassine (1-2), Wajdi (3-5), Rayen (demo, 7-8), Med Amine (9-12); demo ends by steering into a rock to reach results at ~40 s.
