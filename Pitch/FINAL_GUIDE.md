@@ -85,7 +85,7 @@ Inputs merged:
 | 4 | Three roles, one raft | III Experience | 0:25 | Wajdi ZENTANI |
 | 5 | The gameplay loop | III Experience | 0:20 | Wajdi ZENTANI |
 | 6 | Live demo | V Proof | 0:45 | Rayen TOUIL |
-| 6b | Demo backup (hidden) (hidden) | V Proof (backup) | — | Rayen TOUIL |
+| 6b | Demo backup (hidden) | V Proof (backup) | — | Rayen TOUIL |
 | 7 | One authoritative game room per match | IV Engineering | 0:25 | Rayen TOUIL |
 | 8 | Engineering challenges we solved | IV Engineering | 0:30 | Rayen TOUIL |
 | 9 | Impact and roadmap | VI Impact | 0:30 | Med Amine CHAKROUN |
@@ -179,7 +179,7 @@ Planned time: **4:10** for 10 slides. Script at 140 words/min: 453 spoken words 
 - **Animation / transition:** Fade, then switch the projector to the mirrored phone.
 - **Speaker notes:** Let's prove it live. [START DEMO] Two phones, one bot. I'm the left paddler; Wajdi is the collector. Watch: when we stroke together, the raft surges. Wajdi taps a bottle, the net flies, and it scores. The server runs all of this sixty times a second. [~25 s of play, then steer into a rock] Rock ahead... game over. And here is our result: waste per bin, accuracy, and kilos of river cleaned. [CLICK]
 
-### 6b. Demo backup (hidden) (hidden, Plan B) — — — Rayen TOUIL
+### 6b. Demo backup (hidden) — — — Rayen TOUIL
 
 - **Text on the slide:**
   - Demo backup

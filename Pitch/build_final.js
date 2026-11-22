@@ -496,14 +496,14 @@ body{margin:0}
   const speechSec = Math.round(spokenWords / 140 * 60) + toSec(demoMeta.time);
   let C_ = "", E_ = "";
   for (const m of metas) {
-    C_ += `\n### ${label(m)}. ${m.title}${m.hidden ? " (hidden, Plan B)" : ""} — ${m.time} — ${m.speaker}\n\n`;
+    C_ += `\n### ${label(m)}. ${m.title} — ${m.time} — ${m.speaker}\n\n`;
     C_ += `- **Text on the slide:**\n${m.onSlide.map(t => `  - ${t}`).join("\n")}\n`;
     C_ += `- **Visual composition:** ${m.visual}\n- **Images:** ${m.images.join(", ")}\n`;
     if (m.diagram) C_ += `- **Diagram:** ${m.diagram}\n`;
     C_ += `- **Animation / transition:** ${m.animation}\n- **Speaker notes:** ${m.script}\n`;
     if (!m.hidden) E_ += `\n**${label(m)}. ${m.title}** (${m.speaker}, ${m.time}${m.demo ? "" : `, ${m.words} words`})\n\n${m.script}\n`;
   }
-  const B_ = `| # | Slide | Act | Time | Speaker |\n|---|---|---|---|---|\n` + metas.map(m => `| ${label(m)} | ${m.title}${m.hidden ? " (hidden)" : ""} | ${actOf(m.n)} | ${m.time} | ${m.speaker} |`).join("\n");
+  const B_ = `| # | Slide | Act | Time | Speaker |\n|---|---|---|---|---|\n` + metas.map(m => `| ${label(m)} | ${m.title} | ${actOf(m.n)} | ${m.time} | ${m.speaker} |`).join("\n");
   function actOf(n) { return ["I Problem", "I Problem", "II Idea", "III Experience", "III Experience", "V Proof", "V Proof (backup)", "IV Engineering", "IV Engineering", "VI Impact", "VI Impact"][n - 1]; }
   const guide = fs.readFileSync(path.join(PITCH, "guide_template.md"), "utf8")
     .replace("{{B}}", B_ + `\n\nPlanned time: **${mmss(plannedSec)}** for ${shown.length} slides. Script at 140 words/min: ${spokenWords} spoken words (${mmss(spokenWords / 140 * 60)}) + 0:45 demo = **${mmss(speechSec)}**, leaving about ${mmss(300 - speechSec)} of margin inside the 5:00 limit.`)
