@@ -74,3 +74,13 @@ desktop.ini
 
 # mirrored project used by tools/build_copy.sh (build while the editor is open)
 /.bc/
+
+# Node / Cloudflare / secrets
+node_modules/
+.wrangler/
+.env
+.env.*
+.dev.vars
+*.keystore
+*.jks
+*.pem
