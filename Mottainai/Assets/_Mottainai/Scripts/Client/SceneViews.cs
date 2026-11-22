@@ -151,6 +151,32 @@ namespace Mottainai.Client
 
         public void Throw() => armAnim = 0f;
 
+        Transform partnerHalo;
+        int partnerIdx;
+        bool partnerShown;
+
+        /// Soft pulsing halo above the other paddler (onboarding: "sync with your team").
+        public void SetPartnerHalo(Role r)
+        {
+            partnerIdx = (int)r;
+            if (partnerHalo == null)
+            {
+                partnerHalo = VisualFactory.Part(transform, ProceduralMeshes.Torus(0.32f, 0.045f, 1f, 28, 6), VisualFactory.Lit(new Color(0.45f, 0.95f, 1f), 1.2f), Vector3.zero, Vector3.one, default, "partnerHalo").transform;
+                partnerHalo.gameObject.SetActive(false);
+            }
+        }
+
+        public void ShowPartnerHalo(bool on)
+        {
+            on = on && partnerIdx >= 1 && partnerIdx <= 3 && partnerHalo != null;
+            if (partnerHalo != null && partnerShown != on) { partnerShown = on; partnerHalo.gameObject.SetActive(on); }
+            if (!on) return;
+            var c = crew[partnerIdx];
+            partnerHalo.localPosition = c.localPosition + Vector3.up * (1.25f + 0.06f * Mathf.Sin(Time.time * 5f));
+            float s = 1f + 0.15f * Mathf.Sin(Time.time * 6f);
+            partnerHalo.localScale = new Vector3(s, 1f, s);
+        }
+
         public Vector3 PaddleTip(bool left) => transform.TransformPoint(new Vector3(left ? -1.5f : 1.5f, 0f, -0.35f));
         public Vector3 CollectorHand => transform.TransformPoint(new Vector3(0, 1.2f, 1.1f));
 

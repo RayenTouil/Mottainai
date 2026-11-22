@@ -220,8 +220,16 @@ namespace Mottainai.Client
             for (int i = flyers.Count - 1; i >= 0; i--)
             {
                 var f = flyers[i];
-                f.t += dt / 0.45f;
+                f.t += dt / 0.62f;
                 var tr = f.go.transform;
+                if (f.t < 0.3f)
+                {
+                    // collect pop (~0.19 s): quick squash-and-grow in place before flying to the raft
+                    float pk = f.t / 0.3f;
+                    tr.localScale = f.scale * (1f + 0.4f * Mathf.Sin(pk * Mathf.PI * 0.5f));
+                    tr.position = f.from + Vector3.up * 0.25f * pk;
+                    continue;
+                }
                 if (f.t >= 1f)
                 {
                     tr.localScale = f.scale;
@@ -230,10 +238,11 @@ namespace Mottainai.Client
                     flyers.RemoveAt(i);
                     continue;
                 }
-                float k = f.t;
-                var mid = (f.from + target) * 0.5f + Vector3.up * 2.2f;
-                tr.position = Vector3.Lerp(Vector3.Lerp(f.from, mid, k), Vector3.Lerp(mid, target, k), k);
-                tr.localScale = f.scale * Mathf.Lerp(1.15f, 0.25f, k * k);
+                float k = (f.t - 0.3f) / 0.7f;
+                var from = f.from + Vector3.up * 0.25f;
+                var mid = (from + target) * 0.5f + Vector3.up * 2.2f;
+                tr.position = Vector3.Lerp(Vector3.Lerp(from, mid, k), Vector3.Lerp(mid, target, k), k);
+                tr.localScale = f.scale * Mathf.Lerp(1.4f, 0.25f, k * k);
                 tr.Rotate(0f, 720f * dt, 360f * dt, Space.Self);
             }
         }

@@ -29,6 +29,22 @@ namespace Mottainai.Client
 
         public void Play(Id id, float vol = 1f) { if (clips != null) src.PlayOneShot(clips[(int)id], vol); }
 
+        AudioSource[] pitched;
+        int pitchedNext;
+        /// One-shot at a given pitch (per waste family), small pool of sources so overlapping catches don't cut off.
+        public void Play(Id id, float vol, float pitch)
+        {
+            if (clips == null) return;
+            if (pitched == null)
+            {
+                pitched = new AudioSource[3];
+                for (int i = 0; i < pitched.Length; i++) { pitched[i] = gameObject.AddComponent<AudioSource>(); pitched[i].playOnAwake = false; pitched[i].spatialBlend = 0f; }
+            }
+            var s = pitched[pitchedNext]; pitchedNext = (pitchedNext + 1) % pitched.Length;
+            s.pitch = pitch;
+            s.PlayOneShot(clips[(int)id], vol);
+        }
+
         static AudioClip Make(Id id)
         {
             float len = id switch { Id.Splash => 0.3f, Id.Hit => 0.6f, Id.Shield => 0.6f, Id.Go => 0.4f, Id.Sync => 0.35f, Id.Valuable => 0.5f, Id.Combo => 0.4f, _ => 0.18f };

@@ -19,9 +19,11 @@ namespace Mottainai.Client
 
         public Role role;
         public bool active;
+        /// Screen points owned by UI (in-game menu button, settings overlay): touches starting there are ignored.
+        public Func<Vector2, bool> Blocked;
         float cooldownUntil, hudToggleAt;
 
-        struct Finger { public Vector2 start, anchor; public float startTime, anchorTime; public bool moved, consumed; }
+        struct Finger { public Vector2 start, anchor; public float startTime, anchorTime; public bool moved, consumed, ignore; }
         readonly Finger[] fingers = new Finger[16];
 
         void OnEnable()
@@ -75,10 +77,11 @@ namespace Mottainai.Client
                 switch (t.phase)
                 {
                     case TouchPhase.Began:
-                        f = new Finger { start = pos, anchor = pos, startTime = now, anchorTime = now };
+                        f = new Finger { start = pos, anchor = pos, startTime = now, anchorTime = now, ignore = Blocked != null && Blocked(pos) };
                         break;
                     case TouchPhase.Moved:
                     case TouchPhase.Stationary:
+                        if (f.ignore) break;
                         if ((pos - f.start).magnitude > h * 0.03f) f.moved = true;
                         if (role == Role.LeftPaddler || role == Role.RightPaddler)
                         {
@@ -93,7 +96,7 @@ namespace Mottainai.Client
                         break;
                     case TouchPhase.Ended:
                     case TouchPhase.Canceled:
-                        if (role == Role.Collector && t.phase == TouchPhase.Ended)
+                        if (role == Role.Collector && t.phase == TouchPhase.Ended && !f.ignore)
                         {
                             var d = pos - f.start;
                             if (!f.moved && now - f.startTime < 0.45f) OnTap?.Invoke(pos);

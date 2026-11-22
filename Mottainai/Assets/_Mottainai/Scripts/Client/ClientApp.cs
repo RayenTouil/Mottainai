@@ -122,6 +122,8 @@ namespace Mottainai.Client
                 Debug.Log(lr == null ? "[AUTOPLAY] LAB failed" : $"[AUTOPLAY] LAB edge {lr.edgeColo} {lr.edgeRttAvg:F1}/{lr.edgeRttP95:F1} ms, room {lr.roomColo} {lr.roomRttAvg:F1}/{lr.roomRttP95:F1} ms, down {lr.downMbps:F0} Mbit/s, up {lr.upMbps:F0} Mbit/s csv={lab.CsvPath}");
                 Shot("lab");
             }
+            yield return new WaitForSecondsRealtime(2f);
+            Shot("title");
             Debug.Log($"[AUTOPLAY] login to {content.BaseUrl} as {playerName}");
             StartLogin();
             float t0 = Time.realtimeSinceStartup;
@@ -167,11 +169,18 @@ namespace Mottainai.Client
         }
 
         // ---------------- flow ----------------
-        void StartLogin()
+        /// quick = PLAY on the title (straight into Quick Play room DEMO); otherwise the private-room menu.
+        void StartLogin(bool quick = false)
         {
             playerName = string.IsNullOrWhiteSpace(nameInput.text) ? playerName : nameInput.text.Trim();
             PlayerPrefs.SetString("name", playerName);
             PlayerPrefs.Save();
+            if (loggedIn)
+            {
+                if (quick) JoinRoom("DEMO"); else { Show(UiScreen.Menu); RefreshMenuUi(); }
+                return;
+            }
+            quickAfterLogin = quick;
             StartCoroutine(LoginFlow());
         }
 
@@ -195,8 +204,9 @@ namespace Mottainai.Client
             downloadTitle.text = content.Status;
             yield return new WaitForSecondsRealtime(content.FromCache ? 0.4f : 1.2f);
             world.ApplyContent(content); // texture upload hitch now, not at match start
-            Show(UiScreen.Menu);
-            RefreshMenuUi();
+            loggedIn = true;
+            if (quickAfterLogin) { Show(UiScreen.Login); JoinRoom("DEMO"); }
+            else { Show(UiScreen.Menu); RefreshMenuUi(); }
         }
 
         void JoinRoom(string code)
@@ -225,8 +235,8 @@ namespace Mottainai.Client
         {
             net.Disconnect();
             lobby = null;
-            Show(UiScreen.Menu);
-            RefreshMenuUi();
+            Show(UiScreen.Login);
+            SetStatus("");
         }
 
         void OnDisconnected(string reason)
@@ -287,7 +297,7 @@ namespace Mottainai.Client
         IEnumerator ShowResultsSoon()
         {
             yield return new WaitForSecondsRealtime(1.6f);
-            if (results != null) { FillResults(); Show(UiScreen.Results); }
+            if (results != null) { CaptureThumb(); FillResults(); Show(UiScreen.Results); }
         }
 
         // ---------------- events from server ----------------
@@ -303,6 +313,7 @@ namespace Mottainai.Client
                     case EvType.Go: Big("PADDLE!", new Color(0.5f, 1f, 0.6f), 1f); sfx.Play(Sfx.Id.Go); break;
                     case EvType.Stroke:
                         if (e.role == myRole) world.AckLocalStroke(); // prediction: this stroke is now in the server state
+                        else if ((e.role == Role.LeftPaddler || e.role == Role.RightPaddler) && myRole != Role.Collector) partnerStrokeAt = Time.time; // SYNC ring
                         bool mine = e.role == myRole && Time.time - lastLocalStroke < 0.6f;
                         if (!mine)
                         {
@@ -317,6 +328,7 @@ namespace Mottainai.Client
                         Big(syncStreak > 1 ? $"SYNC x{syncStreak}!" : "SYNC!", Color.Lerp(new Color(0.4f, 0.9f, 1f), new Color(1f, 0.85f, 0.3f), Mathf.Clamp01((syncStreak - 1) / 4f)), 0.7f);
                         world.SyncKick();
                         raft.HopAll();
+                        onboardActions += 2;
                         world.Splash(raft.PaddleTip(true), true);
                         world.Splash(raft.PaddleTip(false), true);
                         sfx.Play(Sfx.Id.Sync);
@@ -336,13 +348,15 @@ namespace Mottainai.Client
                         var pos = world.EntityPosition(e.entity, new Vector3(e.x, 0.2f, e.z));
                         world.Collect(e.entity);
                         if (type != WasteType.Toxic) raft.Hop(Role.Collector);
+                        CountCatch(type);
                         Color c = WasteCatalog.Colors[(int)type];
                         world.fx.Burst(pos, c, type == WasteType.Valuable ? 26 : 12, 2f);
                         if (type == WasteType.Toxic) { Popup(pos, $"TOXIC -{Mathf.Abs(GameTuning.Current.wasteScores[(int)WasteType.Toxic])}", c, 1.1f); sfx.Play(Sfx.Id.Toxic); }
                         else
                         {
                             Popup(pos, (combo ? "COMBO " : "") + "+" + e.value, c, combo ? 1.4f : 1f);
-                            sfx.Play(type == WasteType.Valuable ? Sfx.Id.Valuable : Sfx.Id.Catch);
+                            if (type == WasteType.Valuable) sfx.Play(Sfx.Id.Valuable);
+                            else sfx.Play(Sfx.Id.Catch, 0.9f, FamilyPitch[(int)type]); // short soft sound per family
                         }
                         if (myRole == Role.Collector) NetworkInfo.Provider.Vibrate(15);
                         break;
@@ -392,6 +406,7 @@ namespace Mottainai.Client
             net.SendStroke(myRole, power, back);
             if (hudPhase == MatchPhase.Running) world.PredictStroke(myRole == Role.LeftPaddler, power, back);
             lastLocalStroke = Time.time;
+            onboardActions++;
             world.raftView.Stroke(myRole, back);
             world.Splash(world.raftView.PaddleTip(myRole == Role.LeftPaddler), false);
             sfx.Play(Sfx.Id.Splash, 0.6f);
@@ -419,6 +434,7 @@ namespace Mottainai.Client
             if (d.magnitude > t.netRange * 1.1f) { ThrowDirection(d); return; }
             localThrowReady = Time.time + t.netCooldown;
             lastLocalThrow = Time.time;
+            onboardActions++;
             net.SendThrow(id, new Vector2(d.x, d.z));
             world.raftView.Throw();
             world.fx.ThrowNet(world.raftView.CollectorHand, p, t.netTravel);
@@ -440,6 +456,8 @@ namespace Mottainai.Client
             world.fx.ThrowNet(world.raftView.CollectorHand, world.RaftPos + d * t.netRange * 0.75f, t.netTravel);
             sfx.Play(Sfx.Id.Throw);
         }
+
+        static readonly float[] FamilyPitch = { 1f, 0.88f, 1.28f, 0.78f, 1.14f, 1f, 1f };
 
         // ---------------- per frame ----------------
         void Update()
