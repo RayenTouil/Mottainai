@@ -7,21 +7,62 @@ using UnityEngine.UI;
 
 namespace Mottainai.Client
 {
+    /// Press feedback for v3 pill buttons: face down 4 px, shadow band shrinks to 2 px.
+    public class PressFace : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
+    {
+        public RectTransform face;
+        void Set(bool down) { if (face == null) return; face.offsetMin = new Vector2(face.offsetMin.x, down ? 2f : 6f); face.offsetMax = new Vector2(face.offsetMax.x, down ? -4f : 0f); }
+        public void OnPointerDown(PointerEventData e) => Set(true);
+        public void OnPointerUp(PointerEventData e) => Set(false);
+        public void OnPointerExit(PointerEventData e) => Set(false);
+    }
+
     /// Code-only uGUI/TMP builder (no prefabs).
     public static class UIKit
     {
-        public static readonly Color Dark = new Color(0.06f, 0.12f, 0.16f, 0.92f);
-        public static readonly Color Panel = new Color(0.08f, 0.2f, 0.24f, 0.88f);
-        public static readonly Color Accent = new Color(0.18f, 0.72f, 0.45f);
-        public static readonly Color Accent2 = new Color(0.12f, 0.5f, 0.85f);
-        public static readonly Color Warn = new Color(0.9f, 0.35f, 0.2f);
+        // v3 §9 UI tokens
+        public static readonly Color Dark = new Color(0x1E / 255f, 0x2A / 255f, 0x34 / 255f, 0.92f);
+        public static readonly Color Panel = new Color(0x1E / 255f, 0x2A / 255f, 0x34 / 255f, 0.8f);
+        public static readonly Color Accent = new Color(0x4C / 255f, 0xC9 / 255f, 0x4C / 255f);
+        public static readonly Color Accent2 = new Color(0x2F / 255f, 0x8B / 255f, 0xFF / 255f);
+        public static readonly Color Warn = new Color(0xFF / 255f, 0x7A / 255f, 0x1A / 255f);
+
+        static TMP_FontAsset font;
+        static Material fontMat;
+        static bool fontTried;
+
+        /// Fredoka SemiBold (OFL) as a runtime TMP SDF asset with a shared 0.15 outline (#0E161C). Fallback: TMP default font.
+        public static void ApplyFont(TMP_Text t)
+        {
+            if (!fontTried)
+            {
+                fontTried = true;
+                try
+                {
+                    var ttf = Resources.Load<Font>("Fonts/Fredoka-SemiBold");
+                    if (ttf != null) font = TMP_FontAsset.CreateFontAsset(ttf, 90, 9, UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA, 1024, 1024);
+                }
+                catch (Exception e) { Debug.LogWarning("[UI] font: " + e.Message); }
+                var baseFont = font != null ? font : TMP_Settings.defaultFontAsset;
+                if (baseFont != null)
+                {
+                    fontMat = new Material(baseFont.material) { name = "UI_Outline" };
+                    fontMat.EnableKeyword("OUTLINE_ON");
+                    fontMat.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.15f);
+                    fontMat.SetColor(ShaderUtilities.ID_OutlineColor, new Color32(0x0E, 0x16, 0x1C, 255));
+                    fontMat.SetFloat(ShaderUtilities.ID_FaceDilate, 0.1f);
+                }
+            }
+            if (font != null) t.font = font;
+            if (fontMat != null) t.fontSharedMaterial = fontMat;
+        }
         public static readonly Color Muted = new Color(0.35f, 0.42f, 0.46f);
         public static readonly Color TextLight = new Color(0.95f, 0.98f, 0.96f);
 
         static Sprite _star;
         public static Sprite Star => _star != null ? _star : (_star = MakeStar(128));
         static Sprite _rounded, _circle;
-        public static Sprite Rounded => _rounded != null ? _rounded : (_rounded = MakeRounded(64, 18));
+        public static Sprite Rounded => _rounded != null ? _rounded : (_rounded = MakeRounded(64, 24));
         public static Sprite Circle => _circle != null ? _circle : (_circle = MakeCircle(128));
 
         static Sprite MakeRounded(int size, int radius)
@@ -157,19 +198,27 @@ namespace Mottainai.Client
             t.alignment = align;
             t.raycastTarget = false;
             t.textWrappingMode = TextWrappingModes.Normal;
+            ApplyFont(t);
             return t;
         }
 
+        /// v3 chunky pill: root = shadow band color, child "Face" inset 6 px at the bottom; press moves the face down 4 px.
         public static Button Button(Transform parent, string label, Color bg, Action onClick, float fontSize = 40, string name = null)
         {
-            var img = Image(parent, bg, null, name ?? ("Btn_" + label));
+            Color shadow = bg == Accent ? new Color(0x2E / 255f, 0x8A / 255f, 0x2E / 255f) : bg == Accent2 ? new Color(0x1E / 255f, 0x5F / 255f, 0xB3 / 255f) : new Color(bg.r * 0.62f, bg.g * 0.62f, bg.b * 0.62f, bg.a);
+            var img = Image(parent, shadow, null, name ?? ("Btn_" + label));
+            var face = Image(img.transform, bg, null, "Face");
+            face.raycastTarget = false;
+            Stretch(face.rectTransform, 0, 0, 0, 6);
             var b = img.gameObject.AddComponent<Button>();
+            b.targetGraphic = face;
             var colors = b.colors;
-            colors.highlightedColor = new Color(1.1f, 1.1f, 1.1f);
-            colors.pressedColor = new Color(0.75f, 0.75f, 0.75f);
-            colors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.6f);
+            colors.highlightedColor = new Color(1.06f, 1.06f, 1.06f);
+            colors.pressedColor = new Color(0.92f, 0.92f, 0.92f);
+            colors.disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.7f);
             b.colors = colors;
-            var t = Text(img.transform, label, fontSize, Color.white);
+            img.gameObject.AddComponent<PressFace>().face = face.rectTransform;
+            var t = Text(face.transform, label, fontSize, Color.white);
             t.fontStyle = FontStyles.Bold;
             Stretch(t.rectTransform, 12, 4, 12, 4);
             if (onClick != null) b.onClick.AddListener(() => onClick());

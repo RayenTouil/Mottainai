@@ -370,6 +370,15 @@ namespace Mottainai.Client
         void BuildHud()
         {
             var root = hudCanvas.transform;
+            // v3 panels: score (top-left) and timer (top-right), ui.panel with a 2 px inner stroke at 15 % white
+            var scoreBg = UIKit.Image(root, UIKit.Panel, null, "ScorePanel");
+            scoreBg.raycastTarget = false;
+            UIKit.Place(scoreBg.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(22, -14), new Vector2(520, 268));
+            var so = scoreBg.gameObject.AddComponent<Outline>(); so.effectColor = new Color(1, 1, 1, 0.15f); so.effectDistance = new Vector2(2, -2);
+            var timerBg = UIKit.Image(root, UIKit.Panel, null, "TimerPanel");
+            timerBg.raycastTarget = false;
+            UIKit.Place(timerBg.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-22, -14), new Vector2(300, 96));
+            var to = timerBg.gameObject.AddComponent<Outline>(); to.effectColor = new Color(1, 1, 1, 0.15f); to.effectDistance = new Vector2(2, -2);
             scoreText = UIKit.Text(root, "0", 64, Color.white, TextAlignmentOptions.TopLeft);
             UIKit.Place(scoreText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -24), new Vector2(600, 90));
             scoreText.fontStyle = FontStyles.Bold;
@@ -378,7 +387,7 @@ namespace Mottainai.Client
             var track = UIKit.Image(root, new Color(1f, 1f, 1f, 0.18f));
             track.raycastTarget = false;
             UIKit.Place(track.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -168), new Vector2(460, 22));
-            progressFill = UIKit.Image(track.transform, new Color(0.45f, 0.95f, 0.55f)).rectTransform;
+            progressFill = UIKit.Image(track.transform, UIKit.Accent).rectTransform;
             progressFill.GetComponent<Image>().raycastTarget = false;
             progressFill.anchorMin = Vector2.zero; progressFill.anchorMax = new Vector2(0, 1); progressFill.offsetMin = progressFill.offsetMax = Vector2.zero;
             distanceText = UIKit.Text(root, "", 28, Color.white, TextAlignmentOptions.TopLeft);
@@ -394,9 +403,9 @@ namespace Mottainai.Client
             badgeName.fontStyle = FontStyles.Bold;
             UIKit.Place(badgeName.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(84, -238), new Vector2(500, 34));
 
-            timerText = UIKit.Text(root, "2:00", 72, Color.white, TextAlignmentOptions.TopRight);
+            timerText = UIKit.Text(root, "2:00", 56, Color.white, TextAlignmentOptions.TopRight);
             timerText.fontStyle = FontStyles.Bold;
-            UIKit.Place(timerText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -20), new Vector2(400, 90));
+            UIKit.Place(timerText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-48, -26), new Vector2(260, 80));
             shieldText = UIKit.Text(root, "", 28, new Color(0.5f, 0.91f, 1f), TextAlignmentOptions.TopRight);
             shieldText.fontStyle = FontStyles.Bold;
             UIKit.Place(shieldText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -112), new Vector2(400, 40));
@@ -552,7 +561,7 @@ namespace Mottainai.Client
             }
             else if (screen == UiScreen.Game)
             {
-                scoreText.text = $"SCORE {hudScore}";
+                scoreText.text = $"<size=30>SCORE</size>  {hudScore}";
                 comboText.text = hudCombo ? "COMBO READY x1.5" : "";
                 if (world != null)
                 {
