@@ -410,7 +410,7 @@ namespace Mottainai.Client
         {
             float now = Time.time;
             var stern = new Vector2(RaftPos.x, RaftPos.z) - new Vector2(Mathf.Sin(RaftHeading), Mathf.Cos(RaftHeading)) * 1.45f;
-            float strength = Attract ? 0.55f : Mathf.Clamp01(0.3f + Mathf.Max(0f, smoothSpeed - 2f) * 0.22f);
+            float strength = Attract ? 0.5f : Mathf.Min(0.8f, 0.25f + Mathf.Max(0f, smoothSpeed - 2f) * 0.15f);
             trailTimer -= Time.deltaTime;
             if (trailTimer <= 0f)
             {
@@ -449,7 +449,7 @@ namespace Mottainai.Client
             {
                 int idx = (trailHead + i) % TrailLen;
                 if (trailT[idx] <= 0f) continue;
-                float age = (now - trailT[idx]) / 1.7f;
+                float age = (now - trailT[idx]) / 1.2f;
                 if (age >= 1f) continue;
                 if (havePrev) fxMap.Wake(prev, trail[idx], WakeWidth(prevAge), WakeWidth(age), (1f - prevAge) * prevS, (1f - age) * trailS[idx]);
                 prev = trail[idx]; prevAge = age; prevS = trailS[idx]; havePrev = true;
@@ -458,7 +458,7 @@ namespace Mottainai.Client
             fxMap.End();
         }
 
-        static float WakeWidth(float age) => 0.75f + age * 2.2f;
+        static float WakeWidth(float age) => 0.3f + age * 0.3f;
 
         static void Interp(Slot s, double rt, out Vector3 p, out float yaw)
         {
@@ -522,9 +522,9 @@ namespace Mottainai.Client
         {
             float h = RaftHeading * 0.35f;
             var fwd = new Vector3(Mathf.Sin(h), 0f, Mathf.Cos(h));
-            var targetPos = RaftPos - fwd * 9f + Vector3.up * 6.3f;
-            camT.position = Vector3.SmoothDamp(camT.position, targetPos, ref camVel, 0.18f);
-            var look = RaftPos + fwd * 5f + Vector3.up * 0.5f;
+            var targetPos = RaftPos - fwd * 9f + Vector3.up * 6f;
+            camT.position = Vector3.SmoothDamp(camT.position, targetPos, ref camVel, 0.25f);
+            var look = RaftPos + fwd * 4f;
             camT.rotation = Quaternion.Slerp(camT.rotation, Quaternion.LookRotation(look - camT.position), Mathf.Min(1f, Time.deltaTime * 8f));
             // speed-reactive FOV + punch on sync boost, roll with yaw
             float dt = Mathf.Max(1e-4f, Time.deltaTime);
@@ -532,7 +532,7 @@ namespace Mottainai.Client
             lastRaftPos = RaftPos;
             smoothSpeed = Mathf.Lerp(smoothSpeed, Mathf.Min(speed, 12f), dt * 3f);
             fovKick = Mathf.Max(0f, fovKick - dt * 12f);
-            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 52f + smoothSpeed * 1.1f + fovKick, dt * 6f);
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, 50f + smoothSpeed * 0.4f + fovKick * 0.5f, dt * 6f);
             if (shake > 0f) { camT.position += Random.insideUnitSphere * shake * 0.35f; shake = Mathf.Max(0f, shake - dt * 2.5f); }
             if (sky != null) sky.position = camT.position;
             postFx.ShieldLeft = ShieldLeft;
@@ -627,8 +627,8 @@ namespace Mottainai.Client
         {
             lastRaftPos = RaftPos;
             smoothSpeed = 0f;
-            camT.position = RaftPos + new Vector3(0, 6.3f, -9f);
-            camT.rotation = Quaternion.LookRotation(RaftPos + new Vector3(0, 0.5f, 5f) - camT.position);
+            camT.position = RaftPos + new Vector3(0, 6f, -9f);
+            camT.rotation = Quaternion.LookRotation(RaftPos + new Vector3(0, 0f, 4f) - camT.position);
         }
 
         /// Screen-space generous picking of floating waste for the collector.

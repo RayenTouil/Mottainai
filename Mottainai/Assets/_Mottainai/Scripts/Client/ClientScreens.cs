@@ -385,19 +385,21 @@ namespace Mottainai.Client
             UIKit.Place(distanceText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -196), new Vector2(600, 40));
 
             badgeCircle = UIKit.Image(root, Color.white, UIKit.Circle, "Badge");
-            UIKit.Place(badgeCircle.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -16), new Vector2(130, 130));
-            badgeLetter = UIKit.Text(badgeCircle.transform, "?", 84, Color.white);
+            badgeCircle.raycastTarget = false;
+            UIKit.Place(badgeCircle.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -238), new Vector2(34, 34));
+            badgeLetter = UIKit.Text(badgeCircle.transform, "?", 22, Color.white);
             badgeLetter.fontStyle = FontStyles.Bold;
             UIKit.Stretch(badgeLetter.rectTransform);
-            badgeName = UIKit.Text(root, "", 34, Color.white);
+            badgeName = UIKit.Text(root, "", 24, Color.white, TextAlignmentOptions.Left);
             badgeName.fontStyle = FontStyles.Bold;
-            UIKit.Place(badgeName.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -150), new Vector2(700, 50));
+            UIKit.Place(badgeName.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(84, -238), new Vector2(500, 34));
 
             timerText = UIKit.Text(root, "2:00", 72, Color.white, TextAlignmentOptions.TopRight);
             timerText.fontStyle = FontStyles.Bold;
             UIKit.Place(timerText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -20), new Vector2(400, 90));
-            shieldText = UIKit.Text(root, "", 36, new Color(0.5f, 0.9f, 1f), TextAlignmentOptions.TopRight);
-            UIKit.Place(shieldText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -110), new Vector2(950, 50));
+            shieldText = UIKit.Text(root, "", 28, new Color(0.5f, 0.91f, 1f), TextAlignmentOptions.TopRight);
+            shieldText.fontStyle = FontStyles.Bold;
+            UIKit.Place(shieldText.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-40, -112), new Vector2(400, 40));
 
             bigText = UIKit.Text(root, "", 160, Color.white);
             bigText.fontStyle = FontStyles.Bold;
@@ -428,11 +430,23 @@ namespace Mottainai.Client
             hudCanvas.gameObject.SetActive(false);
         }
 
+        GameObject netPill;
+        TextMeshProUGUI netPillText;
+
         void BuildNetHud()
         {
-            var bg = UIKit.Image(netCanvas.transform, new Color(0, 0, 0, 0.5f), null, "NetHud");
+            var pill = UIKit.Image(netCanvas.transform, new Color32(0x1E, 0x2A, 0x34, 204), null, "NetPill");
+            UIKit.Place(pill.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -20), new Vector2(560, 64));
+            pill.gameObject.AddComponent<Button>().onClick.AddListener(() => netHudOn = !netHudOn);
+            netPillText = UIKit.Text(pill.transform, "", 26, Color.white);
+            netPillText.richText = true; netPillText.raycastTarget = false;
+            netPillText.fontStyle = FontStyles.Bold;
+            UIKit.Stretch(netPillText.rectTransform, 12, 2, 12, 2);
+            netPill = pill.gameObject;
+
+            var bg = UIKit.Image(netCanvas.transform, new Color(0, 0, 0, 0.6f), null, "NetHud");
             bg.raycastTarget = false;
-            UIKit.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(16, 16), new Vector2(520, 372));
+            UIKit.Place(bg.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -92), new Vector2(560, 372));
             for (int i = 0; i < 4; i++)
             {
                 qualityBars[i] = UIKit.Image(bg.transform, new Color(1f, 1f, 1f, 0.2f), null, "Q" + i);
@@ -450,7 +464,7 @@ namespace Mottainai.Client
             Color c = r switch { Role.LeftPaddler => new Color(0.2f, 0.6f, 1f), Role.RightPaddler => new Color(0.95f, 0.3f, 0.45f), Role.Collector => new Color(0.3f, 0.8f, 0.35f), _ => Color.grey };
             badgeCircle.color = c;
             badgeLetter.text = RoleInfo.Letter(r);
-            badgeName.text = "YOU: " + RoleInfo.Name(r);
+            badgeName.text = RoleInfo.Name(r);
             hintText.text = RoleInfo.Hint(r) + (Application.isMobilePlatform ? "" : "   [keys: Q/E or W/S paddle, Space throw, H net HUD]");
         }
 
@@ -485,6 +499,18 @@ namespace Mottainai.Client
             bigText.color = c;
             bigDur = dur;
             bigUntil = Time.time + dur;
+        }
+
+        void SyncChip(Vector3 world, int streak)
+        {
+            foreach (var p in pops)
+            {
+                if (p.on) continue;
+                p.on = true; p.world = world; p.age = 0; p.life = 0.6f; p.scale = 0.62f;
+                p.t.text = $"<mark=#1E2A34CC padding=14,14,4,4>x{streak}</mark>"; p.t.color = Color.white;
+                p.t.gameObject.SetActive(true);
+                return;
+            }
         }
 
         void Popup(Vector3 world, string text, Color c, float scale)
@@ -536,11 +562,13 @@ namespace Mottainai.Client
                 }
                 if (hudPhase == MatchPhase.Countdown) timerText.text = $"{Mathf.CeilToInt(hudTimeLeft)}";
                 else { int s = Mathf.CeilToInt(hudTimeLeft); timerText.text = $"{s / 60}:{s % 60:00}"; }
-                timerText.color = hudPhase == MatchPhase.Running && hudTimeLeft < 15f ? new Color(1f, 0.5f, 0.4f) : Color.white;
-                string pw = hudShield > 0.05f ? $"SHIELD {hudShield:F1}s  " : "";
+                bool lowT = hudPhase == MatchPhase.Running && hudTimeLeft < 15f;
+                timerText.color = lowT ? new Color32(0xFF, 0x7A, 0x1A, 255) : Color.white;
+                timerText.rectTransform.localScale = Vector3.one * (lowT ? 1f + 0.06f * Mathf.Abs(Mathf.Sin(Time.time * 6f)) : 1f);
+                string pw = hudShield > 0.05f ? $"<color=#7FE9FF>SHIELD {hudShield:F0}</color>  " : "";
                 float ml = magnetUntil - Time.time, tl = turboUntil - Time.time;
-                if (ml > 0f) pw += $"<color=#FF6FD8>MAGNET {ml:F1}s</color>  ";
-                if (tl > 0f) pw += $"<color=#FFA53A>TURBO {tl:F1}s</color>";
+                if (ml > 0f) pw += $"<color=#00C2A8>MAGNET {ml:F0}</color>  ";
+                if (tl > 0f) pw += $"<color=#FF7A1A>TURBO {tl:F0}</color>";
                 shieldText.text = pw;
                 hintPanel.SetActive(Time.time < hintUntil);
             }
@@ -572,11 +600,20 @@ namespace Mottainai.Client
                 }
             }
 
+            netPill.SetActive(screen == UiScreen.Game);
             netHudPanel.SetActive(netHudOn && screen == UiScreen.Game);
             netHudTimer -= dt;
-            if (netHudPanel.activeSelf && netHudTimer <= 0f)
+            bool netTick = netHudTimer <= 0f;
+            if (netTick) netHudTimer = 0.25f;
+            if (netTick && netPill.activeSelf)
             {
-                netHudTimer = 0.25f;
+                var s = net.stats;
+                var ni = NetworkInfo.Provider;
+                string rttC = s.RttAvg < 30f ? "#4CC94C" : s.RttAvg < 60f ? "#FFD23F" : "#FF7A1A";
+                netPillText.text = $"<color=#00C2A8>{ni.NetworkType}</color>   RTT <color={rttC}>{s.RttAvg:F0} ms</color>   <size=22>{content.EdgeColo} → {net.RoomColo}</size>";
+            }
+            if (netTick && netHudPanel.activeSelf)
+            {
                 var s = net.stats;
                 var ni = NetworkInfo.Provider;
                 string badgeColor = ni.NetworkType == "5G SA" ? "#39FF88" : ni.NetworkType == "5G NSA" ? "#B6FF5C" : ni.NetworkType == "LTE" ? "#FFD24C" : "#9AD0FF";

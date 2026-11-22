@@ -44,7 +44,14 @@ namespace Mottainai.Client
             highlight = VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(1f, 0.85f, 0.2f), 1f), Vector3.zero, new Vector3(0.5f, 0.02f, 0.5f), default, "you").transform;
             highlight.gameObject.SetActive(false);
 
-            magnetRing = VisualFactory.Part(t, ProceduralMeshes.Torus(1.75f, 0.05f, 1.2f, 40, 6), VisualFactory.Lit(new Color(1f, 0.3f, 0.85f), 1.2f), new Vector3(0, 0.35f, 0), Vector3.one, default, "magnetRing").transform;
+            magnetRing = new GameObject("magnetRing").transform;
+            magnetRing.SetParent(t, false);
+            var dashMat = VisualFactory.Lit(new Color32(0x00, 0xC2, 0xA8, 255), 1.2f);
+            for (int d = 0; d < 14; d++)
+            {
+                float a = d * Mathf.PI * 2f / 14f;
+                VisualFactory.Part(magnetRing, VisualFactory.Cube, dashMat, new Vector3(Mathf.Sin(a) * 1.75f, 0f, Mathf.Cos(a) * 1.75f), new Vector3(0.42f, 0.06f, 0.09f), new Vector3(0f, a * Mathf.Rad2Deg + 90f, 0f), "dash");
+            }
             magnetRing.gameObject.SetActive(false);
             var jetMat = VisualFactory.Lit(new Color(1f, 0.55f, 0.1f), 1.6f);
             for (int j = 0; j < 2; j++)
@@ -52,7 +59,7 @@ namespace Mottainai.Client
                 jets[j] = VisualFactory.Part(t, VisualFactory.Cone, jetMat, new Vector3(j == 0 ? -0.55f : 0.55f, 0.3f, -1.55f), new Vector3(0.25f, 0.7f, 0.25f), new Vector3(-90f, 0f, 0f), "turboJet").transform;
                 jets[j].gameObject.SetActive(false);
             }
-            bubble = VisualFactory.Part(t, VisualFactory.Sphere, VisualFactory.Transparent(new Color(0.35f, 0.85f, 1f, 0.22f), 2.5f), new Vector3(0, 0.6f, 0), new Vector3(3.6f, 2.6f, 4.4f), default, "shield");
+            bubble = VisualFactory.Part(t, VisualFactory.Sphere, VisualFactory.Transparent(new Color(0.5f, 0.91f, 1f, 0.08f), 1.1f), new Vector3(0, 0.55f, 0), new Vector3(2.4f, 1.9f, 3.0f), default, "shield");
             bubbleRenderer = bubble.GetComponent<MeshRenderer>();
             bubbleProps = new MaterialPropertyBlock();
             bubble.SetActive(false);
@@ -154,7 +161,7 @@ namespace Mottainai.Client
             if (bubble.activeSelf != on) bubble.SetActive(on);
             if (on)
             {
-                bubbleProps.SetColor("_BaseColor", new Color(0.35f, 0.85f, 1f, 0.18f + 0.08f * Mathf.Sin(Time.time * 5f)));
+                bubbleProps.SetColor("_BaseColor", new Color(0.5f, 0.91f, 1f, 0.08f));
                 bubbleRenderer.SetPropertyBlock(bubbleProps);
             }
         }

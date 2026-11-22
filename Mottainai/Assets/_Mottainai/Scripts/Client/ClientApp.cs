@@ -24,7 +24,7 @@ namespace Mottainai.Client
         UiScreen screen;
 
         string playerName, token;
-        bool forceDownload, netHudOn = true;
+        bool forceDownload, netHudOn = false;
         Role preferredRole;
         Role myRole;
         LobbyState lobby;
@@ -309,7 +309,7 @@ namespace Mottainai.Client
                     case EvType.Sync:
                         syncStreak = Time.time - lastSyncTime < 2f ? syncStreak + 1 : 1;
                         lastSyncTime = Time.time;
-                        Big(syncStreak > 1 ? $"SYNC x{syncStreak}!" : "SYNC!", Color.Lerp(new Color(0.4f, 0.9f, 1f), new Color(1f, 0.85f, 0.3f), Mathf.Clamp01((syncStreak - 1) / 4f)), 0.7f);
+                        if (syncStreak == 3 || syncStreak == 5 || syncStreak >= 10) SyncChip(raft.transform.position + Vector3.up * 1.5f, syncStreak);
                         world.SyncKick();
                         world.fx.Splash(raft.PaddleTip(true), true);
                         world.fx.Splash(raft.PaddleTip(false), true);
