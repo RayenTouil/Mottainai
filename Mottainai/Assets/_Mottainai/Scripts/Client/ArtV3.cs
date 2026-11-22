@@ -55,7 +55,7 @@ namespace Mottainai.Client
         {
             int key = (int)(innerRatio * 1000) * 100 + seg;
             if (rings.TryGetValue(key, out var m)) return m;
-            var v = new Vector3[seg * 2]; var uv = new Vector2[seg * 2]; var tri = new int[seg * 6];
+            var v = new Vector3[seg * 2]; var uv = new Vector2[seg * 2]; var tri = new int[seg * 12]; // double-sided
             for (int i = 0; i < seg; i++)
             {
                 float a = i * Mathf.PI * 2f / seg;
@@ -66,6 +66,9 @@ namespace Mottainai.Client
                 int k = i * 6;
                 tri[k] = i * 2; tri[k + 1] = n * 2 + 1; tri[k + 2] = i * 2 + 1;
                 tri[k + 3] = i * 2; tri[k + 4] = n * 2; tri[k + 5] = n * 2 + 1;
+                int b = seg * 6 + k;
+                tri[b] = tri[k]; tri[b + 1] = tri[k + 2]; tri[b + 2] = tri[k + 1];
+                tri[b + 3] = tri[k + 3]; tri[b + 4] = tri[k + 5]; tri[b + 5] = tri[k + 4];
             }
             m = new Mesh { name = "Ring", vertices = v, uv = uv, triangles = tri };
             m.RecalculateNormals(); m.RecalculateBounds();
@@ -121,7 +124,7 @@ namespace Mottainai.Client
                             if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
                         }
                     float e = (Mathf.Sqrt(f2) - Mathf.Sqrt(f1)) * N; // 0 on cell edges
-                    float line = Mathf.Pow(Mathf.Clamp01(1f - e / 0.35f), 1.6f);
+                    float line = Mathf.Pow(Mathf.Clamp01(1f - e / 0.25f), 2f);
                     px[y * S + x] = (byte)(line * 255f);
                 }
             caustics = new Texture2D(S, S, TextureFormat.R8, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, name = "Caustics" };

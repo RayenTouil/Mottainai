@@ -242,11 +242,11 @@ namespace Mottainai.Client
 
     public class WaterView : MonoBehaviour
     {
-        Transform waterT, bankL, bankR, sandL, sandR;
+        Transform waterT, bankL, bankR, sandL, sandR, shadeL, shadeR;
         Material mat;
         readonly List<Transform> trees = new List<Transform>();
         const int TreeCount = 36;
-        const float TreeSpacing = 8f;
+        const float TreeSpacing = 5f; // alternating banks -> a 3-5 tree cluster every 10 m per bank
 
         public static WaterView Create(Transform parent, ContentService content)
         {
@@ -281,24 +281,42 @@ namespace Mottainai.Client
 
             var grass = VisualFactory.Lit(ArtV3.Grass);
             var sand = VisualFactory.Lit(ArtV3.Cliff);
-            bankL = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(-hw - 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
-            bankR = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(hw + 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
-            sandL = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(-hw - 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
-            sandR = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(hw + 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
+            // v3 §7 bank profile: 2 m grass top, cliff face with a darker lower band (foam line comes from the water shader)
+            bankL = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(-hw - 36f, 0.8f, 0), new Vector3(70f, 2.4f, 190f)).transform;
+            bankR = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(hw + 36f, 0.8f, 0), new Vector3(70f, 2.4f, 190f)).transform;
+            sandL = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(-hw - 0.6f, 0.85f, 0), new Vector3(1.2f, 2.3f, 190f)).transform;
+            sandR = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(hw + 0.6f, 0.85f, 0), new Vector3(1.2f, 2.3f, 190f)).transform;
+            var shade = VisualFactory.Lit(ArtV3.CliffShade);
+            shadeL = VisualFactory.Part(transform, VisualFactory.Cube, shade, new Vector3(-hw - 0.55f, 0.2f, 0), new Vector3(1.22f, 0.9f, 190f)).transform;
+            shadeR = VisualFactory.Part(transform, VisualFactory.Cube, shade, new Vector3(hw + 0.55f, 0.2f, 0), new Vector3(1.22f, 0.9f, 190f)).transform;
+            var grassLip = VisualFactory.Lit(ArtV3.GrassDark);
+            VisualFactory.Part(sandL, VisualFactory.Cube, grassLip, new Vector3(0f, 0.5f + 0.02f, 0f), new Vector3(1.05f, 0.04f, 1f));
+            VisualFactory.Part(sandR, VisualFactory.Cube, grassLip, new Vector3(0f, 0.5f + 0.02f, 0f), new Vector3(1.05f, 0.04f, 1f));
 
             var trunk = VisualFactory.Lit(ArtV3.Bark);
             var leaf = new[] { VisualFactory.Lit(ArtV3.PineA), VisualFactory.Lit(ArtV3.TreeRound), VisualFactory.Lit(ArtV3.PineB) };
             for (int i = 0; i < TreeCount; i++)
             {
-                var tr = new GameObject("tree").transform;
+                var tr = new GameObject("treeCluster").transform;
                 tr.SetParent(transform, false);
-                VisualFactory.Part(tr, VisualFactory.Cylinder, trunk, new Vector3(0, 1.2f, 0), new Vector3(0.35f, 1.2f, 0.35f));
-                if (i % 3 == 0) VisualFactory.Part(tr, ProceduralMeshes.Pine(i % 4), leaf[i % 3], Vector3.zero, Vector3.one, new Vector3(0, i * 37, 0));
-                else
+                int n = 3 + i % 3; // clusters of 3-5
+                for (int k = 0; k < n; k++)
                 {
-                    VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5), leaf[i % 3], new Vector3(0, 3f, 0), new Vector3(2.8f, 2.4f, 2.8f), new Vector3(0, i * 53, 0));
-                    VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5 + 5), leaf[(i + 1) % 3], new Vector3(0.7f, 2.4f, 0.4f), new Vector3(1.6f, 1.4f, 1.6f));
+                    int q = i * 7 + k * 3;
+                    var one = new GameObject("tree").transform;
+                    one.SetParent(tr, false);
+                    one.localPosition = new Vector3(Mathf.Sin(q * 1.7f) * 2.6f + k * 0.8f, 0f, Mathf.Cos(q * 2.3f) * 3.2f);
+                    one.localScale = Vector3.one * (0.8f + (q * 37 % 50) / 100f);
+                    one.localRotation = Quaternion.Euler(0f, q * 47 % 360, 0f);
+                    VisualFactory.Part(one, VisualFactory.Cylinder, trunk, new Vector3(0, 1.2f, 0), new Vector3(0.35f, 1.2f, 0.35f));
+                    if ((i + k) % 3 == 0) VisualFactory.Part(one, ProceduralMeshes.Pine(q % 4), leaf[k % 2 == 0 ? 0 : 2], Vector3.zero, Vector3.one * (k == 0 ? 1.25f : 0.9f));
+                    else
+                    {
+                        VisualFactory.Part(one, ProceduralMeshes.Blob(q % 5), leaf[1], new Vector3(0, 3f, 0), new Vector3(2.8f, 2.4f, 2.8f));
+                        VisualFactory.Part(one, ProceduralMeshes.Blob(q % 5 + 5), VisualFactory.Lit(ArtV3.GrassDark), new Vector3(0.7f, 2.4f, 0.4f), new Vector3(1.6f, 1.4f, 1.6f));
+                    }
                 }
+                if (i % 2 == 1) VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5 + 10), VisualFactory.Lit(ArtV3.GrassDark), new Vector3(-1.8f, 0.3f, 1.5f), new Vector3(1.4f, 0.9f, 1.3f), default, "bush");
                 if (i % 4 == 1) VisualFactory.Part(tr, ProceduralMeshes.Rock(i % 6 + 20), VisualFactory.Lit(ArtV3.RockTop), new Vector3(1.6f, 0.1f, 0.8f), new Vector3(1.2f, 0.8f, 1.1f));
                 trees.Add(tr);
             }
@@ -343,10 +361,12 @@ namespace Mottainai.Client
         {
             float z = Mathf.Floor(raft.z / 2f) * 2f;
             waterT.localPosition = new Vector3(0, 0, z);
-            bankL.localPosition = new Vector3(bankL.localPosition.x, 0.4f, z + 40f);
-            bankR.localPosition = new Vector3(bankR.localPosition.x, 0.4f, z + 40f);
-            sandL.localPosition = new Vector3(sandL.localPosition.x, 0.1f, z + 40f);
-            sandR.localPosition = new Vector3(sandR.localPosition.x, 0.1f, z + 40f);
+            bankL.localPosition = new Vector3(bankL.localPosition.x, 0.8f, z + 40f);
+            bankR.localPosition = new Vector3(bankR.localPosition.x, 0.8f, z + 40f);
+            sandL.localPosition = new Vector3(sandL.localPosition.x, 0.85f, z + 40f);
+            sandR.localPosition = new Vector3(sandR.localPosition.x, 0.85f, z + 40f);
+            shadeL.localPosition = new Vector3(shadeL.localPosition.x, 0.2f, z + 40f);
+            shadeR.localPosition = new Vector3(shadeR.localPosition.x, 0.2f, z + 40f);
 
             float hw = GameTuning.Current.riverWidth * 0.5f;
             int baseCell = Mathf.FloorToInt((raft.z - 20f) / TreeSpacing);
@@ -355,10 +375,10 @@ namespace Mottainai.Client
                 int idx = ((c % TreeCount) + TreeCount) % TreeCount;
                 uint h = (uint)(c * 2654435761u);
                 float side = (c & 1) == 0 ? -1f : 1f;
-                float off = 2.8f + (h % 1000) / 1000f * 6f;
-                float s = 0.8f + ((h >> 10) % 100) / 100f * 0.6f;
+                float off = 5.5f + (h % 1000) / 1000f * 6f;
+                float s = 0.9f + ((h >> 10) % 100) / 100f * 0.3f;
                 var tr = trees[idx];
-                tr.localPosition = new Vector3(side * (hw + off), 0.9f, c * TreeSpacing + ((h >> 20) % 100) / 100f * 4f);
+                tr.localPosition = new Vector3(side * (hw + off), 2.0f, c * TreeSpacing + ((h >> 20) % 100) / 100f * 4f);
                 tr.localScale = Vector3.one * s;
             }
         }

@@ -319,11 +319,13 @@ namespace Mottainai.Client
                         Part(body, Cylinder, Lit(c), new Vector3(0, 0.22f, 0), new Vector3(0.36f, 0.24f, 0.36f));
                         Part(body, Cylinder, Lit(new Color(0.12f, 0.12f, 0.13f)), new Vector3(0, 0.47f, 0), new Vector3(0.37f, 0.02f, 0.37f));
                         Part(body, Cylinder, Lit(new Color(0.12f, 0.12f, 0.13f)), new Vector3(0, 0.22f, 0), new Vector3(0.37f, 0.015f, 0.37f));
-                        var sign = new GameObject("billboard").transform;
-                        sign.SetParent(body, false);
-                        sign.localPosition = new Vector3(0, 0.85f, 0);
-                        Part(sign, Triangle, Lit(Color.white, 0.6f), Vector3.zero, Vector3.one * 0.42f);
-                        Part(sign, Triangle, Lit(new Color(0.08f, 0.08f, 0.08f), 0.6f), new Vector3(0, -0.015f, -0.01f), Vector3.one * 0.28f);
+                        // hazard symbol: black trefoil-ish disc on a white plate, on both sides of the barrel (no floating sign: read as a fin)
+                        for (int s = -1; s <= 1; s += 2)
+                        {
+                            Part(body, Cube, Lit(Color.white, 0.3f), new Vector3(0, 0.24f, s * 0.181f), new Vector3(0.2f, 0.2f, 0.01f), new Vector3(0, 0, 45f));
+                            Part(body, Cylinder, Lit(new Color(0.08f, 0.08f, 0.08f)), new Vector3(0, 0.24f, s * 0.188f), new Vector3(0.11f, 0.005f, 0.11f), new Vector3(90f, 0, 0));
+                        }
+                        Part(body, Cylinder, Lit(new Color(0.08f, 0.08f, 0.08f)), new Vector3(0, 0.48f, 0), new Vector3(0.12f, 0.005f, 0.12f));
                         break;
                 }
             }

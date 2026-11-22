@@ -14,7 +14,7 @@ namespace Mottainai.Client
         {
             phase = Random.value * 10f;
             yaw = Random.value * 360f;
-            if (ring != null && ringScale == Vector3.zero) ringScale = ring.localScale;
+
         }
 
         void Update()
@@ -27,6 +27,7 @@ namespace Mottainai.Client
                 vis.localPosition = new Vector3(0f, bob, 0f);
                 vis.localRotation = Quaternion.Euler(Mathf.Sin(t * 1.3f) * roll, yaw, Mathf.Sin(t * 0.9f) * tilt);
             }
+            if (ring != null && ringScale == Vector3.zero) ringScale = ring.localScale;
             if (ring != null)
             {
                 ring.localPosition = new Vector3(0f, 0.14f + bob, 0f); // above the 0.12 m wave crests

@@ -33,16 +33,17 @@ namespace Mottainai.Client
         void Build()
         {
             var reedA = ReedClump(1); var reedB = ReedClump(2);
-            var matA = VisualFactory.Lit(new Color(0.33f, 0.6f, 0.24f));
-            var matB = VisualFactory.Lit(new Color(0.55f, 0.66f, 0.26f));
-            var rockMat = VisualFactory.Lit(new Color(0.56f, 0.54f, 0.5f));
+            var matA = VisualFactory.Lit(ArtV3.GrassDark);
+            var matB = VisualFactory.Lit(ArtV3.Grass);
+            var rockMat = VisualFactory.Lit(ArtV3.RockTop);
+            var rockMatB = VisualFactory.Lit(ArtV3.RockSide);
             for (int i = 0; i < ReedCount; i++)
             {
                 reeds[i] = VisualFactory.Part(transform, i % 2 == 0 ? reedA : reedB, i % 2 == 0 ? matA : matB, Vector3.zero, Vector3.one, default, "reeds").transform;
-                shoreRocks[i] = VisualFactory.Part(transform, ProceduralMeshes.Rock(30 + i % 5), rockMat, Vector3.zero, new Vector3(0.9f, 0.55f, 0.8f), default, "shoreRock").transform;
+                shoreRocks[i] = VisualFactory.Part(transform, ProceduralMeshes.Rock(30 + i % 5), i % 2 == 0 ? rockMat : rockMatB, Vector3.zero, new Vector3(1.8f, 1.5f, 1.6f), default, "shoreRock").transform;
             }
 
-            var hillMats = new[] { VisualFactory.Lit(new Color(0.4f, 0.58f, 0.46f)), VisualFactory.Lit(new Color(0.36f, 0.5f, 0.52f)), VisualFactory.Lit(new Color(0.46f, 0.6f, 0.4f)) };
+            var hillMats = new[] { VisualFactory.Lit(ArtV3.HillsFar), VisualFactory.Lit(ArtV3.HillsFar * 0.95f + ArtV3.Fog * 0.05f), VisualFactory.Lit(ArtV3.HillsFar * 0.9f + ArtV3.Fog * 0.1f) };
             for (int i = 0; i < HillCount; i++)
                 hills[i] = VisualFactory.Part(transform, ProceduralMeshes.Rock(40 + i % 6), hillMats[i % 3], Vector3.zero, Vector3.one, default, "hill").transform;
 
@@ -64,7 +65,8 @@ namespace Mottainai.Client
                 bins[g] = root;
             }
 
-            var birdMat = VisualFactory.Lit(new Color(0.15f, 0.17f, 0.2f));
+            BuildKit();
+            var birdMat = VisualFactory.Lit(Color.white);
             for (int i = 0; i < 5; i++)
             {
                 var t = new GameObject("bird").transform;
@@ -79,6 +81,74 @@ namespace Mottainai.Client
                 birds.Add(new Bird { t = t, wingL = wl, wingR = wr, offset = new Vector3(-row * 1.3f, row * 0.2f, side * row * 1.4f), phase = i * 0.7f });
             }
             flock = new Vector3(-70f, 16f, 60f);
+        }
+
+        // ---------------- v3 bank kit: fence runs, cottages, one dock (pooled, recycled by z-cell) ----------------
+        const int FenceCount = 10; const float FenceSpacing = 9f;
+        const int CottageCount = 3; const float CottageSpacing = 60f;
+        readonly Transform[] fences = new Transform[FenceCount];
+        readonly Transform[] cottages = new Transform[CottageCount];
+        Transform dock;
+
+        void BuildKit()
+        {
+            var wood = VisualFactory.Lit(ArtV3.Wood);
+            for (int i = 0; i < FenceCount; i++)
+            {
+                var f = new GameObject("fence").transform;
+                f.SetParent(transform, false);
+                for (int p = 0; p < 4; p++) VisualFactory.Part(f, VisualFactory.Cube, wood, new Vector3(0, 0.45f, p * 2f - 3f), new Vector3(0.14f, 0.9f, 0.14f));
+                VisualFactory.Part(f, VisualFactory.Cube, wood, new Vector3(0, 0.7f, 0), new Vector3(0.08f, 0.1f, 6.2f));
+                VisualFactory.Part(f, VisualFactory.Cube, wood, new Vector3(0, 0.38f, 0), new Vector3(0.08f, 0.1f, 6.2f));
+                fences[i] = f;
+            }
+            var wall = VisualFactory.Lit(ArtV3.Wall); var roof = VisualFactory.Lit(ArtV3.Roof);
+            for (int i = 0; i < CottageCount; i++)
+            {
+                var c = new GameObject("cottage").transform;
+                c.SetParent(transform, false);
+                VisualFactory.Part(c, VisualFactory.Cube, wall, new Vector3(0, 1.3f, 0), new Vector3(4f, 2.6f, 3.2f));
+                VisualFactory.Part(c, VisualFactory.Cube, roof, new Vector3(0, 3.05f, -0.82f), new Vector3(4.4f, 0.22f, 2.3f), new Vector3(-40f, 0, 0));
+                VisualFactory.Part(c, VisualFactory.Cube, roof, new Vector3(0, 3.05f, 0.82f), new Vector3(4.4f, 0.22f, 2.3f), new Vector3(40f, 0, 0));
+                VisualFactory.Part(c, VisualFactory.Cube, wood, new Vector3(0, 0.75f, 1.61f), new Vector3(0.8f, 1.5f, 0.05f));
+                VisualFactory.Part(c, VisualFactory.Cube, VisualFactory.Lit(ArtV3.Hex("#8FD3FF"), 0.2f), new Vector3(1.2f, 1.6f, 1.61f), new Vector3(0.7f, 0.6f, 0.05f));
+                cottages[i] = c;
+            }
+            dock = new GameObject("dock").transform;
+            dock.SetParent(transform, false);
+            VisualFactory.Part(dock, VisualFactory.Cube, wood, new Vector3(-1.2f, 0.45f, 0), new Vector3(2.6f, 0.14f, 1.8f));
+            for (int p = 0; p < 3; p++)
+            {
+                VisualFactory.Part(dock, VisualFactory.Cylinder, VisualFactory.Lit(ArtV3.Bark), new Vector3(-0.3f - p * 0.9f, 0.1f, 0.85f), new Vector3(0.16f, 0.5f, 0.16f));
+                VisualFactory.Part(dock, VisualFactory.Cylinder, VisualFactory.Lit(ArtV3.Bark), new Vector3(-0.3f - p * 0.9f, 0.1f, -0.85f), new Vector3(0.16f, 0.5f, 0.16f));
+            }
+        }
+
+        void FollowKit(Vector3 raft, float hw)
+        {
+            int fc = Mathf.FloorToInt((raft.z - 15f) / FenceSpacing);
+            for (int c = fc; c < fc + FenceCount; c++)
+            {
+                int idx = ((c % FenceCount) + FenceCount) % FenceCount;
+                uint h = Hash(c * 13 + 5);
+                float side = (h & 1) == 0 ? -1f : 1f;
+                bool on = ((h >> 4) % 10) < 6;
+                Show(fences[idx], on);
+                if (on) fences[idx].localPosition = new Vector3(side * (hw + 2.2f), 2.0f, c * FenceSpacing);
+            }
+            int cc = Mathf.FloorToInt((raft.z - 20f) / CottageSpacing);
+            for (int c = cc; c < cc + CottageCount; c++)
+            {
+                int idx = ((c % CottageCount) + CottageCount) % CottageCount;
+                uint h = Hash(c * 31 + 9);
+                float side = (c & 1) == 0 ? 1f : -1f;
+                cottages[idx].localPosition = new Vector3(side * (hw + 14f + (h % 8)), 2.0f, c * CottageSpacing + 25f + (h >> 6) % 15);
+                cottages[idx].localRotation = Quaternion.Euler(0f, side > 0f ? -90f + (h >> 10) % 30 : 90f - (h >> 10) % 30, 0f);
+            }
+            int dc = Mathf.FloorToInt((raft.z + 10f) / 140f);
+            float dside = (dc & 1) == 0 ? -1f : 1f;
+            dock.localPosition = new Vector3(dside * hw, 0f, dc * 140f + 70f);
+            dock.localRotation = Quaternion.Euler(0f, dside < 0f ? 180f : 0f, 0f);
         }
 
         static Mesh ReedClump(int seed)
@@ -122,9 +192,9 @@ namespace Mottainai.Client
                 bool reed = ((h >> 15) % 10) < 7;
                 Show(reeds[idx], reed);
                 if (reed) { reeds[idx].localPosition = new Vector3(x, 0f, z); reeds[idx].localRotation = Quaternion.Euler(0f, (h >> 7) % 360, 0f); }
-                bool rock = ((h >> 19) % 10) < 3;
+                bool rock = ((h >> 19) % 10) < 6; // rocks break the bank line every 5-10 m
                 Show(shoreRocks[idx], rock);
-                if (rock) shoreRocks[idx].localPosition = new Vector3(x - side * 0.5f, -0.05f, z + 1.3f);
+                if (rock) { shoreRocks[idx].localPosition = new Vector3(x - side * 0.2f, -0.1f, z + 1.3f); shoreRocks[idx].localRotation = Quaternion.Euler(0f, (h >> 5) % 360, 0f); }
             }
 
             int hc = Mathf.FloorToInt((raft.z - 30f) / HillSpacing);
@@ -144,9 +214,11 @@ namespace Mottainai.Client
             {
                 int idx = ((c % BinGroups) + BinGroups) % BinGroups;
                 float side = (c & 1) == 0 ? -1f : 1f;
-                bins[idx].localPosition = new Vector3(side * (hw + 3.4f), 0.95f, c * BinSpacing + 12f);
+                bins[idx].localPosition = new Vector3(side * (hw + 3.4f), 2.0f, c * BinSpacing + 12f);
                 bins[idx].localRotation = Quaternion.Euler(0f, side < 0f ? 90f : -90f, 0f);
             }
+
+            FollowKit(raft, hw);
 
             // birds: V formation crossing the sky ahead of the raft
             float dt = Time.deltaTime;

@@ -79,7 +79,7 @@ Shader "Mottainai/Water"
                 float2 cuv = float2(u, v) * 2.0; // ~3 m cells
                 float c = SAMPLE_TEXTURE2D(_Caustics, sampler_Caustics, cuv + float2(0.03 * t, 0.05 * t + flow)).r;
                 if (_Tier > 0.5) c *= SAMPLE_TEXTURE2D(_Caustics, sampler_Caustics, cuv + float2(-0.04 * t + 0.37, 0.02 * t + flow + 0.21)).r * 1.6;
-                col += _CausticColor.rgb * c * 0.25;
+                col += _CausticColor.rgb * c * 0.15;
                 if (_Tier > 1.5) col += step(0.9, c) * 0.3;
 
                 // edge foam band (d < 0.04), broken by scrolling noise (tiling 8, speed 0.15)
