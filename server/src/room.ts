@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { C2S, PROTOCOL_VERSION, Reader, S2C, Writer, clamp } from "./protocol";
 import { Coop2MinMode, Kind, MatchSim, NO_ENTITY, Phase, Role, TUNING } from "./sim";
 import ROOM_CFG from "./room_config.json";
+import type { ReportResult, TeamsDO } from "./teams";
 
 const TICK_HZ = 60;
 const IDLE_STOP_MS = 30_000;
@@ -19,7 +20,9 @@ interface Player {
   id: number; token: string; name: string; role: number; ready: boolean;
   ws: WebSocket | null; leftAt: number; backlogMs: number; fps: number; rttMs: number; netType: number;
   lastMsgAt: number;
+  teamId: number; teamName: string; inviteTeamId: number; inviteExp: number;
 }
+const INVITE_MS = 60_000;
 
 interface Missing { id: number; name: string; role: number; since: number; deadline: number; cause: string; }
 /** Match frozen in room.ts (the sim is simply not stepped): waiting for missing humans, then a 3-2-1 (resumeAt). */
@@ -46,6 +49,9 @@ export class RoomDO extends DurableObject {
   deferred: Deferred[] = [];
   pause: PauseState | null = null;
   mstats = newNetStats();
+  matchTokens = new Set<string>();   // every human who held a role in the current match (team eligibility)
+  matchStartedAt = 0;
+  lastTeamResult: (ReportResult & { matchId: string }) | null = null;
   w = new Writer(8192);
 
   constructor(ctx: DurableObjectState, env: any) {
@@ -54,7 +60,7 @@ export class RoomDO extends DurableObject {
       const a = ws.deserializeAttachment() as (Partial<Player> & { code?: string }) | null;
       if (!a?.token) continue;
       this.code = a.code ?? this.code;
-      this.players.push({ id: a.id!, token: a.token, name: a.name ?? "?", role: a.role ?? 0, ready: false, ws, leftAt: 0, backlogMs: 0, fps: 0, rttMs: 0, netType: 0, lastMsgAt: Date.now() });
+      this.players.push({ id: a.id!, token: a.token, name: a.name ?? "?", role: a.role ?? 0, ready: false, ws, leftAt: 0, backlogMs: 0, fps: 0, rttMs: 0, netType: 0, lastMsgAt: Date.now(), teamId: 0, teamName: "", inviteTeamId: 0, inviteExp: 0 });
       this.nextId = Math.max(this.nextId, (a.id ?? 0) + 1);
     }
   }
@@ -94,7 +100,7 @@ export class RoomDO extends DurableObject {
       if (old && old !== server) { try { old.close(4000, "replaced"); } catch {} }
       if (!p.role && !spectate) p.role = this.pickRole(wantRole, p);
     } else {
-      p = { id: this.nextId++, token, name, role: 0, ready: false, ws: server, leftAt: 0, backlogMs: 0, fps: 0, rttMs: 0, netType: 0, lastMsgAt: Date.now() };
+      p = { id: this.nextId++, token, name, role: 0, ready: false, ws: server, leftAt: 0, backlogMs: 0, fps: 0, rttMs: 0, netType: 0, lastMsgAt: Date.now(), teamId: 0, teamName: "", inviteTeamId: 0, inviteExp: 0 };
       this.players.push(p);
       p.role = spectate ? 0 : this.pickRole(wantRole, p);
     }
@@ -108,6 +114,7 @@ export class RoomDO extends DurableObject {
       // joining / reconnecting mid-match: MATCH_START + a fresh snapshot (frozen state while paused), role back from the bot
       const miss = this.pause?.missing.find(m => m.id === p!.id);
       this.sim.setBot(0, p.role, false);
+      this.matchTokens.add(p.token);
       this.sendMatchStart(p);
       try { server.send(this.buildSnapshot(this.sim)); } catch {}
       if (miss) {
@@ -117,7 +124,7 @@ export class RoomDO extends DurableObject {
         this.log({ ev: "reconnect", player: p.name, ms, cause: miss.cause, stillMissing: this.pause!.missing.length });
         this.afterMissingChange();
       } else if (this.pause) this.sendPauseState(p);
-    } else if (this.sim && this.sim.phase === Phase.Finished && this.sim.results) this.sendResults(p.ws!);
+    } else if (this.sim && this.sim.phase === Phase.Finished && this.sim.results) { this.sendResults(p.ws!); if (this.lastTeamResult) this.sendTeamResult(p, this.lastTeamResult); }
     else if (clientMatch && !this.sim) {
       // the client was in a match this room no longer has (Durable Object restarted / redeployed): back to the lobby cleanly
       this.notice(p, "Match lost (server restarted) - back to the lobby");
@@ -125,6 +132,7 @@ export class RoomDO extends DurableObject {
     }
     this.broadcastLobby();
     this.startLoop();
+    this.loadTeam(p);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -172,6 +180,7 @@ export class RoomDO extends DurableObject {
     for (const p of live) w.u8w(p.id).str(p.name).u8w(p.role).u8w((p.ready ? 1 : 0) | (p.ws ? 2 : 0));
     for (const r of [1, 2, 3]) w.u8w(this.roleOwner(r));
     w.u8w(this.hostId); // v3
+    for (const p of live) w.str(p.teamName); // v3 teams: "" = guest
     this.broadcast(w.bytes());
   }
 
@@ -191,6 +200,9 @@ export class RoomDO extends DurableObject {
     this.deferred.length = 0;
     this.pause = null;
     this.mstats = newNetStats();
+    this.matchTokens = new Set(this.players.filter(x => x.ws && x.role).map(x => x.token));
+    this.matchStartedAt = Date.now();
+    this.lastTeamResult = null;
     for (const p of this.players) { p.ready = false; if (p.ws) this.sendMatchStart(p); }
     this.broadcastLobby();
   }
@@ -248,6 +260,8 @@ export class RoomDO extends DurableObject {
         case C2S.READY: { const on = r.u8() !== 0; if (this.inLobby) p.ready = on; this.broadcastLobby(); break; }
         case C2S.START: this.tryStart(p); break;
         case C2S.CONTINUE_BOT: this.continueWithBots(p); break;
+        case C2S.TEAM_CREATE: await this.teamCreate(p, r.str()); break;
+        case C2S.TEAM_ANSWER: await this.teamAnswer(p, r.u8() !== 0); break;
         case C2S.LEAVE: { // voluntary: bot takes the role now, no pause, no reconnect slot
           this.drop(ws, "leave");
           this.players = this.players.filter(x => x !== p);
@@ -390,6 +404,81 @@ export class RoomDO extends DurableObject {
   broadcastResume() { this.broadcast(this.resumeBytes()); }
   sendPauseState(p: Player) { if (!p.ws || !this.pause) return; try { p.ws.send(this.pause.resumeAt ? this.resumeBytes() : this.pauseBytes()); } catch {} }
 
+  // ---------------- teams (TeamsDO is the authority; RoomDO only reports and relays) ----------------
+  teams() { const ns = (this.env as any).TEAMS as DurableObjectNamespace<TeamsDO>; return ns.get(ns.idFromName("global")); }
+
+  async loadTeam(p: Player) {
+    try {
+      const t = await this.teams().teamOf(p.token);
+      p.teamId = t?.teamId ?? 0; p.teamName = t?.teamName ?? "";
+      this.broadcastLobby();
+    } catch (e) { this.log({ ev: "team_lookup_failed", err: String(e) }); }
+  }
+
+  reportMatch(seed: number, total: number) {
+    const matchId = `${this.code}-${seed}-${this.matchStartedAt}`; // unique per match: rematch = new id, re-report = same id
+    const tokens = [...this.matchTokens];
+    this.teams().report({ matchId, roomCode: this.code, score: total, tokens })
+      .then(r => { this.lastTeamResult = { ...r, matchId }; this.log({ ev: "team_report", matchId, ...r }); for (const p of this.players) this.sendTeamResult(p, r); })
+      .catch(e => this.log({ ev: "team_report_failed", err: String(e) }));
+  }
+
+  sendTeamResult(p: Player, r: ReportResult) {
+    if (!p.ws) return;
+    const w = this.w.reset();
+    w.u8w(S2C.TEAM_RESULT).u8w(r.counted ? 1 : 0).str(r.teamName).i32(r.points).u16(clamp(r.rank, 0, 65535)).u8w(r.canSave ? 1 : 0);
+    try { p.ws.send(w.bytes()); } catch {}
+  }
+
+  /** Host: create a team from this room (name) or invite to the host's team (empty name); the other humans get an invite. */
+  async teamCreate(p: Player, rawName: string) {
+    if (!this.inLobby) return this.notice(p, "Teams are made in the lobby or on the results screen");
+    this.updateHost();
+    if (p.id !== this.hostId) return this.notice(p, "Only the host can create the team");
+    let teamId = p.teamId, teamName = p.teamName;
+    if (rawName.trim()) {
+      const r = await this.teams().create(p.token, p.name, rawName);
+      if (!r.ok) return this.notice(p, r.error);
+      teamId = r.team!.id; teamName = r.team!.name;
+    } else if (!teamId) return this.notice(p, "Enter a team name");
+    p.teamId = teamId; p.teamName = teamName;
+    const now = Date.now();
+    for (const x of this.players) {
+      if (x === p || !x.ws || !x.role || x.teamId === teamId) continue;
+      x.inviteTeamId = teamId; x.inviteExp = now + INVITE_MS;
+      const w = this.w.reset();
+      w.u8w(S2C.TEAM_INVITE).str(teamName).str(p.name).str(x.teamName);
+      try { x.ws.send(w.bytes()); } catch {}
+    }
+    this.log({ ev: "team_create", by: p.name, team: teamName });
+    await this.claimPending(teamId);
+    this.broadcastLobby();
+  }
+
+  async teamAnswer(p: Player, accept: boolean) {
+    if (!p.inviteTeamId || Date.now() > p.inviteExp) return;
+    const tid = p.inviteTeamId;
+    p.inviteTeamId = 0;
+    const host = this.players.find(x => x.id === this.hostId);
+    if (!accept) { if (host) this.notice(host, `${p.name} plays as a guest`); return; }
+    const r = await this.teams().join(p.token, p.name, tid, true); // accepting = leave the old team, join this one
+    if (!r.ok) return this.notice(p, r.error);
+    p.teamId = r.team!.id; p.teamName = r.team!.name;
+    await this.claimPending(tid);
+    this.broadcastLobby();
+  }
+
+  /** The room's last guest result counts for the new team once every player of that match is in it (once). */
+  async claimPending(teamId: number) {
+    try {
+      const r = await this.teams().claim(this.code, teamId);
+      if (!r.counted) return;
+      this.lastTeamResult = { ...r, matchId: "claimed" };
+      this.log({ ev: "team_claim", ...r });
+      for (const x of this.players) this.sendTeamResult(x, r);
+    } catch (e) { this.log({ ev: "team_claim_failed", err: String(e) }); }
+  }
+
   log(o: Record<string, unknown>) { console.log(JSON.stringify({ room: this.code, ...o })); }
 
   // ---------------- loop ----------------
@@ -450,6 +539,7 @@ export class RoomDO extends DurableObject {
         this.resultsSent = true;
         for (const p of this.players) { p.ready = false; if (p.ws) this.sendResults(p.ws); } // rematch needs READY again
         this.log({ ev: "match_end", reason: sim.results?.reason, ...this.mstats });
+        if (sim.results && sim.results.reason !== 3) this.reportMatch(sim.seed, sim.results.total);
         this.broadcastLobby();
       }
       return;

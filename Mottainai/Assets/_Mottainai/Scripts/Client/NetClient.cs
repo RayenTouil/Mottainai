@@ -83,6 +83,8 @@ namespace Mottainai.Client
         public event Action<string> OnDisconnected;
         public event Action<PauseInfo> OnPause;
         public event Action<int> OnResume;
+        public event Action<TeamResultInfo> OnTeamResult;
+        public event Action<TeamInviteInfo> OnTeamInvite;
 
         public string token, playerName, roomCode = "", baseUrl;
         public string RoomColo = "?";
@@ -194,6 +196,8 @@ namespace Mottainai.Client
                     case Msg.Results: ws.Url = baseWsUrl; OnResults?.Invoke(Codec.ReadResults(ref r)); break;
                     case Msg.Pause: OnPause?.Invoke(Codec.ReadPause(ref r)); break;
                     case Msg.Resume: OnResume?.Invoke(r.U16()); break;
+                    case Msg.TeamResult: OnTeamResult?.Invoke(new TeamResultInfo { counted = r.U8() == 1, teamName = r.Str(), points = (int)r.I32(), rank = r.U16(), canSave = r.U8() == 1 }); break;
+                    case Msg.TeamInvite: OnTeamInvite?.Invoke(new TeamInviteInfo { teamName = r.Str(), fromName = r.Str(), currentTeam = r.Str() }); break;
                 }
             }
             catch (Exception e) { Debug.LogWarning($"[Net] bad frame 0x{m[0]:X2}: {e.Message}"); }
@@ -250,6 +254,9 @@ namespace Mottainai.Client
         public void SendLeave() => ws.Send(w.Begin(Msg.Leave).ToArray());
         public void StartMatch() => ws.Send(w.Begin(Msg.Start).ToArray());
         /// v3: host skips the reconnect wait (bots take the missing roles).
+        /// v3 teams: host creates a team from the room (name) or invites the room to the host's team (empty name).
+        public void SendTeamCreate(string name) => ws.Send(w.Begin(Msg.TeamCreate).Str((name ?? "").Trim()).ToArray());
+        public void SendTeamAnswer(bool accept) => ws.Send(w.Begin(Msg.TeamAnswer).U8(accept ? 1 : 0).ToArray());
         public void ContinueWithBot() => ws.Send(w.Begin(Msg.ContinueBot).ToArray());
 
         /// App to background: close the socket so the room pauses at once; foreground: reconnect immediately.

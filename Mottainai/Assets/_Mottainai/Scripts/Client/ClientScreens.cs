@@ -66,7 +66,7 @@ namespace Mottainai.Client
             hudCanvas.GetComponent<GraphicRaycaster>().enabled = false;
             netCanvas = UIKit.Canvas("UI_NetHud", 30);
             netCanvas.GetComponent<GraphicRaycaster>().enabled = false;
-            BuildLogin(); BuildDownload(); BuildMenu(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud(); BuildV4();
+            BuildLogin(); BuildDownload(); BuildMenu(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud(); BuildV4(); BuildTeamUi();
         }
 
         GameObject Panel(UiScreen s, Color bg)
@@ -264,6 +264,7 @@ namespace Mottainai.Client
             sb.Append("</size>");
             lobbyPlayers.text = sb.ToString();
             UIKit.Label(startButton).text = inMatch ? "IN MATCH..." : $"START  {readyN}/{humans}";
+            RefreshTeamBanner();
         }
 
         void BuildResults()
@@ -300,6 +301,7 @@ namespace Mottainai.Client
 
         void FillResults()
         {
+            RefreshResultsTeam();
             var r = results;
             var s = net.stats;
             var ni = NetworkInfo.Provider;

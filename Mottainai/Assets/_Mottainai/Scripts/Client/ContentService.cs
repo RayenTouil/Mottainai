@@ -61,6 +61,15 @@ namespace Mottainai.Client
             Login = JsonUtility.FromJson<LoginResponse>(req.downloadHandler.text);
         }
 
+        /// JSON GET (body null) / POST to the Worker API; done(httpStatus, responseText).
+        public IEnumerator Api(string path, string body, Action<long, string> done)
+        {
+            using var req = body == null ? UnityWebRequest.Get(BaseUrl + path) : UnityWebRequest.Post(BaseUrl + path, body, "application/json");
+            req.timeout = 8;
+            yield return req.SendWebRequest();
+            done?.Invoke(req.responseCode, req.downloadHandler?.text ?? "");
+        }
+
         public IEnumerator CreateRoom(Action<string> onCode, Action<string> onError)
         {
             using var req = UnityWebRequest.Post(BaseUrl + "/api/rooms", "{}", "application/json");

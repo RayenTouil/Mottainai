@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Mottainai.Client
 {
-    public enum UiScreen { Login, Download, Menu, Lobby, Game, Results, Lab }
+    public enum UiScreen { Login, Download, Menu, Lobby, Game, Results, Lab, Team, Leaderboard }
 
     /// Client state machine: Title -> Content Pack -> Menu -> Lobby (room WebSocket) -> Match -> Results.
     public partial class ClientApp : MonoBehaviour
@@ -88,6 +88,7 @@ namespace Mottainai.Client
                 if (cli[i] == "-suspendat" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendAt);
                 if (cli[i] == "-suspendfor" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendFor);
                 if (cli[i] == "-shotsat" && i + 1 < cli.Length) shotsAt = cli[i + 1];
+                if (cli[i] == "-teamname" && i + 1 < cli.Length) autoTeam = cli[i + 1];
                 if (cli[i] == "-role" && i + 1 < cli.Length && int.TryParse(cli[i + 1], out int ar)) preferredRole = (Role)ar;
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
             }
@@ -104,7 +105,7 @@ namespace Mottainai.Client
         int perfFrames; float perfTime, perfWorst;
         string shotsDir;
         float quitAfter, suspendAt, suspendFor = 5f; // -suspendat: simulate app background (same path as a screen lock)
-        string shotsAt;
+        string shotsAt, autoTeam; // -teamname: create a team, screenshot TEAM + LEADERBOARD, play, leave the team at the end
         int shotIndex;
 
         void Shot(string label)
@@ -136,6 +137,17 @@ namespace Mottainai.Client
             while (screen != UiScreen.Menu && Time.realtimeSinceStartup - t0 < 90f) yield return null;
             if (screen != UiScreen.Menu) { Debug.LogError("[AUTOPLAY] FAIL: never reached menu. " + loginStatus.text); Application.Quit(2); yield break; }
             Debug.Log($"[AUTOPLAY] menu; content {content.BytesTotal / 1048576f:F1} MB at {content.Mbps:F1} MB/s cached={content.FromCache}");
+            if (!string.IsNullOrEmpty(autoTeam))
+            {
+                Show(UiScreen.Team);
+                yield return TeamCall("/api/team/create", $"{{\"token\":\"{token}\",\"playerName\":{Json(playerName)},\"name\":{Json(autoTeam)}}}");
+                Debug.Log("[AUTOPLAY] team: " + (myTeam != null ? myTeam.name + " " + myTeam.joinCode : teamStatus.text));
+                yield return new WaitForSecondsRealtime(0.8f); Shot("team"); yield return null; yield return null; // capture happens at end of frame
+                Show(UiScreen.Leaderboard);
+                yield return LoadBoard();
+                yield return new WaitForSecondsRealtime(0.8f); Shot("board"); yield return null; yield return null;
+                Show(UiScreen.Menu);
+            }
             JoinRoom(autoRoom);
             while (screen != UiScreen.Lobby || lobby == null) yield return null;
             yield return new WaitForSecondsRealtime(0.8f);
@@ -180,6 +192,8 @@ namespace Mottainai.Client
             Debug.Log($"[AUTOPLAY] RESULT reason={r.reason} total={r.total} catch={r.catchScore} toxic=-{r.toxicPenalty} acc={r.Accuracy:P0} dist={r.distance:F0}m kg={r.kg:F1} dur={r.duration:F0}s counts={string.Join(",", r.counts)} rxMB={net.stats.TotalDownMB:F1}");
             yield return new WaitForSecondsRealtime(2.5f);
             Shot("results");
+            Debug.Log("[AUTOPLAY] TEAM_RESULT " + (lastTeamResult == null ? "none" : $"counted={lastTeamResult.counted} team={lastTeamResult.teamName} +{lastTeamResult.points} rank={lastTeamResult.rank}"));
+            if (!string.IsNullOrEmpty(autoTeam)) yield return TeamCall("/api/team/leave", $"{{\"token\":\"{token}\"}}");
             yield return new WaitForSecondsRealtime(1f);
             Application.Quit(0);
         }
@@ -242,6 +256,7 @@ namespace Mottainai.Client
         void LeaveRoom()
         {
             ClearNetPause();
+            guestsChosen = false; lastTeamResult = null;
             net.Disconnect();
             lobby = null;
             Show(UiScreen.Menu);
@@ -289,7 +304,7 @@ namespace Mottainai.Client
             world.AimAssist = myRole == Role.Collector;
             input.role = myRole;
             input.active = true;
-            if (!resync) net.stats.ResetAggregates();
+            if (!resync) { net.stats.ResetAggregates(); lastTeamResult = null; }
             hintUntil = resync ? 0f : Time.time + info.countdown + 3f;
             results = null;
             Show(UiScreen.Game);

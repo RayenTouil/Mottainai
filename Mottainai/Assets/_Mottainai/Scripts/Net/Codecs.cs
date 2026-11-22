@@ -11,9 +11,9 @@ namespace Mottainai.Net
     {
         public const int ProtocolVersion = 3;
         // client -> server
-        public const byte Role = 0x01, Ready = 0x02, Start = 0x03, Leave = 0x04, ContinueBot = 0x05, Stroke = 0x10, BackPaddle = 0x11, Net = 0x12, Ping = 0x20, Stats = 0x21;
+        public const byte Role = 0x01, Ready = 0x02, Start = 0x03, Leave = 0x04, ContinueBot = 0x05, TeamCreate = 0x06, TeamAnswer = 0x07, Stroke = 0x10, BackPaddle = 0x11, Net = 0x12, Ping = 0x20, Stats = 0x21;
         // server -> client
-        public const byte Welcome = 0x80, Lobby = 0x81, MatchStart = 0x82, Snapshot = 0x83, Events = 0x84, Results = 0x85, Pong = 0x86, Notice = 0x87, Pause = 0x8A, Resume = 0x8B;
+        public const byte Welcome = 0x80, Lobby = 0x81, MatchStart = 0x82, Snapshot = 0x83, Events = 0x84, Results = 0x85, Pong = 0x86, Notice = 0x87, Pause = 0x8A, Resume = 0x8B, TeamResult = 0x8C, TeamInvite = 0x8D;
     }
 
     public struct NetEntity
@@ -47,7 +47,12 @@ namespace Mottainai.Net
         public int entityCount;
     }
 
-    public class LobbyPlayer { public ulong clientId; public string name; public Role role; public bool ready, connected; }
+    public class LobbyPlayer { public ulong clientId; public string name; public Role role; public bool ready, connected; public string team = ""; }
+
+    /// v3 TEAM_RESULT: did the finished match count for a team (server-authoritative), and can this guest crew still save it.
+    public class TeamResultInfo { public bool counted, canSave; public string teamName; public int points, rank; }
+    /// v3 TEAM_INVITE: the host invites me to a team (currentTeam = the team I would leave).
+    public class TeamInviteInfo { public string teamName, fromName, currentTeam; }
 
     public class LobbyState
     {
@@ -100,6 +105,13 @@ namespace Mottainai.Net
         public ByteWriter Begin(byte id) { len = 0; return U8(id); }
         void Need(int n) { if (len + n > buf.Length) Array.Resize(ref buf, Math.Max(buf.Length * 2, len + n)); }
         public ByteWriter U8(int v) { Need(1); buf[len++] = (byte)v; return this; }
+        public ByteWriter Str(string s)
+        {
+            var b = Encoding.UTF8.GetBytes(s ?? "");
+            int n = Math.Min(b.Length, 255);
+            U8(n); Need(n); Buffer.BlockCopy(b, 0, buf, len, n); len += n;
+            return this;
+        }
         public ByteWriter U16(int v) { Need(2); buf[len++] = (byte)v; buf[len++] = (byte)(v >> 8); return this; }
         public ByteWriter I16(int v) => U16((ushort)(short)Mathf.Clamp(v, short.MinValue, short.MaxValue));
         public ByteWriter F32(float v) { Need(4); var x = BitConverter.GetBytes(v); Buffer.BlockCopy(x, 0, buf, len, 4); len += 4; return this; }
@@ -197,6 +209,7 @@ namespace Mottainai.Net
             }
             for (int i = 0; i < 3; i++) s.roleOwner[i] = r.U8();
             if (r.Left > 0) s.hostId = r.U8();
+            for (int i = 0; i < s.players.Count && r.Left > 0; i++) s.players[i].team = r.Str(); // v3 teams ("" = guest)
             return s;
         }
 

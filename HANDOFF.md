@@ -7,12 +7,12 @@ Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler log
 - Merge check (2026-11-22): compile OK; Windows autoplay 60 fps, nodelay on; phone R5CY30BPV8B full match TimeUp, 60.1 fps avg, worst 33.2 ms, no crash (Docs/art_v3/merge_phone.png).
 - Backups: tags backup/before-merge-{main,artv3,dev}; branches art/v3, dev, wip/* kept.
 ## In progress
+- v4 Phase D done: TeamsDO (teams, leaderboard, server-authoritative scores, once per match), lobby banner + invites, save crew on results, TEAM + LEADERBOARD screens (tools/teamtest.ts PASS on mottainai-v4).
 - v4 Phase C done: pause/resume on disconnect, 1.5 s dead-socket rule, 30 s grace, Continue with bot, abort when all gone, DO-restart notice (server/tools/reconnect.ts T1-T9 PASS on mottainai-v4; phone: airplane + screen-off PASS). Report: Docs/v4/reconnect.md. Pending: 3-phone guided tests (same doc).
 - v4 Phase A+B (feature/v4, server mottainai-v4): onboarding cards, collect/avoid pop-up, legend bar, safe-area score, pause/LEAVE; host + READY/START rules (tools/lobbytest.ts 18/18).
 - I1 (5G SA, Wi-Fi OFF, 3 full matches in a row) never formally run. A4 (teammate readability) open.
-- Voice chat task (feature/voice) paused: audit not delivered yet.
 ## Exact next step
-- Run the 3-phone checklist in Docs/v4/reconnect.md (fill the table), then Phase D (teams + leaderboard).
+- Run the 3-phone checklist in Docs/v4/reconnect.md, then Phase E (voice, Docs/prompts/VOICE.md).
 ## Resume commands
 - `git pull --rebase --autostash` ; close editor -> `build_android.bat` -> `install_phone.bat`
 - `bash tools/compile_check.sh` (works with editor open) ; phone autoplay: `bash tools/phone_art_test.sh <name>`

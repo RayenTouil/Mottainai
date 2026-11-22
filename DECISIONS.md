@@ -100,4 +100,11 @@
 - v4/C: after a pause the client rebuilds its clock line on the first new snapshot (server tick froze, local time did not); while paused it renders the latest frozen state, no prediction.
 - v4/C: aborted match result kept 30 s for reconnecting players (idle stop no longer wipes it at once).
 - v4/C: `&spectate=1` join (no role) added for automated phone tests: an idle human paddler would crash the raft and hide the reconnect results.
+- v4/D: TeamsDO = one global SQLite DO, RPC from index.ts and RoomDO; tables players/teams/members/matches/pending; members.token PRIMARY KEY = one team per player; matches.id PRIMARY KEY = counted once.
+- v4/D: matchId = room-seed-startMs; participants = every human who held a role during the match (incl. mid-match joiners), spectators excluded; a team match needs all of them in one team.
+- v4/D: names 3-16 unicode letters/digits/spaces, trimmed, inner spaces collapsed; uniqueness on a lowercased nameKey (SQLite NOCASE is ASCII only). Join codes 6 chars without 0/O/1/I.
+- v4/D: the last member leaving deletes the team (spec: 1-3 members) and its match rows; the name becomes free again.
+- v4/D: join checks "full" before leaving the old team (a failed invite never kicks a player out of their team).
+- v4/D: host already in a team -> lobby button "INVITE TO TEAM <name>" (TEAM_CREATE with empty name) instead of a forced new team.
+- v4/D: leaderboard order total, best, oldest team; rank = position in that order. Tokens never leave the server.
 - v4/B: client REMATCH = back to lobby + READY (the host still presses START); START shown to the host only, enabled at N/N ready.

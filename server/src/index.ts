@@ -1,10 +1,13 @@
 import { PROTOCOL_VERSION } from "./protocol";
 export { RoomDO } from "./room";
 export { TelemetryDO } from "./telemetry";
+export { TeamsDO } from "./teams";
+import type { TeamsDO } from "./teams";
 
 export interface Env {
   ROOM: DurableObjectNamespace;
   TELEMETRY: DurableObjectNamespace;
+  TEAMS: DurableObjectNamespace<TeamsDO>;
   ASSETS: Fetcher;
 }
 
@@ -69,6 +72,25 @@ export default {
     if (p === "/api/telemetry" || p === "/api/telemetry.csv") {
       const stub = env.TELEMETRY.get(env.TELEMETRY.idFromName("global"));
       return stub.fetch(req);
+    }
+
+    // teams + leaderboard (scores are credited by RoomDO only; no score route here)
+    if (p.startsWith("/api/team/") || p === "/api/leaderboard") {
+      const teams = env.TEAMS.get(env.TEAMS.idFromName("global"));
+      const q = url.searchParams;
+      let b: any = {};
+      if (req.method === "POST") { try { b = await req.json(); } catch { return json({ ok: false, error: "bad json" }, 400); } }
+      const post = (f: () => Promise<any>) => req.method === "POST" ? f() : Promise.resolve({ ok: false, status: 405, error: "POST only" });
+      let r: any;
+      switch (p) {
+        case "/api/team/create": r = await post(() => teams.create(String(b.token ?? ""), String(b.playerName ?? ""), b.name)); break;
+        case "/api/team/join": r = await post(() => teams.join(String(b.token ?? ""), String(b.playerName ?? ""), String(b.joinCode ?? ""))); break;
+        case "/api/team/leave": r = await post(() => teams.leave(String(b.token ?? ""))); break;
+        case "/api/team/me": r = await teams.me(q.get("token") ?? ""); break;
+        case "/api/leaderboard": r = await teams.leaderboard(Number(q.get("limit") ?? 20), q.get("token") ?? ""); break;
+        default: return json({ ok: false, error: "not found" }, 404);
+      }
+      return json(r, r.ok === false ? r.status : 200);
     }
 
     if (p.startsWith("/api/")) return json({ error: "not found" }, 404);
