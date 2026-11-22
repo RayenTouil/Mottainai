@@ -1,15 +1,15 @@
-# HANDOFF (v2 Cloudflare)
+# HANDOFF — branch `art/v3` (base 857577f = main; spec ART_DIRECTION_v3.md)
 Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler login` once per PC)
-## Done
-- S0: PROTOCOL.md v2, server/ Worker + RoomDO (WELCOME/LOBBY/PING/PONG/fake snapshots) + TelemetryDO. Smoke: `node server/tools/smoke.ts`.
-- C1 code: NGO/UTP + Server assembly + local-server scripts removed; Net/WsClient (ClientWebSocket, backoff), Net/Codecs (PROTOCOL v2), NetClient, ContentService (server_config.json, /api/*, /pack sha256), NetworkLab (edge/room RTT, down/up, telemetry), screens Title(5-tap URL)/Pack/Menu/Lobby/Game/Results, Net HUD (edge/room colo). `tools/compile_check.sh` OK.
-## Done (S1)
-- server/src/sim.ts full sim + bots + lag comp + scoring; RoomDO lobby/countdown/run/results/rematch, bot takeover/reconnect; real 36 MB pack (genpack.mjs); lab + telemetry endpoints. Tests: `npm run simcheck` (0/20 crashes), `node tools/fakeclient.ts` (full match on Cloudflare: 60 snap/s, ~200 kbps, RTT ~60 ms).
-## Done (P1 models, early)
-- CC0 models in Resources/Models + glTFast + ModelImportRules + VisualFactory mapping (primitive fallback). Open Unity once to import, check raft/paddle/shark orientation.
+Worktree: `../Mottainai_v3` (separate project folder; batch builds work while the main editor is open).
+## Done (art v3, visual-only)
+- P0 declutter: no center SYNC text (chip x3/x5/x10), Net pill top-center (tap -> full panel, closed by default), role/power chips, thin shield, cyan magnet, narrow wake, camera 9/6/look-ahead 4/FOV 50.
+- P1 lighting/sky/fog/post + water shader v3 (bank gradient, fresnel, edge foam, caustics, crossed waves). ArtV3.cs = tokens + tier (PlayerPrefs artTier, 0 Low default).
+- P2 waste rings/silhouettes/anim/pickup FX, valuable purple, obstacle palette. P3 yellow raft + bean crew + blob shadows.
+- P4 banks (cliff faces, tree clusters, rocks, fences, cottages, dock). P5 UI skin (Fredoka, panels, pill buttons).
+- PC check: full match on Windows OK (TimeUp, 60 fps, worst 33.9 ms); shots in Docs/art_v3/P5_pc_*.png.
 ## In progress
-- C1/C2 build: Unity editor must be CLOSED -> build_android.bat -> install_phone.bat (1 phone only: R5CY30BPV8B, 5G SA, Wi-Fi OFF).
+- Phone tests (A9 FPS on Low, phone screenshots) blocked: phone not connected.
 ## Exact next step
-- I1 (1 phone): Quick Play, 1 human + 2 bots. Human = LEFT PADDLER, then COLLECTOR. Pass = 3 full matches in a row over 5G SA. Then Network Lab on Wi-Fi + 5G SA -> /api/telemetry.csv.
+- Plug phone R5CY30BPV8B -> `bash tools/phone_art_test.sh P6` (installs Builds/Mottainai.apk, autoplay in a private room, screenshot Docs/art_v3/P6.png, prints [PERF]).
 ## Resume commands
-- `git pull --rebase --autostash` ; `deploy_server.bat` ; `build_android.bat` ; `install_phone.bat`
+- `bash build_android.sh` ; Windows check: run BuildTools.BuildWindows, then `Builds/Win/Mottainai.exe -autoplay -room AV3X -shots <abs dir> -quitafter 27`

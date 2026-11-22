@@ -60,3 +60,12 @@
 - P1 models: raft model replaces torus hull/rope/floor (Content Pack raft skin only applies to the torus hull); paddle auto-oriented blade-down at import.
 - P1 models: glTFast 6.21.0 added for metal_can.glb (only GLB-only model). bear_trap.fbx imported but unmapped (no ObstacleType for it; needs server sim + protocol change).
 - I1 test plan: 1 phone on this PC -> 1 human + 2 bots (LEFT PADDLER, then COLLECTOR); pass = 3 full matches in a row on 5G SA.
+
+- art/v3: separate git worktree ../Mottainai_v3 so the open editor on dev is untouched.
+- art/v3: river UVs computed in-shader from world x (straight river) instead of regenerating mesh UVs.
+- art/v3: caustic tiling 2 per river width (spec 6 gave 0.5 m cells, read as tiles); intensity 0.15.
+- art/v3: rings/blob shadows at +0.14/+0.13 m (spec 0.02) so 0.12 m wave crests do not hide them.
+- art/v3: camera look-ahead 4 m gives ~25 deg pitch (35 deg would push the horizon off-screen and the raft above center).
+- art/v3: raft 2.4 x 3.0 m outer (spec 2.6 x 1.6 leaves no room for 3 crew).
+- art/v3: wake = water-shader V-wake from the FX map (no TrailRenderer: URP particle shader may be stripped).
+- art/v3: toxic hazard = plates on barrel (floating sign read as a shark fin).
