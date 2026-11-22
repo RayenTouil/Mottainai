@@ -29,6 +29,7 @@ namespace Mottainai.EditorTools
             ImportTmpEssentials();
             ReimportUrtShaders();
             EnsureTuning();
+            EnsureDesignTokens();
             ConfigureUrp();
             ConfigurePlayer();
             CreateBootstrapScene();
@@ -122,6 +123,14 @@ namespace Mottainai.EditorTools
             AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameTuning>(), TuningPath);
         }
 
+        static void EnsureDesignTokens()
+        {
+            const string path = Root + "/Resources/DesignTokens.asset";
+            if (AssetDatabase.LoadAssetAtPath<DesignTokens>(path) != null) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<DesignTokens>(), path);
+        }
+
         static void ConfigureUrp()
         {
             var rp = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(MobileRp);
@@ -212,11 +221,13 @@ namespace Mottainai.EditorTools
             Build(BuildTarget.Android, BuildTargetGroup.Android, Arg("-out", "../Builds/Mottainai.apk"), opts, 0, null);
         }
 
+        /// Windows player for visual checks: Mottainai.exe -autoplay -room SHOT1 -shots <dir> -quitafter 25
         [MenuItem("Mottainai/Build/Windows (visual check)")]
         public static void BuildWindows()
         {
             SetupProject();
-            Build(BuildTarget.StandaloneWindows64, BuildTargetGroup.Standalone, "../Builds/Win/Mottainai.exe", BuildOptions.None, 0, null);
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.Mono2x);
+            Build(BuildTarget.StandaloneWindows64, BuildTargetGroup.Standalone, Arg("-out", "../Builds/Win/Mottainai.exe"), BuildOptions.None, (int)StandaloneBuildSubtarget.Player, null);
         }
 
         [MenuItem("Mottainai/Build/Android APK + Run on Phone")]

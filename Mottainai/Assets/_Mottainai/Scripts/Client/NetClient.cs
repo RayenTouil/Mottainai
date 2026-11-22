@@ -16,7 +16,8 @@ namespace Mottainai.Client
         public float DownKbps, UpKbps, Pps, LossPct, SnapshotRate, Fps;
         public float TotalDownMB, TotalUpMB;
         public uint ServerTick;
-        public float InterpMs;
+        public float InterpMs, SnapJitterMs, PredLeadMs, LatePct;
+        public bool NoDelay;
         long lastRecv, lastSent, lastMsgs;
         float window;
         int snapshots;
@@ -94,9 +95,9 @@ namespace Mottainai.Client
         readonly List<MatchEvent> evBuffer = new List<MatchEvent>(64);
         readonly ByteWriter w = new ByteWriter();
         float pingTimer, statsTimer, backlogMaxMs;
-        readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
-        public double NowMs => clock.Elapsed.TotalMilliseconds;
-        public double Now => clock.Elapsed.TotalSeconds;
+        Action<byte[], double> dispatch;
+        public double NowMs => NetTime.Ms;
+        public double Now => NetTime.Ms * 0.001;
 
         public NetClient()
         {
@@ -125,7 +126,7 @@ namespace Mottainai.Client
 
         public bool Ready => Welcomed && ws.IsOpen;
 
-        void Dispatch(byte[] m)
+        void Dispatch(byte[] m, double recvMs)
         {
             var r = new ByteReader(m, 1, m.Length - 1);
             try
@@ -146,7 +147,7 @@ namespace Mottainai.Client
                     {
                         double sent = r.F64();
                         stats.ServerTick = r.U32();
-                        stats.AddRtt((float)(NowMs - sent));
+                        stats.AddRtt((float)(recvMs - sent)); // socket-thread receive time: no frame quantization
                         break;
                     }
                     case Msg.Lobby: OnLobby?.Invoke(Codec.ReadLobby(ref r, roomCode)); break;
@@ -178,8 +179,10 @@ namespace Mottainai.Client
 
         public void Tick(float dt, bool inMatch)
         {
-            backlogMaxMs = Mathf.Max(backlogMaxMs, ws.Backlog * 1000f / Mathf.Max(1, SnapshotHz));
-            ws.Poll(Dispatch);
+            // backlog = age of the oldest undelivered frame; single hitches (loading) are not a sustained backlog
+            if (dt < 0.05f) backlogMaxMs = Mathf.Max(backlogMaxMs, (float)ws.OldestAgeMs);
+            ws.Poll(dispatch ??= Dispatch);
+            stats.NoDelay = ws.NoDelay;
             stats.Update(dt, ws);
             if (!Ready) return;
             pingTimer -= dt;

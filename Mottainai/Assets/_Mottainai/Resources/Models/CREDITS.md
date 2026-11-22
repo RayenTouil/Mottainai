@@ -17,4 +17,9 @@ All models from poly.pizza, imported 2026-11-21. Quaternius models are CC0 (no a
 | Propane Tank by Quaternius - 3revwBHxDC.zip (PropaneTank.fbx) | Quaternius | CC0 1.0 | Models/Waste/toxic_propane_tank.fbx |
 | First Aid Kit by Quaternius - Hp80p6148W.zip (FirstAidKit_Hard.fbx) | Quaternius | CC0 1.0 | Models/Pickups/first_aid_kit.fbx |
 
-Skipped duplicates: Raft Paddle by Quaternius - XLwljDJQZ7 (1).zip (identical FBX), Raft Paddle by Quaternius - XLwljDJQZ7.glb (FBX preferred).
+Skipped duplicates: Raft Paddle by Quaternius - XLwljDJQZ7 (1).zip (identical FBX), Raft Paddle by Quaternius - XLwljDJQZ7.glb (FBX preferred).| Elm tree by Poly by Google - 68OOL4zL6Co.glb | Poly by Google | CC-BY 3.0 (poly.pizza listing) | Models/Scenery/elm_tree.glb (texture 2048 -> 1024) |
+| Palm tree by Poly by Google - 1l79utpMAy0.glb | Poly by Google | CC-BY 3.0 (poly.pizza listing) | Models/Scenery/palm_tree.glb (texture 2048 -> 1024) |
+| Pine Tree by Danni Bittman - 2Qo-fmVKuSG.glb | Danni Bittman | CC-BY 3.0 (poly.pizza listing) | Models/Scenery/pine_tree.glb |
+| Iceberg 1 by S. Paul Michael - edgjUwbVVtl.glb | S. Paul Michael | CC-BY 3.0 (poly.pizza listing) | Models/obstacle_iceberg.glb |
+
+Rejected: Nature by 3Donimus (66,635 tris > 5k scenery budget). Environment_PalmTree_1.fbx not used (palm_tree.glb covers the sea-side palms).

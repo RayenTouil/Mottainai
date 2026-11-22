@@ -69,3 +69,17 @@
 - art/v3: raft 2.4 x 3.0 m outer (spec 2.6 x 1.6 leaves no room for 3 crew).
 - art/v3: wake = water-shader V-wake from the FX map (no TrailRenderer: URP particle shader may be stripped).
 - art/v3: toxic hazard = plates on barrel (floating sign read as a shark fin).
+- NET: DO loop uses drift-free setTimeout chain aimed at ideal tick times (setInterval drifted 0.3 ms/tick: 0-16 ms sawtooth + 2-snapshot bursts). Measured server send jitter p95 14.7 -> 0.7 ms (tools/jitter.ts).
+- NET: events flushed immediately after STROKE/NET input (teammates see strokes ~half a tick sooner); inputs arriving <=120 ms before their cooldown are deferred, not dropped.
+- NET: client sets TCP_NODELAY via reflection (Mono ClientWebSocket measured NoDelay=False); RTT stamped on the socket thread; raft prediction timebase = server tick clock (best-arrival line + RTTmin/2), strokes acked by their EVENTS echo; jitter buffer = max(2 intervals, interval + p95 lateness); starved entities extrapolate up to 6 ticks; 120 Hz target drops to 60 if not sustained; MSAA capped at 2x.
+- BUILD: tools/build_copy.sh builds from a robocopy mirror (.bc/) so APKs/Windows players can be built while the editor is open.
+- ART: camera framing changed to the reference (raft ~32 deg below camera, horizon ~20% from top); visual sun top-right decoupled from key light (upper-right behind camera) so the toy crew stays front-lit.
+- ART: Quality High/Low (PlayerPrefs qualityHigh; default High on >=5.5 GB / 8-core phones): Low disables post, sky rays, water caustics.
+- ART: blob shadows drawn into the water FX map alpha (no extra draw calls); ripple rings/bow wave/splash rings in the FX map foam channel.
+- ART: imported Elm/Palm GLB textures downscaled 2048 -> 1024 (budget), Nature pack rejected (66k tris). Rocks: 30% render as red/white buoys (visual only).
+- FIX: content-pack textures never loaded (LoadRawTextureData requires full mip chain) -> SetPixelData mip 0 + Apply.
+- ART P5: waste variants chosen at pooled-instance creation (bottle/bag/tire, box, jar/bottles, core/banana, cans/bars, chest/ring, barrel/battery); category = glowing bin-color torus ring; hazard sign billboards face the camera; valuables pulse a 2-glint sparkle.
+- ART P6: Title is the main menu (PLAY = login + pack + Quick Play DEMO; FRIENDS = create/join menu); MENU on results returns to the title; settings overlay on its own canvas never pauses the match; gestures starting on the menu button/overlay are ignored.
+- ART P6: Fredoka SemiBold + Nunito Sans Regular/ExtraBold latin subsets (fontsource, OFL) -> runtime TMP dynamic font assets (fallback: LiberationSans).
+- ART P6: SYNC ring = time left in the partner's sync window (stroke now = boost); collector ring = net cooldown. Results thumbnail = one render of the world camera into a 560x315 RT.
+- ART P8: Low quality halves far trees + path props (draw calls); flowering bushes added to the bank kit; lighthouse island moved to x=22 so it shows at the horizon.

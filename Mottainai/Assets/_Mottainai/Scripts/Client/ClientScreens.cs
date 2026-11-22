@@ -633,12 +633,13 @@ namespace Mottainai.Client
                 sb.Append($"Snapshots <b>{s.SnapshotRate:F0}</b>/s (server {net.SnapshotHz} Hz)  tick #{s.ServerTick}\n");
                 sb.Append(world != null && world.PredictionLeadMs > 0 ? $"Raft prediction ON  lead {world.PredictionLeadMs:F0} ms\n" : "Raft prediction idle\n");
                 sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps   msgs {s.Pps:F0}/s\n");
-                sb.Append($"Interp buffer {(world != null ? world.InterpMs : 0):F0} ms (jitter p95 {(world != null ? world.JitterMs : 0):F0})\n");
+                sb.Append($"Jitter buffer <b>{(world != null ? world.InterpMs : 0):F0} ms</b>  (snapshot jitter p95 {(world != null ? world.JitterMs : 0):F0} ms, late {(world != null ? world.LatePct : 0):F0}%)  TCP_NODELAY {(s.NoDelay ? "on" : "off")}\n");
                 float frameMs = 1000f / Mathf.Max(1f, s.Fps);
+                float teamMs = s.RttAvg + frameMs;
                 float worldMs = s.RttAvg * 0.5f + (world != null ? world.InterpMs : 0f) + frameMs;
                 sb.Append($"FPS {s.Fps:F0} ({frameMs:F1} ms/frame)   rx {s.TotalDownMB:F1} MB\n");
                 sb.Append($"<color=#FFE38A>Latency budget</color>  my paddle>screen <b>{frameMs:F0} ms</b> (predicted)\n");
-                sb.Append($"team/world>screen <b>{worldMs:F0} ms</b> = RTT/2 + interp + frame\n");
+                sb.Append($"teammate stroke>screen <b>{teamMs:F0} ms</b> = RTT + frame   world <b>{worldMs:F0} ms</b>\n");
                 int q = 4;
                 if (s.RttP95 > 30f) q--;
                 if (s.RttP95 > 60f) q--;

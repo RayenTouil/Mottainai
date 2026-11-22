@@ -71,3 +71,6 @@ desktop.ini
 /logs/
 
 /*/ServerData/
+
+# mirrored project used by tools/build_copy.sh (build while the editor is open)
+/.bc/

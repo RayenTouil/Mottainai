@@ -1,4 +1,5 @@
 <linker>
   <assembly fullname="Mottainai.Core" preserve="all"/>
   <assembly fullname="Mottainai.Net" preserve="all"/>
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
 </linker>
