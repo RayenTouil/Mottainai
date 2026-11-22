@@ -305,7 +305,7 @@ namespace Mottainai.Client
                 var r = (Role)(i + 1);
                 var holder = lobby.IsBot(r) ? null : lobby.players.Find(x => x.role == r && x.connected);
                 bool mine = holder != null && holder.clientId == net.ClientId;
-                roleWho[i].text = holder == null ? "<color=#BFD3D6>BOT</color>" : (mine ? "<color=#A8DF70>YOU</color>" : holder.name) + (holder.ready ? "  <color=#FFC857>READY</color>" : "");
+                roleWho[i].text = holder == null ? "<color=#BFD3D6>BOT</color>" : (mine ? "<color=#FFFFFF>YOU</color>" : holder.name) + (holder.ready ? "  <color=#FFC857>READY</color>" : "");
                 UIKit.Recolor(roleButtons[i], mine ? UIKit.Primary : holder == null ? UIKit.PanelDark : UIKit.Secondary);
             }
             var me = lobby.players.Find(x => x.clientId == net.ClientId);
@@ -639,9 +639,11 @@ namespace Mottainai.Client
             bigText.textWrappingMode = TextWrappingModes.NoWrap;
             UIKit.Place(bigText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 150), new Vector2(1500, 220));
 
-            toastText = UIKit.Bold(root, "", 30, Tk.reward);
-            toastText.outlineWidth = 0.15f; toastText.outlineColor = new Color32(0x24, 0x4A, 0x53, 230);
-            UIKit.Place(toastText.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -176), new Vector2(1200, 46));
+            var toastBg = UIKit.Card(root, new Color(UIKit.DeepTeal.r, UIKit.DeepTeal.g, UIKit.DeepTeal.b, 0.85f), "Toast");
+            UIKit.Place(toastBg.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -176), new Vector2(760, 52));
+            toastText = UIKit.Bold(toastBg.transform, "", 28, Tk.reward);
+            toastText.textWrappingMode = TextWrappingModes.NoWrap;
+            UIKit.Stretch(toastText.rectTransform, 16, 0, 16, 0);
 
             // onboarding (left side, mid height): animated hand + key words
             var hp = UIKit.Card(root, new Color(UIKit.DeepTeal.r, UIKit.DeepTeal.g, UIKit.DeepTeal.b, 0.86f), "Onboarding");
@@ -669,7 +671,7 @@ namespace Mottainai.Client
         void BuildNetHud()
         {
             var bg = UIKit.Card(netCanvas.transform, new Color(UIKit.DeepTeal.r, UIKit.DeepTeal.g, UIKit.DeepTeal.b, 0.82f), "NetHud");
-            UIKit.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(18, 18), new Vector2(500, 318));
+            UIKit.Place(bg.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(18, 18), new Vector2(560, 318));
             netHudBadgeBg = UIKit.Image(bg.transform, new Color(0.36f, 1f, 0.62f), UIKit.RoundedL, "NetBadge");
             UIKit.Place(netHudBadgeBg.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(16, -14), new Vector2(150, 44));
             netHudBadge = UIKit.Title(netHudBadgeBg.transform, "", 28, UIKit.DeepTeal);
@@ -836,7 +838,7 @@ namespace Mottainai.Client
                     bigText.rectTransform.localScale = Vector3.one * (1f + 0.25f * Mathf.Max(0f, 0.2f - k) * 5f);
                     var c = bigText.color; c.a = Mathf.Clamp01(left * 3f); bigText.color = c;
                 }
-                toastText.gameObject.SetActive(Time.time < toastUntil);
+                toastText.transform.parent.gameObject.SetActive(Time.time < toastUntil);
                 var cam = world != null ? world.cam : null;
                 foreach (var p in pops)
                 {

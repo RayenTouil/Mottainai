@@ -124,6 +124,7 @@ namespace Mottainai.Client
             }
             yield return new WaitForSecondsRealtime(2f);
             Shot("title");
+            yield return null; yield return null; // let the capture happen before the screen changes
             Debug.Log($"[AUTOPLAY] login to {content.BaseUrl} as {playerName}");
             StartLogin();
             float t0 = Time.realtimeSinceStartup;

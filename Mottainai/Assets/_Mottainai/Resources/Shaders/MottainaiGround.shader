@@ -2,8 +2,8 @@ Shader "Mottainai/Ground"
 {
     Properties
     {
-        _GrassA ("Grass light", Color) = (0.53, 0.80, 0.36, 1)
-        _GrassB ("Grass dark", Color) = (0.38, 0.67, 0.29, 1)
+        _GrassA ("Grass light", Color) = (0.52, 0.79, 0.35, 1)
+        _GrassB ("Grass dark", Color) = (0.31, 0.58, 0.25, 1)
         _Path ("Path", Color) = (0.89, 0.79, 0.60, 1)
         _Earth ("Earth", Color) = (0.62, 0.47, 0.33, 1)
         _PathX ("Path |x|", Float) = 17
@@ -50,8 +50,9 @@ Shader "Mottainai/Ground"
                 float3 n = normalize(i.normalWS);
                 float2 p = i.positionWS.xz;
                 // grass: large soft light/dark patches
-                float v = Nz(p * 0.03).r * 0.65 + Nz(p * 0.1).g * 0.35;
-                float3 col = lerp(_GrassB.rgb, _GrassA.rgb, smoothstep(0.3, 0.7, v));
+                float v = Nz(p * 0.045).r * 0.6 + Nz(p * 0.16).g * 0.4;
+                float3 col = lerp(_GrassB.rgb, _GrassA.rgb, smoothstep(0.38, 0.62, v));
+                col *= 0.94 + 0.12 * Nz(p * 0.6).r; // fine blades
                 // gently winding park path along each bank
                 float px = _PathX + sin(p.y * 0.045) * 0.8 + sin(p.y * 0.013 + 1.7) * 0.6;
                 float d = abs(abs(p.x) - px);

@@ -199,7 +199,7 @@ namespace Mottainai.Client
                 {
                     float cx = Mathf.Clamp(x + 0.5f, radius, size - radius), cy = Mathf.Clamp(y + 0.5f, radius, size - radius);
                     float d = Mathf.Sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy));
-                    px[y * size + x] = new Color(c.r, c.g, c.b, Mathf.Clamp01(radius - d + 0.5f));
+                    px[y * size + x] = new Color(c.r, c.g, c.b, c.a * Mathf.Clamp01(radius - d + 0.5f));
                 }
             }
             tex.SetPixels32(px);
