@@ -69,3 +69,8 @@
 - ART: blob shadows drawn into the water FX map alpha (no extra draw calls); ripple rings/bow wave/splash rings in the FX map foam channel.
 - ART: imported Elm/Palm GLB textures downscaled 2048 -> 1024 (budget), Nature pack rejected (66k tris). Rocks: 30% render as red/white buoys (visual only).
 - FIX: content-pack textures never loaded (LoadRawTextureData requires full mip chain) -> SetPixelData mip 0 + Apply.
+- ART P5: waste variants chosen at pooled-instance creation (bottle/bag/tire, box, jar/bottles, core/banana, cans/bars, chest/ring, barrel/battery); category = glowing bin-color torus ring; hazard sign billboards face the camera; valuables pulse a 2-glint sparkle.
+- ART P6: Title is the main menu (PLAY = login + pack + Quick Play DEMO; FRIENDS = create/join menu); MENU on results returns to the title; settings overlay on its own canvas never pauses the match; gestures starting on the menu button/overlay are ignored.
+- ART P6: Fredoka SemiBold + Nunito Sans Regular/ExtraBold latin subsets (fontsource, OFL) -> runtime TMP dynamic font assets (fallback: LiberationSans).
+- ART P6: SYNC ring = time left in the partner's sync window (stroke now = boost); collector ring = net cooldown. Results thumbnail = one render of the world camera into a 560x315 RT.
+- ART P8: Low quality halves far trees + path props (draw calls); flowering bushes added to the bank kit; lighthouse island moved to x=22 so it shows at the horizon.
