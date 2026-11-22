@@ -187,8 +187,8 @@ SUP'COM engineering students.
 |---|---|
 | **Rayen TOUIL** | Pitch deck & presentation, README, 3D asset integration |
 | **Yassine AFFES** | Lead developer, main codebase (game, server, networking) |
-| **Med Amine CHAKROUN** | Local server version & playit.gg hosting |
-| **Wajdi ZENTANI** | [role] |
+| **Med Amine CHAKROUN** | Coach |
+| **Wajdi ZENTANI** | Pitcher & the team's saver |
 
 ## 🙏 Credits
 
