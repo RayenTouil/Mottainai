@@ -8,8 +8,8 @@ Worktree: `../Mottainai_v3` (separate project folder; batch builds work while th
 - P4 banks (cliff faces, tree clusters, rocks, fences, cottages, dock). P5 UI skin (Fredoka, panels, pill buttons).
 - PC check: full match on Windows OK (TimeUp, 60 fps, worst 33.9 ms); shots in Docs/art_v3/P5_pc_*.png.
 ## In progress
-- Phone tests (A9 FPS on Low, phone screenshots) blocked: phone not connected.
+- Phone A9 PASS: full match 81.8 fps avg, worst 41.6 ms (Low tier, Wi-Fi), Docs/art_v3/P6.png. A4 (teammate naming test) still open.
 ## Exact next step
-- Plug phone R5CY30BPV8B -> `bash tools/phone_art_test.sh P6` (installs Builds/Mottainai.apk, autoplay in a private room, screenshot Docs/art_v3/P6.png, prints [PERF]).
+- A4 with a teammate; optional: shrink center "SHIELD!/MAGNET NET!" Big text. Merge art/v3 -> main is the team's call.
 ## Resume commands
 - `bash build_android.sh` ; Windows check: run BuildTools.BuildWindows, then `Builds/Win/Mottainai.exe -autoplay -room AV3X -shots <abs dir> -quitafter 27`

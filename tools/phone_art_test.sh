@@ -9,9 +9,9 @@ PKG=com.supcom.mottainai
 ROOM="AV$(( RANDOM % 9000 + 1000 ))"
 "$ADB" install -r Builds/Mottainai.apk >/dev/null
 ACT="$("$ADB" shell cmd package resolve-activity --brief $PKG | tail -1 | tr -d '\r')"
-"$ADB" shell am force-stop $PKG
+"$ADB" shell am force-stop --user 0 $PKG
 "$ADB" logcat -c
-"$ADB" shell am start -n "$ACT" -e unity "-autoplay -room $ROOM -name ArtBot" >/dev/null
+"$ADB" shell am start -n "$ACT" -e unity "'-autoplay -room $ROOM -name ArtBot'" --user 0 >/dev/null
 mkdir -p Docs/art_v3
 shot=0
 for i in $(seq 1 400); do
