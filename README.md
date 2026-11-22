@@ -134,6 +134,8 @@ Phones only send gestures; the server decides everything (Cloudflare Worker + Du
 
 [![Demo](docs/media/demo_preview.gif)](docs/media/MOTTAINAI_Demo.mp4)
 
+<sub>Two real phones, one raft: Rayen (right paddler) and Yassine (left paddler) join room BCFJ, then paddle together down the river.</sub>
+
 ▶️ [Watch the full demo video (MP4)](docs/media/MOTTAINAI_Demo.mp4)
 
 🎤 **Pitch presentation:** [rayentouil.github.io/Mottainai/presentation](https://rayentouil.github.io/Mottainai/presentation/) · source: [`docs/presentation/index.html`](docs/presentation/index.html)
@@ -185,8 +187,8 @@ SUP'COM engineering students.
 
 | Member | Role |
 |---|---|
-| **Rayen TOUIL** | Pitch deck & presentation, README, 3D asset integration |
-| **Yassine AFFES** | Lead developer, main codebase (game, server, networking) |
+| **Rayen TOUIL** | Pitch deck & presentation, 3D asset integration, main codebase |
+| **Yassine AFFES** | Lead developer (server & networking), coder, second pitcher |
 | **Med Amine CHAKROUN** | Coach |
 | **Wajdi ZENTANI** | Pitcher & the team's saver |
 
