@@ -241,28 +241,30 @@ namespace Mottainai.Client
             mat = shader != null ? new Material(shader) : VisualFactory.Lit(new Color(0.2f, 0.55f, 0.7f));
             if (shader != null)
             {
-                mat.SetFloat("_Flow", t.currentSpeed);
+                mat.SetFloat("_Flow", 0.4f);
                 mat.SetFloat("_HalfWidth", t.riverWidth * 0.5f);
+                mat.SetFloat("_Tier", ArtV3.Tier);
+                mat.SetTexture("_Caustics", ArtV3.Caustics());
             }
             ApplyContent(content);
             float hw = t.riverWidth * 0.5f;
             var wgo = new GameObject("WaterMesh");
             wgo.transform.SetParent(transform, false);
-            wgo.AddComponent<MeshFilter>().sharedMesh = Grid(hw * 2f + 6f, 150f, 48, 100);
+            wgo.AddComponent<MeshFilter>().sharedMesh = Grid(hw * 2f + 6f, 150f, 16, 150); // 4.8k tris, 1 vertex per metre
             var mr = wgo.AddComponent<MeshRenderer>();
             mr.sharedMaterial = mat;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             waterT = wgo.transform;
 
-            var grass = VisualFactory.Lit(new Color(0.42f, 0.7f, 0.32f));
-            var sand = VisualFactory.Lit(new Color(0.88f, 0.8f, 0.6f));
+            var grass = VisualFactory.Lit(ArtV3.Grass);
+            var sand = VisualFactory.Lit(ArtV3.Cliff);
             bankL = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(-hw - 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
             bankR = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(hw + 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
             sandL = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(-hw - 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
             sandR = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(hw + 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
 
-            var trunk = VisualFactory.Lit(new Color(0.45f, 0.3f, 0.18f));
-            var leaf = new[] { VisualFactory.Lit(new Color(0.2f, 0.55f, 0.25f)), VisualFactory.Lit(new Color(0.3f, 0.65f, 0.2f)), VisualFactory.Lit(new Color(0.15f, 0.45f, 0.3f)) };
+            var trunk = VisualFactory.Lit(ArtV3.Bark);
+            var leaf = new[] { VisualFactory.Lit(ArtV3.PineA), VisualFactory.Lit(ArtV3.TreeRound), VisualFactory.Lit(ArtV3.PineB) };
             for (int i = 0; i < TreeCount; i++)
             {
                 var tr = new GameObject("tree").transform;
@@ -274,7 +276,7 @@ namespace Mottainai.Client
                     VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5), leaf[i % 3], new Vector3(0, 3f, 0), new Vector3(2.8f, 2.4f, 2.8f), new Vector3(0, i * 53, 0));
                     VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5 + 5), leaf[(i + 1) % 3], new Vector3(0.7f, 2.4f, 0.4f), new Vector3(1.6f, 1.4f, 1.6f));
                 }
-                if (i % 4 == 1) VisualFactory.Part(tr, ProceduralMeshes.Rock(i % 6 + 20), VisualFactory.Lit(new Color(0.55f, 0.53f, 0.5f)), new Vector3(1.6f, 0.1f, 0.8f), new Vector3(1.2f, 0.8f, 1.1f));
+                if (i % 4 == 1) VisualFactory.Part(tr, ProceduralMeshes.Rock(i % 6 + 20), VisualFactory.Lit(ArtV3.RockTop), new Vector3(1.6f, 0.1f, 0.8f), new Vector3(1.2f, 0.8f, 1.1f));
                 trees.Add(tr);
             }
         }

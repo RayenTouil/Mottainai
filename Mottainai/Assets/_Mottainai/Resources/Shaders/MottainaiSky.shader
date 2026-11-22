@@ -47,7 +47,7 @@ Shader "Mottainai/Sky"
                 float3 col = lerp(_Horizon.rgb, _Zenith.rgb, pow(h, 0.55));
                 float3 sd = normalize(_SunDir.xyz);
                 float s = saturate(dot(d, sd));
-                col += _SunColor.rgb * (pow(s, 900) * 3 + pow(s, 12) * 0.25);
+                col += _SunColor.rgb * pow(s, 12) * 0.15; // v3: no sun disk
                 if (d.y > 0.02)
                 {
                     float2 uv = d.xz / (d.y + 0.15) * 0.22 + float2(_Time.y * 0.0015, _Time.y * 0.003);

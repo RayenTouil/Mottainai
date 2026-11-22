@@ -80,14 +80,13 @@ namespace Mottainai.Client
             camT = cam.transform;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.62f, 0.84f, 0.95f);
-            cam.fieldOfView = 55f;
+            cam.fieldOfView = 50f;
             cam.nearClipPlane = 0.3f;
-            cam.farClipPlane = 140f;
+            cam.farClipPlane = 150f;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = cam.backgroundColor;
-            RenderSettings.fogStartDistance = 55f;
-            RenderSettings.fogEndDistance = 125f;
+            RenderSettings.fogStartDistance = 40f;
+            RenderSettings.fogEndDistance = 140f;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.55f, 0.6f, 0.65f);
 
@@ -96,25 +95,24 @@ namespace Mottainai.Client
             lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             var l = lightGo.AddComponent<Light>();
             l.type = LightType.Directional;
-            l.intensity = 1.15f;
-            l.color = new Color(1f, 0.97f, 0.9f);
-            l.shadows = LightShadows.None;
+            l.intensity = 1.3f;
+            l.color = ArtV3.Hex("#FFF2DC");
+            l.shadows = LightShadows.None; // v3: off on Low (no realtime shadows in this build)
 
-            // hemispheric ambient (sky blue from above, warm bounce from below) for softer cartoon shading
-            var sh = new UnityEngine.Rendering.SphericalHarmonicsL2();
-            sh.AddAmbientLight(new Color(0.42f, 0.47f, 0.52f));
-            sh.AddDirectionalLight(Vector3.up, new Color(0.35f, 0.5f, 0.7f), 0.9f);
-            sh.AddDirectionalLight(Vector3.down, new Color(0.35f, 0.4f, 0.25f), 0.5f);
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Custom;
-            RenderSettings.ambientProbe = sh;
+            // v3 gradient environment: sky #9ED8FF, equator #CDEBD8, ground #6E8A5A
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = ArtV3.Hex("#9ED8FF");
+            RenderSettings.ambientEquatorColor = ArtV3.Hex("#CDEBD8");
+            RenderSettings.ambientGroundColor = ArtV3.Hex("#6E8A5A");
+            RenderSettings.ambientIntensity = 1f;
 
             NoiseTexture.Ensure();
-            var horizon = new Color(0.72f, 0.88f, 0.98f);
-            var zenith = new Color(0.22f, 0.52f, 0.9f);
+            var horizon = ArtV3.SkyHorizon;
+            var zenith = ArtV3.SkyTop;
             Shader.SetGlobalVector("_MottainaiSkyHorizon", horizon);
             Shader.SetGlobalVector("_MottainaiSkyZenith", zenith);
             cam.backgroundColor = horizon;
-            RenderSettings.fogColor = horizon;
+            RenderSettings.fogColor = ArtV3.Fog;
             var skyShader = Shader.Find("Mottainai/Sky");
             if (skyShader != null)
             {
