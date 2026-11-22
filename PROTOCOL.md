@@ -1,4 +1,4 @@
-# MOTTAINAI wire protocol — `PROTOCOL_VERSION = 2`
+# MOTTAINAI wire protocol — `PROTOCOL_VERSION = 3`
 
 Transport: one WebSocket (wss) per player, `GET /ws/room/:code?token=&name=&role=` (role 1 L, 2 R, 3 C, 0 any).
 All game frames are **binary**, little-endian. Byte 0 = message id. `str` = u8 length + UTF-8 bytes.

@@ -84,3 +84,4 @@
 - ART P6: SYNC ring = time left in the partner's sync window (stroke now = boost); collector ring = net cooldown. Results thumbnail = one render of the world camera into a 560x315 RT.
 - ART P8: Low quality halves far trees + path props (draw calls); flowering bushes added to the bank kit; lighthouse island moved to x=22 so it shows at the horizon.
 - merge (2026-11-22): main = art/v3 + dev. Visual conflicts -> v3; netcode (f9a81bc) re-applied on v3 ClientApp/ClientScreens/WorldView; BuildWindows = dev (Mono). Dev v2 ParkKit/SceneLook removed (did not compile vs v3, unused).
+- v4: wrangler env v4 = separate Worker mottainai-v4 (own DOs); deploy_server.bat v4; PROTOCOL_VERSION 3 (stub, no new messages yet).

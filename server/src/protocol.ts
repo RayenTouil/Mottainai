@@ -1,5 +1,5 @@
 // Binary codec mirroring PROTOCOL.md (little-endian).
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const C2S = { ROLE: 0x01, READY: 0x02, START: 0x03, STROKE: 0x10, BACKPADDLE: 0x11, NET: 0x12, PING: 0x20, STATS: 0x21 } as const;
 export const S2C = { WELCOME: 0x80, LOBBY: 0x81, MATCH_START: 0x82, SNAPSHOT: 0x83, EVENTS: 0x84, RESULTS: 0x85, PONG: 0x86, NOTICE: 0x87 } as const;

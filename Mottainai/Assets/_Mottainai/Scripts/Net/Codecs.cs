@@ -9,7 +9,7 @@ namespace Mottainai.Net
     /// Message ids — mirror of PROTOCOL.md / server/src/protocol.ts.
     public static class Msg
     {
-        public const int ProtocolVersion = 2;
+        public const int ProtocolVersion = 3;
         // client -> server
         public const byte Role = 0x01, Ready = 0x02, Start = 0x03, Stroke = 0x10, BackPaddle = 0x11, Net = 0x12, Ping = 0x20, Stats = 0x21;
         // server -> client
