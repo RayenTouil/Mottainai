@@ -21,7 +21,7 @@ namespace Mottainai.Client
             public byte code, flags;
             public uint lastTick;
             public GameObject go;
-            public Transform fin, body;
+            public Transform fin, body, bill, spark;
             public bool active;
             public int listIndex;
         }
@@ -174,6 +174,8 @@ namespace Mottainai.Client
             s.count = 0; s.head = 0;
             s.fin = s.go.transform.Find("fin");
             s.body = s.go.transform.Find("body");
+            s.bill = s.go.transform.Find("billboard");
+            s.spark = s.go.transform.Find("sparkle");
             s.active = true;
             s.listIndex = active.Count;
             active.Add(id);
@@ -276,10 +278,18 @@ namespace Mottainai.Client
                 t.localPosition = p;
                 if (EntityCode.Kind(s.code) == EntityKind.Waste)
                 {
-                    // cosmetic roll/pitch on the wavelets (server drives position, bob and yaw)
-                    float ph = id * 1.37f, tt = Time.time;
-                    float roll = Mathf.Sin(tt * 1.9f + ph) * 7f, pitch = Mathf.Sin(tt * 1.4f + ph * 0.7f) * 5f;
+                    // cosmetic per-family motion on the wavelets (server drives position, bob and yaw)
+                    int sub = EntityCode.Sub(s.code);
+                    float ph = id * 1.37f, tt = Time.time, amp = WasteRock[sub], spd = sub == (int)WasteType.Toxic ? 0.6f : 1f;
+                    float roll = Mathf.Sin(tt * 1.9f * spd + ph) * 7f * amp, pitch = Mathf.Sin(tt * 1.4f * spd + ph * 0.7f) * 5f * amp;
                     t.localRotation = Quaternion.Euler(pitch, yaw, roll);
+                    if (s.bill != null) s.bill.rotation = Quaternion.LookRotation(s.bill.position - camT.position); // hazard sign faces the camera
+                    if (s.spark != null)
+                    {
+                        float pulse = Mathf.Abs(Mathf.Sin(tt * 2.2f + ph));
+                        s.spark.localScale = Vector3.one * (0.35f + 0.75f * pulse * pulse);
+                        s.spark.rotation = Quaternion.LookRotation(s.spark.position - camT.position) * Quaternion.Euler(0f, 0f, tt * 40f);
+                    }
                 }
                 else t.localRotation = Quaternion.Euler(0f, yaw, 0f);
                 if (EntityCode.Kind(s.code) == EntityKind.Obstacle && EntityCode.Sub(s.code) == (byte)ObstacleType.Shark)
@@ -483,6 +493,8 @@ namespace Mottainai.Client
         }
 
         static float WakeWidth(float age) => 0.85f + age * 2.6f;
+        // rocking amplitude per waste family (Plastic, Paper, Glass, Organic, Metal, Valuable, Toxic)
+        static readonly float[] WasteRock = { 1.2f, 0.7f, 0.8f, 1f, 1.1f, 0.6f, 1.4f };
         static readonly int SeaId = Shader.PropertyToID("_MottainaiSea");
         struct Ripple { public float x, z, t0, r0, grow; }
         readonly List<Ripple> ripples = new List<Ripple>(16);

@@ -63,6 +63,7 @@ namespace Mottainai.Client
         public static Material Lit(Color c, float emission = 0f) => Lit(c, emission, 0f);
 
         public static Material Gloss(Color c, float gloss = 1f) => Lit(c, 0f, gloss);
+        public static Material Gloss(Color c, float gloss, float emission) => Lit(c, emission, gloss);
 
         public static Material Lit(Color c, float emission, float gloss)
         {
@@ -207,32 +208,6 @@ namespace Mottainai.Client
             return pivot;
         }
 
-        static readonly string[][] WasteModels =
-        {
-            new[] { "Waste/plastic_bottle" },                     // Plastic
-            null,                                                 // Paper
-            new[] { "Waste/glass_bottle" },                       // Glass
-            null,                                                 // Organic
-            new[] { "Waste/metal_can", "Waste/metal_can_broken" },  // Metal
-            null,                                                 // Valuable
-            new[] { "Waste/toxic_propane_tank", "Waste/battery" }, // Toxic
-        };
-
-        static GameObject TryWasteModel(WasteType t, Transform root, float size)
-        {
-            var opts = WasteModels[(int)t];
-            if (opts != null)
-            {
-                int start = Random.Range(0, opts.Length);
-                for (int i = 0; i < opts.Length; i++)
-                {
-                    var go = TryModel(opts[(start + i) % opts.Length], root, size);
-                    if (go != null) return go;
-                }
-            }
-            return TryModel("waste_" + t.ToString().ToLowerInvariant(), root, size);
-        }
-
         /// Root object for an entity code; child 0 = body, optional child "fin" for sharks.
         public static GameObject Create(byte code)
         {
@@ -273,51 +248,152 @@ namespace Mottainai.Client
             }
         }
 
+        /// Waste prop kit (ART_DIRECTION §3): readable collectible silhouettes per category (random variant per pooled
+        /// instance) + glowing bin-color ring (bin colors teach sorting; red stays reserved for TOXIC).
         static void BuildWaste(Transform root, WasteType t)
         {
             Color c = WasteCatalog.Colors[(int)t];
-            var model = TryWasteModel(t, root, 0.8f);
-            if (model != null && t == WasteType.Toxic)
-                Part(root, Triangle, Lit(new Color(1f, 0.85f, 0f), 0.6f), new Vector3(0, 1.0f, 0), Vector3.one * 0.45f, default, "billboard");
-            if (model == null)
+            var body = new GameObject("body").transform;
+            body.SetParent(root, false);
+            int v = Random.Range(0, 3);
+            switch (t)
             {
-                switch (t)
-                {
-                    case WasteType.Plastic:
-                        Part(root, Capsule, Lit(c), new Vector3(0, 0.1f, 0), new Vector3(0.28f, 0.32f, 0.28f), new Vector3(0, 0, 90));
-                        Part(root, Cylinder, Lit(Color.white), new Vector3(0.38f, 0.1f, 0), new Vector3(0.12f, 0.05f, 0.12f), new Vector3(0, 0, 90));
-                        break;
-                    case WasteType.Paper:
-                        Part(root, Cube, Lit(c), new Vector3(0, 0.12f, 0), new Vector3(0.5f, 0.3f, 0.4f), new Vector3(0, 15, 0));
-                        Part(root, Cube, Lit(new Color(0.75f, 0.6f, 0.4f)), new Vector3(0, 0.28f, 0), new Vector3(0.52f, 0.03f, 0.12f));
-                        break;
-                    case WasteType.Glass:
-                        Part(root, Cylinder, Lit(c, 0.25f), new Vector3(0, 0.1f, 0), new Vector3(0.22f, 0.22f, 0.22f), new Vector3(0, 0, 90));
-                        Part(root, Cylinder, Lit(c, 0.25f), new Vector3(0.3f, 0.1f, 0), new Vector3(0.09f, 0.1f, 0.09f), new Vector3(0, 0, 90));
-                        break;
-                    case WasteType.Organic:
-                        Part(root, Capsule, Lit(c), new Vector3(0, 0.08f, 0), new Vector3(0.18f, 0.3f, 0.18f), new Vector3(0, 0, 70));
-                        Part(root, Sphere, Lit(new Color(0.95f, 0.85f, 0.3f)), new Vector3(0.15f, 0.12f, 0), new Vector3(0.2f, 0.15f, 0.2f));
-                        break;
-                    case WasteType.Metal:
-                        Part(root, Cylinder, Lit(c), new Vector3(0, 0.12f, 0), new Vector3(0.24f, 0.16f, 0.24f));
-                        Part(root, Cylinder, Lit(new Color(0.85f, 0.2f, 0.2f)), new Vector3(0, 0.12f, 0), new Vector3(0.25f, 0.06f, 0.25f));
-                        break;
-                    case WasteType.Valuable:
-                        Part(root, Cube, Lit(new Color(0.55f, 0.33f, 0.15f)), new Vector3(0, 0.15f, 0), new Vector3(0.55f, 0.32f, 0.38f));
-                        Part(root, Cube, Lit(c, 1.2f), new Vector3(0, 0.33f, 0), new Vector3(0.58f, 0.08f, 0.4f));
-                        Part(root, Sphere, Transparent(new Color(1f, 0.9f, 0.4f, 0.25f), 1.5f), new Vector3(0, 0.25f, 0), Vector3.one * 0.95f, default, "sparkle");
-                        break;
-                    case WasteType.Toxic:
-                        Part(root, Cylinder, Lit(c), new Vector3(0, 0.25f, 0), new Vector3(0.5f, 0.35f, 0.5f));
-                        Part(root, Cylinder, Lit(new Color(0.1f, 0.1f, 0.1f)), new Vector3(0, 0.25f, 0), new Vector3(0.52f, 0.04f, 0.52f));
-                        // hazard sign billboard
-                        Part(root, Triangle, Lit(new Color(1f, 0.85f, 0f), 0.6f), new Vector3(0, 0.75f, 0), Vector3.one * 0.45f, default, "billboard");
-                        break;
-                }
+                case WasteType.Plastic:
+                    if (v == 0) { if (TryModel("Waste/plastic_bottle_2", body, 0.75f) == null && TryModel("Waste/plastic_bottle", body, 0.75f) == null) Bottle(body); }
+                    else if (v == 1) Bag(body);
+                    else Tire(body);
+                    break;
+                case WasteType.Paper: Box(body); break;
+                case WasteType.Glass:
+                    if (v == 0) { if (TryModel("Waste/glass_bottle", body, 0.7f) == null) Jar(body); }
+                    else if (v == 1) { if (TryModel("Waste/glass_bottle_2", body, 0.7f) == null) Jar(body); }
+                    else Jar(body);
+                    break;
+                case WasteType.Organic: if (v == 0) Banana(body); else AppleCore(body); break;
+                case WasteType.Metal:
+                    if (v == 0) { if (TryModel("Waste/metal_can", body, 0.55f) == null) Can(body, new Color(0.85f, 0.2f, 0.2f)); }
+                    else if (v == 1) { if (TryModel("Waste/metal_bars", body, 0.75f) == null) Can(body, new Color(0.2f, 0.45f, 0.85f)); }
+                    else Can(body, new Color(0.2f, 0.45f, 0.85f));
+                    break;
+                case WasteType.Valuable: if (v == 0) Ring(body); else Chest(body); Sparkle(root); break;
+                case WasteType.Toxic:
+                    if (v == 0) { if (TryModel("Waste/battery", body, 0.7f) == null) Barrel(body); }
+                    else Barrel(body);
+                    Hazard(root);
+                    break;
             }
-            // type-colored ring so kids can read the bin color at a glance
-            Part(root, Cylinder, Transparent(new Color(c.r, c.g, c.b, 0.45f)), new Vector3(0, -0.02f, 0), new Vector3(1.0f, 0.01f, 1.0f), default, "ring");
+            Part(root, ProceduralMeshes.Torus(0.5f, 0.035f, 1f, 28, 6), Lit(c, 0.9f), new Vector3(0, 0.03f, 0), Vector3.one, default, "ring");
+        }
+
+        static void Bottle(Transform b)
+        {
+            Part(b, Capsule, Gloss(new Color(0.62f, 0.9f, 0.97f), 0.9f), new Vector3(0, 0.12f, 0), new Vector3(0.24f, 0.3f, 0.24f), new Vector3(0, 0, 90));
+            Part(b, Cylinder, Lit(Color.white), new Vector3(-0.02f, 0.12f, 0), new Vector3(0.25f, 0.08f, 0.25f), new Vector3(0, 0, 90), "label");
+            Part(b, Cylinder, Gloss(Random.value < 0.5f ? new Color(0.15f, 0.4f, 0.95f) : new Color(0.95f, 0.3f, 0.25f), 0.6f), new Vector3(0.36f, 0.12f, 0), new Vector3(0.1f, 0.05f, 0.1f), new Vector3(0, 0, 90), "cap");
+        }
+
+        static void Bag(Transform b)
+        {
+            var m = Transparent(new Color(0.97f, 0.98f, 1f, 0.82f), 1.2f);
+            Part(b, Sphere, m, new Vector3(0, 0.09f, 0), new Vector3(0.62f, 0.16f, 0.5f));
+            Part(b, Sphere, m, new Vector3(0.1f, 0.16f, 0.05f), new Vector3(0.36f, 0.12f, 0.3f));
+            Part(b, ProceduralMeshes.Torus(0.09f, 0.022f, 1f, 16, 6), m, new Vector3(-0.28f, 0.14f, 0.08f), Vector3.one, new Vector3(0, 0, 70));
+            Part(b, ProceduralMeshes.Torus(0.09f, 0.022f, 1f, 16, 6), m, new Vector3(-0.28f, 0.14f, -0.08f), Vector3.one, new Vector3(0, 0, 70));
+        }
+
+        static void Tire(Transform b)
+        {
+            Part(b, ProceduralMeshes.Torus(0.27f, 0.13f, 1f, 28, 10), Gloss(new Color(0.12f, 0.12f, 0.14f), 0.25f), new Vector3(0, 0.08f, 0), Vector3.one);
+            Part(b, Cylinder, Lit(new Color(0.3f, 0.3f, 0.32f)), new Vector3(0, 0.06f, 0), new Vector3(0.3f, 0.02f, 0.3f));
+        }
+
+        static void Can(Transform b, Color col)
+        {
+            Part(b, Cylinder, Gloss(col, 0.9f), new Vector3(0, 0.11f, 0), new Vector3(0.22f, 0.17f, 0.22f), new Vector3(0, 0, 90));
+            Part(b, Cylinder, Gloss(new Color(0.85f, 0.87f, 0.9f), 1f), new Vector3(0.175f, 0.11f, 0), new Vector3(0.2f, 0.012f, 0.2f), new Vector3(0, 0, 90));
+            Part(b, Cylinder, Gloss(new Color(0.85f, 0.87f, 0.9f), 1f), new Vector3(-0.175f, 0.11f, 0), new Vector3(0.2f, 0.012f, 0.2f), new Vector3(0, 0, 90));
+            Part(b, Cylinder, Lit(Color.white), new Vector3(0, 0.11f, 0), new Vector3(0.225f, 0.04f, 0.225f), new Vector3(0, 0, 90), "stripe");
+        }
+
+        static void Box(Transform b)
+        {
+            var kraft = Lit(new Color(0.78f, 0.58f, 0.36f));
+            Part(b, Cube, kraft, new Vector3(0, 0.15f, 0), new Vector3(0.52f, 0.36f, 0.42f));
+            Part(b, Cube, Lit(new Color(0.7f, 0.5f, 0.3f)), new Vector3(0.18f, 0.36f, 0), new Vector3(0.2f, 0.02f, 0.42f), new Vector3(0, 0, -35f), "flap");
+            Part(b, Cube, Lit(new Color(0.7f, 0.5f, 0.3f)), new Vector3(-0.18f, 0.36f, 0), new Vector3(0.2f, 0.02f, 0.42f), new Vector3(0, 0, 35f), "flap");
+            Part(b, Cube, Lit(new Color(0.9f, 0.8f, 0.6f)), new Vector3(0, 0.15f, 0.212f), new Vector3(0.5f, 0.05f, 0.01f), default, "tape");
+            Part(b, ParkKit.RecycleIcon(), Lit(new Color(0.35f, 0.24f, 0.14f)), new Vector3(0, 0.16f, -0.215f), Vector3.one * 0.22f, new Vector3(0, 180f, 0), "recycle");
+        }
+
+        static void Jar(Transform b)
+        {
+            var g = Gloss(Random.value < 0.6f ? new Color(0.25f, 0.68f, 0.42f) : new Color(0.3f, 0.6f, 0.85f), 1f);
+            Part(b, Cylinder, g, new Vector3(0, 0.12f, 0), new Vector3(0.28f, 0.16f, 0.28f), new Vector3(0, 0, 90));
+            Part(b, Cylinder, g, new Vector3(0.22f, 0.12f, 0), new Vector3(0.18f, 0.06f, 0.18f), new Vector3(0, 0, 90));
+            Part(b, Cylinder, Lit(new Color(0.75f, 0.75f, 0.78f)), new Vector3(0.29f, 0.12f, 0), new Vector3(0.2f, 0.025f, 0.2f), new Vector3(0, 0, 90), "lid");
+            Part(b, Cube, Lit(Color.white, 0.6f), new Vector3(-0.02f, 0.2f, 0.09f), new Vector3(0.22f, 0.02f, 0.03f), default, "highlight");
+        }
+
+        static void AppleCore(Transform b)
+        {
+            Part(b, Capsule, Lit(new Color(0.97f, 0.92f, 0.72f)), new Vector3(0, 0.12f, 0), new Vector3(0.13f, 0.12f, 0.13f));
+            Part(b, Sphere, Gloss(new Color(0.88f, 0.2f, 0.18f), 0.5f), new Vector3(0, 0.25f, 0), new Vector3(0.24f, 0.1f, 0.24f));
+            Part(b, Sphere, Gloss(new Color(0.88f, 0.2f, 0.18f), 0.5f), new Vector3(0, 0.0f, 0), new Vector3(0.22f, 0.09f, 0.22f));
+            Part(b, Cylinder, Lit(new Color(0.4f, 0.26f, 0.12f)), new Vector3(0, 0.33f, 0), new Vector3(0.025f, 0.05f, 0.025f));
+        }
+
+        static void Banana(Transform b)
+        {
+            var y = Lit(new Color(0.98f, 0.85f, 0.25f));
+            for (int i = 0; i < 3; i++)
+                Part(b, Capsule, y, new Vector3(Mathf.Cos(i * 2.1f) * 0.13f, 0.06f, Mathf.Sin(i * 2.1f) * 0.13f), new Vector3(0.11f, 0.17f, 0.06f), new Vector3(70f, i * 120f, 0f));
+            Part(b, Cylinder, Lit(new Color(0.45f, 0.32f, 0.15f)), new Vector3(0, 0.1f, 0), new Vector3(0.06f, 0.06f, 0.06f));
+        }
+
+        static void Barrel(Transform b)
+        {
+            var rust = Gloss(new Color(0.72f, 0.38f, 0.16f), 0.2f);
+            Part(b, Cylinder, rust, new Vector3(0, 0.22f, 0), new Vector3(0.48f, 0.3f, 0.48f));
+            Part(b, Cylinder, Lit(new Color(0.35f, 0.2f, 0.1f)), new Vector3(0, 0.36f, 0), new Vector3(0.5f, 0.03f, 0.5f), default, "hoop");
+            Part(b, Cylinder, Lit(new Color(0.35f, 0.2f, 0.1f)), new Vector3(0, 0.08f, 0), new Vector3(0.5f, 0.03f, 0.5f), default, "hoop");
+            Part(b, Sphere, Lit(new Color(0.55f, 0.27f, 0.12f)), new Vector3(0.18f, 0.3f, 0.12f), new Vector3(0.14f, 0.06f, 0.1f), default, "rustSpot");
+        }
+
+        /// Floating hazard sign above toxic waste (billboard, turned toward the camera by WorldView).
+        static void Hazard(Transform root)
+        {
+            var bb = new GameObject("billboard").transform;
+            bb.SetParent(root, false);
+            bb.localPosition = new Vector3(0, 0.95f, 0);
+            Part(bb, Triangle, Lit(new Color(1f, 0.82f, 0.1f), 0.5f), new Vector3(0, -0.2f, 0), Vector3.one * 0.5f);
+            Part(bb, Cube, Lit(new Color(0.1f, 0.1f, 0.1f)), new Vector3(0, 0.02f, -0.01f), new Vector3(0.05f, 0.16f, 0.01f));
+            Part(bb, Cube, Lit(new Color(0.1f, 0.1f, 0.1f)), new Vector3(0, -0.1f, -0.01f), new Vector3(0.05f, 0.05f, 0.01f));
+        }
+
+        static void Chest(Transform b)
+        {
+            var gold = Gloss(new Color(1f, 0.8f, 0.25f), 1f);
+            Part(b, Cube, Lit(new Color(0.55f, 0.33f, 0.16f)), new Vector3(0, 0.14f, 0), new Vector3(0.48f, 0.26f, 0.34f));
+            Part(b, Capsule, Lit(new Color(0.6f, 0.36f, 0.18f)), new Vector3(0, 0.29f, 0), new Vector3(0.34f, 0.24f, 0.34f), new Vector3(0, 0, 90));
+            Part(b, Cube, gold, new Vector3(0, 0.27f, 0), new Vector3(0.5f, 0.05f, 0.36f), default, "band");
+            Part(b, Cube, gold, new Vector3(0, 0.2f, 0.18f), new Vector3(0.08f, 0.1f, 0.03f), default, "lock");
+        }
+
+        static void Ring(Transform b)
+        {
+            Part(b, ProceduralMeshes.Torus(0.17f, 0.045f, 1f, 24, 8), Gloss(new Color(1f, 0.8f, 0.25f), 1f), new Vector3(0, 0.2f, 0), Vector3.one, new Vector3(70f, 0, 0));
+            Part(b, Sphere, Gloss(new Color(0.62f, 0.35f, 0.95f), 1f, 0.5f), new Vector3(0, 0.4f, 0.06f), Vector3.one * 0.13f, default, "gem");
+        }
+
+        /// Discreet sparkle (two crossed glints), pulsed by WorldView.
+        static void Sparkle(Transform root)
+        {
+            var sp = new GameObject("sparkle").transform;
+            sp.SetParent(root, false);
+            sp.localPosition = new Vector3(0.15f, 0.55f, 0);
+            var m = Lit(new Color(1f, 0.97f, 0.8f), 1.5f);
+            Part(sp, Cube, m, Vector3.zero, new Vector3(0.36f, 0.035f, 0.035f));
+            Part(sp, Cube, m, Vector3.zero, new Vector3(0.035f, 0.36f, 0.035f));
         }
 
         /// Red-and-white river buoy (ART_DIRECTION §3: visual variant of Rock).
