@@ -161,6 +161,9 @@ namespace Mottainai.Net
         /// for the ACK of the previous frame (up to one RTT). Find the TCP socket under the stream chain and set TCP_NODELAY.
         static bool DisableNagle(ClientWebSocket ws)
         {
+#if ENABLE_IL2CPP
+            return false; // reflection walk segfaults under IL2CPP (stripped metadata)
+#else
             try
             {
                 var s = FindSocket(ws, 0, new HashSet<object>(RefEq.I));
@@ -170,6 +173,7 @@ namespace Mottainai.Net
                 return s.NoDelay;
             }
             catch (Exception e) { Debug.Log("[Ws] NoDelay failed: " + e.Message); return false; }
+#endif
         }
 
         static Socket FindSocket(object o, int depth, HashSet<object> seen)
