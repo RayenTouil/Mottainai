@@ -20,10 +20,11 @@ export class RoomDO extends DurableObject {
   players: Player[] = [];
   nextId = 1;
   sim: MatchSim | null = null;
-  timer: ReturnType<typeof setInterval> | null = null;
+  timer: ReturnType<typeof setTimeout> | null = null;
   lastHumanAt = Date.now();
   lastStepAt = 0;
   tick = 0;
+  lastSnapTick = -99;
   snapshotHz = 60;
   resultsSent = false;
   w = new Writer(8192);
@@ -180,6 +181,7 @@ export class RoomDO extends DurableObject {
           r.u8(); // side: the player's role is authoritative
           const power = r.u8() / 255;
           if (this.sim && (p.role === Role.Left || p.role === Role.Right)) this.sim.humanStroke(this.sim.teams[0], p.role, power, id === C2S.BACKPADDLE);
+          this.flushEvents();
           break;
         }
         case C2S.NET: {
@@ -188,6 +190,7 @@ export class RoomDO extends DurableObject {
             const rewind = clamp(p.rttMs / 2, 0, TUNING.lagCompCapMs) / 1000; // lag compensation: RTT/2, cap 150 ms
             this.sim.applyThrow(this.sim.teams[0], target === NO_ENTITY ? NO_ENTITY : target, dx, dz, rewind);
           }
+          this.flushEvents();
           break;
         }
         default: break;
@@ -207,43 +210,41 @@ export class RoomDO extends DurableObject {
   }
 
   // ---------------- loop ----------------
+  // Drift-free scheduling: each timeout aims at the next ideal tick time (setInterval drifted ~0.3 ms/tick,
+  // producing a 0-16 ms sawtooth in snapshot timing and 2-snapshot bursts).
   startLoop() {
     if (this.timer) return;
     this.lastStepAt = Date.now();
-    this.timer = setInterval(() => this.loop(), 1000 / TICK_HZ);
+    this.schedule();
+  }
+
+  schedule() {
+    const next = this.lastStepAt + 1000 / TICK_HZ;
+    this.timer = setTimeout(() => this.loop(), Math.max(0, Math.ceil(next - Date.now())));
   }
 
   loop() {
+    this.timer = null;
     const now = Date.now();
     if (this.players.some(p => p.ws)) this.lastHumanAt = now;
     else if (now - this.lastHumanAt > IDLE_STOP_MS) {
-      clearInterval(this.timer!); this.timer = null;
       this.sim?.abort(); this.sim = null;
       return;
     }
-    // fixed-step catch-up (timer jitter), max 4 steps per callback
+    // fixed-step catch-up, max 4 steps per callback, one snapshot per callback (no bursts)
     let steps = Math.floor((now - this.lastStepAt) * TICK_HZ / 1000);
-    if (steps <= 0) return;
-    if (steps > 4) { steps = 4; this.lastStepAt = now; } else this.lastStepAt += steps * 1000 / TICK_HZ;
-    for (let i = 0; i < steps; i++) this.step();
+    if (steps > 4) { this.lastStepAt = now - 4000 / TICK_HZ; steps = 4; }
+    for (let i = 0; i < steps; i++) this.step(i === steps - 1);
+    this.lastStepAt += steps * 1000 / TICK_HZ;
+    this.schedule();
   }
 
-  step() {
+  step(sendSnapshot: boolean) {
     this.tick++;
     const sim = this.sim;
     if (!sim) return;
     if (sim.phase !== Phase.Finished) sim.step(1 / TICK_HZ);
-    if (sim.events.length) {
-      const evs = sim.events;
-      for (let i = 0; i < evs.length; i += 255) {
-        const n = Math.min(255, evs.length - i);
-        const w = this.w.reset();
-        w.u8w(S2C.EVENTS).u8w(n);
-        for (let k = i; k < i + n; k++) { const e = evs[k]; w.u8w(e.type).u8w(e.team).u8w(e.role).u16(e.entity).i16(e.value).u8w(e.extra).i16(e.x * 100).f32(e.z); }
-        this.broadcast(w.bytes());
-      }
-      sim.events.length = 0;
-    }
+    this.flushEvents();
     if (sim.phase === Phase.Finished) {
       if (!this.resultsSent) {
         this.resultsSent = true;
@@ -252,8 +253,23 @@ export class RoomDO extends DurableObject {
       }
       return;
     }
-    if (this.snapshotHz === 30 && (this.tick & 1)) return;
+    if (!sendSnapshot || this.tick - this.lastSnapTick < TICK_HZ / this.snapshotHz) return;
+    this.lastSnapTick = this.tick;
     this.broadcast(this.buildSnapshot(sim));
+  }
+
+  /** Broadcast pending sim events now (also called right after input so teammates see strokes ~half a tick sooner). */
+  flushEvents() {
+    const evs = this.sim?.events;
+    if (!evs || !evs.length) return;
+    for (let i = 0; i < evs.length; i += 255) {
+      const n = Math.min(255, evs.length - i);
+      const w = this.w.reset();
+      w.u8w(S2C.EVENTS).u8w(n);
+      for (let k = i; k < i + n; k++) { const e = evs[k]; w.u8w(e.type).u8w(e.team).u8w(e.role).u16(e.entity).i16(e.value).u8w(e.extra).i16(e.x * 100).f32(e.z); }
+      this.broadcast(w.bytes());
+    }
+    evs.length = 0;
   }
 
   buildSnapshot(sim: MatchSim): ArrayBuffer {
@@ -282,6 +298,7 @@ export class RoomDO extends DurableObject {
       n++;
     }
     w.dv.setUint16(countPos, n, true);
+    w.f64(Date.now()); // trailing server send time (ignored by v2 clients; used by tools/jitter.ts)
     return w.bytes();
   }
 }
