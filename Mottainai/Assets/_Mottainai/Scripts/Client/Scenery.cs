@@ -119,10 +119,11 @@ namespace Mottainai.Client
                 float side = (h & 1) == 0 ? -1f : 1f;
                 float x = side * (hw + 0.15f + ((h >> 3) % 100) / 100f * 0.7f);
                 float z = c * ReedSpacing + ((h >> 9) % 100) / 100f * 3f;
-                bool reed = ((h >> 15) % 10) < 7;
+                bool land = c * ReedSpacing < GameTuning.Current.courseLength - 45f;
+                bool reed = land && ((h >> 15) % 10) < 7;
                 Show(reeds[idx], reed);
                 if (reed) { reeds[idx].localPosition = new Vector3(x, 0f, z); reeds[idx].localRotation = Quaternion.Euler(0f, (h >> 7) % 360, 0f); }
-                bool rock = ((h >> 19) % 10) < 3;
+                bool rock = land && ((h >> 19) % 10) < 3;
                 Show(shoreRocks[idx], rock);
                 if (rock) shoreRocks[idx].localPosition = new Vector3(x - side * 0.5f, -0.05f, z + 1.3f);
             }
@@ -145,6 +146,7 @@ namespace Mottainai.Client
                 int idx = ((c % BinGroups) + BinGroups) % BinGroups;
                 float side = (c & 1) == 0 ? -1f : 1f;
                 bins[idx].localPosition = new Vector3(side * (hw + 3.4f), 0.95f, c * BinSpacing + 12f);
+                Show(bins[idx], c * BinSpacing + 12f < GameTuning.Current.courseLength - 45f);
                 bins[idx].localRotation = Quaternion.Euler(0f, side < 0f ? 90f : -90f, 0f);
             }
 

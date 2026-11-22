@@ -306,16 +306,26 @@ namespace Mottainai.Client
             return m;
         }
 
+        /// 0 = river between banks, 1 = open sea (last part of the course).
+        public static float SeaOpen(float z)
+        {
+            float L = GameTuning.Current.courseLength;
+            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(L - 90f, L - 10f, z));
+        }
+
         public void Follow(Vector3 raft)
         {
             float z = Mathf.Floor(raft.z / 2f) * 2f;
-            waterT.localPosition = new Vector3(0, 0, z);
-            bankL.localPosition = new Vector3(bankL.localPosition.x, 0.4f, z + 40f);
-            bankR.localPosition = new Vector3(bankR.localPosition.x, 0.4f, z + 40f);
-            sandL.localPosition = new Vector3(sandL.localPosition.x, 0.1f, z + 40f);
-            sandR.localPosition = new Vector3(sandR.localPosition.x, 0.1f, z + 40f);
-
             float hw = GameTuning.Current.riverWidth * 0.5f;
+            float open = SeaOpen(raft.z + 40f);
+            waterT.localPosition = new Vector3(0, 0, z);
+            waterT.localScale = new Vector3(1f + open * 7f, 1f, 1f);
+            float push = open * 70f;
+            bankL.localPosition = new Vector3(-hw - 36f - push, 0.4f, z + 40f);
+            bankR.localPosition = new Vector3(hw + 36f + push, 0.4f, z + 40f);
+            sandL.localPosition = new Vector3(-hw - 0.6f - push, 0.1f, z + 40f);
+            sandR.localPosition = new Vector3(hw + 0.6f + push, 0.1f, z + 40f);
+            float seaZ = GameTuning.Current.courseLength - 45f;
             int baseCell = Mathf.FloorToInt((raft.z - 20f) / TreeSpacing);
             for (int c = baseCell; c < baseCell + TreeCount; c++)
             {
@@ -325,7 +335,10 @@ namespace Mottainai.Client
                 float off = 2.8f + (h % 1000) / 1000f * 6f;
                 float s = 0.8f + ((h >> 10) % 100) / 100f * 0.6f;
                 var tr = trees[idx];
-                tr.localPosition = new Vector3(side * (hw + off), 0.9f, c * TreeSpacing + ((h >> 20) % 100) / 100f * 4f);
+                float tz = c * TreeSpacing + ((h >> 20) % 100) / 100f * 4f;
+                bool land = tz < seaZ;
+                if (tr.gameObject.activeSelf != land) tr.gameObject.SetActive(land);
+                tr.localPosition = new Vector3(side * (hw + off), 0.9f, tz);
                 tr.localScale = Vector3.one * s;
             }
         }

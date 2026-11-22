@@ -273,7 +273,14 @@ namespace Mottainai.Client
                 Interp(s, RenderTick, out var p, out float yaw);
                 var t = s.go.transform;
                 t.localPosition = p;
-                t.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                if (EntityCode.Kind(s.code) == EntityKind.Waste)
+                {
+                    // cosmetic roll/pitch on the wavelets (server drives position, bob and yaw)
+                    float ph = id * 1.37f, tt = Time.time;
+                    float roll = Mathf.Sin(tt * 1.9f + ph) * 7f, pitch = Mathf.Sin(tt * 1.4f + ph * 0.7f) * 5f;
+                    t.localRotation = Quaternion.Euler(pitch, yaw, roll);
+                }
+                else t.localRotation = Quaternion.Euler(0f, yaw, 0f);
                 if (EntityCode.Kind(s.code) == EntityKind.Obstacle && EntityCode.Sub(s.code) == (byte)ObstacleType.Shark)
                 {
                     if (s.body != null && s.body.gameObject.activeSelf != (s.flags == 2)) s.body.gameObject.SetActive(s.flags == 2);
@@ -428,8 +435,31 @@ namespace Mottainai.Client
                 {
                     fxMap.Disc(p.x, p.z, sub == (byte)WasteType.Toxic ? 4.5f : 3f, 1f, 1);
                     fxMap.Shadow(p.x + ShadowOff.x * 0.3f, p.z + ShadowOff.y * 0.3f, 0.5f, 0.45f, 0.6f);
+                    // small ripple ring breathing around each floating item
+                    float rr = 0.55f + 0.12f * Mathf.Sin(now * 2.6f + active[k] * 0.9f);
+                    fxMap.RingThin(p.x, p.z, rr, 0.55f);
                 }
             }
+            // contact ripple hugging the hull + bow wave V (both grow with speed)
+            {
+                var fwd2 = new Vector2(Mathf.Sin(RaftHeading), Mathf.Cos(RaftHeading));
+                var side2 = new Vector2(fwd2.y, -fwd2.x);
+                float sp = Attract ? 0.5f : Mathf.Clamp01((smoothSpeed - 1.5f) / 5f);
+                fxMap.RingThin(RaftPos.x, RaftPos.z, 1.62f, 0.35f + sp * 0.35f);
+                var bow = new Vector2(RaftPos.x, RaftPos.z) + fwd2 * 1.55f;
+                float spread = 1.0f + sp * 0.9f;
+                fxMap.Wake(bow, bow - fwd2 * 1.4f + side2 * spread, 0.18f, 0.35f, 0.75f * (0.4f + sp), 0.25f * (0.4f + sp));
+                fxMap.Wake(bow, bow - fwd2 * 1.4f - side2 * spread, 0.18f, 0.35f, 0.75f * (0.4f + sp), 0.25f * (0.4f + sp));
+                // paddle / net splash rings expanding on the water
+                for (int i = ripples.Count - 1; i >= 0; i--)
+                {
+                    var r = ripples[i];
+                    float a = (now - r.t0) / 0.9f;
+                    if (a >= 1f) { ripples.RemoveAt(i); continue; }
+                    fxMap.RingThin(r.x, r.z, r.r0 + a * r.grow, (1f - a) * 0.9f);
+                }
+            }
+            Shader.SetGlobalFloat(SeaId, Attract ? 0f : WaterView.SeaOpen(RaftPos.z + 20f));
             // raft blob shadow, offset away from the key light
             var fw = new Vector2(Mathf.Sin(RaftHeading), Mathf.Cos(RaftHeading));
             float rs = 0.65f;
@@ -451,7 +481,18 @@ namespace Mottainai.Client
             fxMap.End();
         }
 
-        static float WakeWidth(float age) => 0.75f + age * 2.2f;
+        static float WakeWidth(float age) => 0.85f + age * 2.6f;
+        static readonly int SeaId = Shader.PropertyToID("_MottainaiSea");
+        struct Ripple { public float x, z, t0, r0, grow; }
+        readonly List<Ripple> ripples = new List<Ripple>(16);
+
+        /// White splash particles + an expanding ripple ring on the water (paddle strokes, SYNC, net landing).
+        public void Splash(Vector3 p, bool big)
+        {
+            fx.Splash(p, big);
+            if (ripples.Count >= 16) ripples.RemoveAt(0);
+            ripples.Add(new Ripple { x = p.x, z = p.z, t0 = Time.time, r0 = big ? 0.5f : 0.3f, grow = big ? 2.6f : 1.6f });
+        }
         static readonly Vector2 ShadowOff = new Vector2(-SceneLook.ToLight.x, -SceneLook.ToLight.z) / SceneLook.ToLight.y;
 
         static void Interp(Slot s, double rt, out Vector3 p, out float yaw)

@@ -307,7 +307,7 @@ namespace Mottainai.Client
                         if (!mine)
                         {
                             raft.Stroke(e.role, e.extra == 1);
-                            world.fx.Splash(raft.PaddleTip(e.role == Role.LeftPaddler), false);
+                            world.Splash(raft.PaddleTip(e.role == Role.LeftPaddler), false);
                             sfx.Play(Sfx.Id.Splash, 0.35f);
                         }
                         break;
@@ -316,8 +316,8 @@ namespace Mottainai.Client
                         lastSyncTime = Time.time;
                         Big(syncStreak > 1 ? $"SYNC x{syncStreak}!" : "SYNC!", Color.Lerp(new Color(0.4f, 0.9f, 1f), new Color(1f, 0.85f, 0.3f), Mathf.Clamp01((syncStreak - 1) / 4f)), 0.7f);
                         world.SyncKick();
-                        world.fx.Splash(raft.PaddleTip(true), true);
-                        world.fx.Splash(raft.PaddleTip(false), true);
+                        world.Splash(raft.PaddleTip(true), true);
+                        world.Splash(raft.PaddleTip(false), true);
                         sfx.Play(Sfx.Id.Sync);
                         if (myRole != Role.Collector) NetworkInfo.Provider.Vibrate(25);
                         break;
@@ -346,10 +346,10 @@ namespace Mottainai.Client
                         break;
                     }
                     case EvType.Combo: Toast($"COMBO READY: next catch x{e.value / 10f:0.0}"); sfx.Play(Sfx.Id.Combo, 0.6f); break;
-                    case EvType.Miss: Popup(new Vector3(e.x, 0.3f, e.z), "miss", new Color(0.8f, 0.85f, 0.9f), 0.8f); world.fx.Splash(new Vector3(e.x, 0.1f, e.z), false); sfx.Play(Sfx.Id.Miss, 0.6f); break;
+                    case EvType.Miss: Popup(new Vector3(e.x, 0.3f, e.z), "miss", new Color(0.8f, 0.85f, 0.9f), 0.8f); world.Splash(new Vector3(e.x, 0.1f, e.z), false); sfx.Play(Sfx.Id.Miss, 0.6f); break;
                     case EvType.Hit:
                         world.fx.Burst(new Vector3(e.x, 0.5f, e.z), new Color(0.55f, 0.4f, 0.3f), 30, 4f, 0.2f, 4f);
-                        world.fx.Splash(world.RaftPos, true);
+                        world.Splash(world.RaftPos, true);
                         Big("CRASH!", new Color(1f, 0.4f, 0.3f), 1.5f);
                         world.HitShake();
                         sfx.Play(Sfx.Id.Hit);
@@ -390,7 +390,7 @@ namespace Mottainai.Client
             if (hudPhase == MatchPhase.Running) world.PredictStroke(myRole == Role.LeftPaddler, power, back);
             lastLocalStroke = Time.time;
             world.raftView.Stroke(myRole, back);
-            world.fx.Splash(world.raftView.PaddleTip(myRole == Role.LeftPaddler), false);
+            world.Splash(world.raftView.PaddleTip(myRole == Role.LeftPaddler), false);
             sfx.Play(Sfx.Id.Splash, 0.6f);
             NetworkInfo.Provider.Vibrate(12);
         }

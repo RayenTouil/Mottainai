@@ -138,6 +138,23 @@ namespace Mottainai.Client
             }
         }
 
+        /// Thin foam ring (ripples around floating items, hull contact, splash rings).
+        public void RingThin(float cx, float cz, float r, float strength)
+        {
+            const float w = 0.22f;
+            Bounds(cx, cz, r + w, out int ix0, out int ix1, out int iz0, out int iz1);
+            for (int iz = iz0; iz <= iz1; iz++)
+            {
+                float dz = z0 + (iz + 0.5f) * TZ - cz;
+                for (int ix = ix0; ix <= ix1; ix++)
+                {
+                    float dx = x0 + (ix + 0.5f) * TX - cx;
+                    float dd = Mathf.Abs(Mathf.Sqrt(dx * dx + dz * dz) - r);
+                    if (dd < w) Put(ix, iz, 0, (1f - dd / w) * strength);
+                }
+            }
+        }
+
         /// Foam ring hugging an obstacle edge with a soft outer halo.
         public void Ring(float cx, float cz, float r, float strength)
         {
