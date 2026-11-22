@@ -67,6 +67,8 @@ namespace Mottainai.Client
             net.OnEvents += OnEvents;
             net.OnResults += OnResults;
             net.OnDisconnected += OnDisconnected;
+            net.OnPause += OnNetPause;
+            net.OnResume += OnNetResume;
 
             input.OnStroke += LocalStroke;
             input.OnTap += LocalTap;
@@ -83,6 +85,9 @@ namespace Mottainai.Client
                 if (cli[i] == "-connect" && i + 1 < cli.Length) content.SetBaseUrl(cli[i + 1]);
                 if (cli[i] == "-name" && i + 1 < cli.Length) playerName = cli[i + 1];
                 if (cli[i] == "-shots" && i + 1 < cli.Length) shotsDir = cli[i + 1];
+                if (cli[i] == "-suspendat" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendAt);
+                if (cli[i] == "-suspendfor" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out suspendFor);
+                if (cli[i] == "-shotsat" && i + 1 < cli.Length) shotsAt = cli[i + 1];
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
             }
 
@@ -97,7 +102,8 @@ namespace Mottainai.Client
         string autoRoom = "DEMO";
         int perfFrames; float perfTime, perfWorst;
         string shotsDir;
-        float quitAfter;
+        float quitAfter, suspendAt, suspendFor = 5f; // -suspendat: simulate app background (same path as a screen lock)
+        string shotsAt;
         int shotIndex;
 
         void Shot(string label)
@@ -140,6 +146,8 @@ namespace Mottainai.Client
             float logT = 0, throwT = 0, gameT = 0;
             int nextShot = 0;
             float[] shotTimes = { 1.5f, 8f, 20f, 40f };
+            if (!string.IsNullOrEmpty(shotsAt)) shotTimes = System.Array.ConvertAll(shotsAt.Split(','), x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture));
+            int suspendState = 0;
             while (results == null)
             {
                 logT += Time.unscaledDeltaTime; throwT += Time.unscaledDeltaTime;
@@ -150,6 +158,8 @@ namespace Mottainai.Client
                     if (gameT > 3f && hudPhase == MatchPhase.Running) { perfFrames++; perfTime += Time.unscaledDeltaTime; perfWorst = Mathf.Max(perfWorst, Time.unscaledDeltaTime); }
                 }
                 if (nextShot < shotTimes.Length && gameT >= shotTimes[nextShot]) Shot($"game_{shotTimes[nextShot++]:0}s");
+                if (suspendAt > 0 && suspendState == 0 && gameT >= suspendAt) { suspendState = 1; Debug.Log("[AUTOPLAY] SUSPEND (simulated background)"); net.Suspend(); }
+                if (suspendState == 1 && gameT >= suspendAt + suspendFor) { suspendState = 2; Debug.Log("[AUTOPLAY] RESUME (simulated foreground)"); net.Resume(); }
                 if (quitAfter > 0 && gameT > quitAfter) { Debug.Log("[AUTOPLAY] quitafter reached"); Application.Quit(0); yield break; }
                 if (screen == UiScreen.Game && throwT > 0.7f && world != null && myRole == Role.Collector)
                 {
@@ -230,6 +240,7 @@ namespace Mottainai.Client
 
         void LeaveRoom()
         {
+            ClearNetPause();
             net.Disconnect();
             lobby = null;
             Show(UiScreen.Menu);
@@ -238,7 +249,7 @@ namespace Mottainai.Client
 
         void OnDisconnected(string reason)
         {
-            if (!net.WantConnected) return;
+            if (!net.WantConnected || screen == UiScreen.Game) return; // in a match the pause overlay says it
             Toast("Connection lost - reconnecting...");
         }
 
@@ -247,11 +258,23 @@ namespace Mottainai.Client
             lobby = s;
             var me = s.players.Find(p => p.clientId == net.ClientId);
             if (me != null && screen != UiScreen.Game) { myRole = me.role; V4OnLobbyRole(myRole); }
+            if (screen == UiScreen.Game && s.phase == MatchPhase.Lobby && results == null)
+            {
+                // the room has no match any more (server restarted / room reset): leave the dead match cleanly
+                ClearNetPause();
+                input.active = false;
+                Toast("Match lost - back to the lobby");
+                Show(UiScreen.Lobby);
+                RefreshLobbyUi();
+            }
             if (screen == UiScreen.Lobby) RefreshLobbyUi();
         }
 
         void OnMatchStart(MatchStartInfo info)
         {
+            // same match again after a reconnect: rebuild the world from the fresh snapshot, keep HUD counts, no intro
+            bool resync = screen == UiScreen.Game && match != null && match.seed == info.seed && results == null;
+            ClearNetPause();
             match = info;
             myRole = info.role;
             if (world == null) world = WorldView.Create(content);
@@ -265,12 +288,12 @@ namespace Mottainai.Client
             world.AimAssist = myRole == Role.Collector;
             input.role = myRole;
             input.active = true;
-            net.stats.ResetAggregates();
-            hintUntil = Time.time + info.countdown + 3f;
+            if (!resync) net.stats.ResetAggregates();
+            hintUntil = resync ? 0f : Time.time + info.countdown + 3f;
             results = null;
             Show(UiScreen.Game);
             SetRoleBadge(myRole);
-            V4OnMatchStart();
+            V4OnMatchStart(resync);
         }
 
         void OnSnapshot(SnapshotFrame f)
@@ -288,6 +311,7 @@ namespace Mottainai.Client
         void OnResults(ResultsData r)
         {
             results = r;
+            ClearNetPause();
             input.active = false;
             StartCoroutine(ShowResultsSoon());
         }
@@ -394,7 +418,7 @@ namespace Mottainai.Client
         // ---------------- local gestures (immediate feedback, server-corrected) ----------------
         void LocalStroke(float power, bool back)
         {
-            if (screen != UiScreen.Game || world == null) return;
+            if (screen != UiScreen.Game || world == null || NetFrozen) return;
             net.SendStroke(myRole, power, back);
             if (hudPhase == MatchPhase.Running) world.PredictStroke(myRole == Role.LeftPaddler, power, back);
             lastLocalStroke = Time.time;
@@ -406,14 +430,14 @@ namespace Mottainai.Client
 
         void LocalTap(Vector2 screenPos)
         {
-            if (screen != UiScreen.Game || world == null || myRole != Role.Collector) return;
+            if (screen != UiScreen.Game || world == null || myRole != Role.Collector || NetFrozen) return;
             if (world.PickWaste(screenPos, out var id, out var p)) ThrowAt(id, p);
             else if (world.ScreenToWater(screenPos, out var w)) ThrowDirection(w - world.RaftPos);
         }
 
         void LocalSwipe(Vector2 dir)
         {
-            if (screen != UiScreen.Game || world == null || myRole != Role.Collector) return;
+            if (screen != UiScreen.Game || world == null || myRole != Role.Collector || NetFrozen) return;
             ThrowDirection(world.CameraFlatRight * dir.x + world.CameraFlatForward * dir.y);
         }
 
@@ -465,9 +489,16 @@ namespace Mottainai.Client
             UpdateUi(dt);
         }
 
+        /// Background (screen lock, app switch, call): close the socket so teammates' match pauses at once instead of
+        /// drifting into an obstacle; foreground: reconnect immediately (same token = same role).
         void OnApplicationPause(bool paused)
         {
-            if (!paused && net.WantConnected && !net.ws.IsOpen) net.Connect(content.BaseUrl, net.roomCode, token, playerName, myRole);
+            if (paused) net.Suspend(); else net.Resume();
+        }
+
+        void OnApplicationFocus(bool focus)
+        {
+            if (focus) net.Resume(); // only reconnects if the socket was suspended or the link went silent
         }
     }
 }

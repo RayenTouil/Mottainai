@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Mottainai.Gameplay;
 using Mottainai.Net;
+using Mottainai.Platform;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -172,6 +173,7 @@ namespace Mottainai.Client
             UIKit.Button(yn, "CANCEL", UIKit.Muted, () => SetLeaveMenu(false), 44);
             leaveMenu.SetActive(false); leaveConfirm.SetActive(false);
 
+            BuildPauseCard(root, dim);
             input.Blocked = pos => V4Blocks(pos);
             v4Canvas.gameObject.SetActive(false);
         }
@@ -187,6 +189,92 @@ namespace Mottainai.Client
             UIKit.Stretch(hole.rectTransform, 7, 7, 7, 7);
             var rt = ring.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f); rt.pivot = new Vector2(0.5f, 1f);
             float s = ((RectTransform)ic.transform).sizeDelta.x; rt.sizeDelta = new Vector2(s, s); rt.anchoredPosition = Vector2.zero;
+        }
+
+        // ---------------- Phase C: pause / resume / reconnecting overlay ----------------
+        GameObject pauseCard;
+        TextMeshProUGUI pauseTitle, pauseBody, pauseBig;
+        Button pauseContinue;
+        PauseInfo netPause;
+        float netPauseAt, resumeAt;
+        bool netPaused;
+        int pauseCount;
+        /// Inputs are ignored by the server while paused / during the 3-2-1, and cannot reach it while reconnecting.
+        bool NetFrozen => netPaused || (screen == UiScreen.Game && results == null && !net.Ready);
+
+        void BuildPauseCard(RectTransform root, Color dim)
+        {
+            var pc = Box(root, new Vector2(0.5f, 0.5f), new Vector2(0, 30), new Vector2(1150, 560), dim, "PauseCard");
+            pc.raycastTarget = true;
+            pauseTitle = UIKit.Text(pc.transform, "", 60, Color.white); pauseTitle.fontStyle = FontStyles.Bold; pauseTitle.raycastTarget = false;
+            UIKit.Place(pauseTitle.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(1050, 90));
+            pauseBody = UIKit.Text(pc.transform, "", 44, Color.white); pauseBody.richText = true; pauseBody.raycastTarget = false;
+            UIKit.Place(pauseBody.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 10), new Vector2(1050, 300));
+            pauseBig = UIKit.Text(pc.transform, "", 220, ArtV3.RaftBody); pauseBig.fontStyle = FontStyles.Bold; pauseBig.raycastTarget = false;
+            UIKit.Place(pauseBig.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(600, 280));
+            pauseContinue = UIKit.Button(pc.transform, "CONTINUE WITH BOT", UIKit.Warn, () => net.ContinueWithBot(), 40);
+            UIKit.Place((RectTransform)pauseContinue.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(560, 100));
+            pauseCard = pc.gameObject;
+            pauseCard.SetActive(false);
+        }
+
+        void OnNetPause(PauseInfo p)
+        {
+            if (!netPaused || resumeAt > 0) pauseCount++;
+            netPause = p; netPauseAt = Time.realtimeSinceStartup; netPaused = true; resumeAt = 0f;
+            world?.SetNetPaused();
+            legendPop.SetActive(false);
+        }
+
+        void OnNetResume(int ms)
+        {
+            netPaused = true; netPause = null;
+            resumeAt = Time.realtimeSinceStartup + ms / 1000f;
+            world?.SetNetPaused();
+        }
+
+        void ClearNetPause() { netPaused = false; resumeAt = 0f; netPause = null; }
+
+        static string RoleHex(Role r) => r == Role.LeftPaddler ? "#2F6BFF" : r == Role.RightPaddler ? "#FFD23F" : "#4CC94C";
+
+        void UpdatePauseCard()
+        {
+            if (pauseCard == null) return;
+            float now = Time.realtimeSinceStartup;
+            if (resumeAt > 0f && now >= resumeAt) ClearNetPause(); // 3-2-1 done: inputs flow again (world unfreezes on the next snapshot)
+            bool game = screen == UiScreen.Game && results == null;
+            bool reconnecting = game && !net.Ready;
+            bool show = game && (netPaused || reconnecting);
+            if (pauseCard.activeSelf != show) pauseCard.SetActive(show);
+            if (!show) return;
+            pauseBig.text = ""; pauseBody.text = "";
+            pauseContinue.gameObject.SetActive(false);
+            if (reconnecting)
+            {
+                pauseTitle.text = "RECONNECTING...";
+                pauseBody.text = "Connection lost. The match waits for you.\n<size=30>" + NetworkInfo.Provider.NetworkType + "</size>";
+            }
+            else if (resumeAt > 0f)
+            {
+                pauseTitle.text = "GET READY";
+                pauseBig.text = Mathf.CeilToInt(resumeAt - now).ToString();
+            }
+            else if (netPause != null)
+            {
+                pauseTitle.text = "WAITING FOR PLAYERS";
+                sb.Clear();
+                float el = now - netPauseAt;
+                foreach (var m in netPause.missing)
+                    sb.Append($"<color={RoleHex(m.role)}>{RoleInfo.Name(m.role)}</color>  <b>{m.name}</b>   <color=#FF7A1A>{Mathf.Max(0, Mathf.CeilToInt(m.graceS - el))} s</color>\n");
+                if (lobby != null)
+                {
+                    sb.Append("<size=30>here: ");
+                    foreach (var pl in lobby.players) if (pl.connected) sb.Append(pl.name).Append("  ");
+                    sb.Append("</size>");
+                }
+                pauseBody.text = sb.ToString();
+                pauseContinue.gameObject.SetActive(lobby != null && lobby.hostId != 0 && lobby.hostId == net.ClientId);
+            }
         }
 
         RectTransform Row(Transform col, string mark, Color c)
@@ -208,7 +296,7 @@ namespace Mottainai.Client
         bool V4Blocks(Vector2 pos)
         {
             if (v4Canvas == null || !v4Canvas.gameObject.activeSelf) return false;
-            if (leaveMenu.activeSelf || leaveConfirm.activeSelf) return true;
+            if (leaveMenu.activeSelf || leaveConfirm.activeSelf || pauseCard.activeSelf) return true;
             foreach (var g in new[] { helpBtn, menuBtn })
                 if (g.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint((RectTransform)g.transform, pos, null)) return true;
             foreach (var g in new[] { roleCard, legendPop })
@@ -252,11 +340,12 @@ namespace Mottainai.Client
             ShowRoleCard(r);
         }
 
-        void V4OnMatchStart()
+        void V4OnMatchStart(bool resync)
         {
-            for (int i = 0; i < 7; i++) hudCounts[i] = 0;
             roleCard.SetActive(false);
             SetLeaveMenu(false);
+            if (resync) return; // reconnect into the same match: keep counts, no intro pop-up
+            for (int i = 0; i < 7; i++) hudCounts[i] = 0;
             legendPop.SetActive(true);
         }
 
@@ -279,6 +368,7 @@ namespace Mottainai.Client
             if (!game && (legendPop.activeSelf || leaveMenu.activeSelf || leaveConfirm.activeSelf)) { legendPop.SetActive(false); SetLeaveMenu(false); }
             if (!game && !lobbyS) roleCard.SetActive(false);
             v4Canvas.gameObject.SetActive(game || (lobbyS && roleCard.activeSelf));
+            UpdatePauseCard();
             helpBtn.SetActive(game); menuBtn.SetActive(game); legendBar.SetActive(game);
             // safe area (notches / punch holes) for every v4 widget
             var sa = Screen.safeArea; float k = 1080f / Mathf.Max(1, Screen.height);

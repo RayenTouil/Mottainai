@@ -11,9 +11,9 @@ namespace Mottainai.Net
     {
         public const int ProtocolVersion = 3;
         // client -> server
-        public const byte Role = 0x01, Ready = 0x02, Start = 0x03, Leave = 0x04, Stroke = 0x10, BackPaddle = 0x11, Net = 0x12, Ping = 0x20, Stats = 0x21;
+        public const byte Role = 0x01, Ready = 0x02, Start = 0x03, Leave = 0x04, ContinueBot = 0x05, Stroke = 0x10, BackPaddle = 0x11, Net = 0x12, Ping = 0x20, Stats = 0x21;
         // server -> client
-        public const byte Welcome = 0x80, Lobby = 0x81, MatchStart = 0x82, Snapshot = 0x83, Events = 0x84, Results = 0x85, Pong = 0x86, Notice = 0x87;
+        public const byte Welcome = 0x80, Lobby = 0x81, MatchStart = 0x82, Snapshot = 0x83, Events = 0x84, Results = 0x85, Pong = 0x86, Notice = 0x87, Pause = 0x8A, Resume = 0x8B;
     }
 
     public struct NetEntity
@@ -58,6 +58,14 @@ namespace Mottainai.Net
         public readonly List<LobbyPlayer> players = new List<LobbyPlayer>();
         public readonly byte[] roleOwner = { 0xFF, 0xFF, 0xFF };
         public bool IsBot(Role r) => r >= Role.LeftPaddler && r <= Role.Collector && roleOwner[(int)r - 1] == 0xFF;
+    }
+
+    /// v3 PAUSE: the server froze the match while human players are missing (grace in seconds per player).
+    public class PauseInfo
+    {
+        public struct Missing { public byte id; public string name; public Role role; public int graceS; }
+        public byte reason;
+        public readonly List<Missing> missing = new List<Missing>();
     }
 
     public class MatchStartInfo { public string code; public int seed; public Role role; public byte team, tickRate = 60; public float duration, countdown; }
@@ -190,6 +198,14 @@ namespace Mottainai.Net
             for (int i = 0; i < 3; i++) s.roleOwner[i] = r.U8();
             if (r.Left > 0) s.hostId = r.U8();
             return s;
+        }
+
+        public static PauseInfo ReadPause(ref ByteReader r)
+        {
+            var p = new PauseInfo { reason = r.U8() };
+            int n = r.U8();
+            for (int i = 0; i < n; i++) p.missing.Add(new PauseInfo.Missing { id = r.U8(), name = r.Str(), role = (Role)r.U8(), graceS = r.U8() });
+            return p;
         }
 
         public static MatchStartInfo ReadMatchStart(ref ByteReader r, string code) => new MatchStartInfo

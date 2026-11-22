@@ -1,0 +1,6 @@
+{
+  "reconnectGraceS": 30,
+  "deadAfterMs": 1500,
+  "resumeCountdownMs": 3000,
+  "pauseBroadcastMs": 1000
+}

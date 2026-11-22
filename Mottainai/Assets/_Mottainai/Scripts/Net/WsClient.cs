@@ -27,12 +27,15 @@ namespace Mottainai.Net
     public struct Inbound { public byte[] data; public double recvMs; }
 
     /// ClientWebSocket on background tasks: receive loop -> lock-free queue -> main thread (Poll).
-    /// Auto-reconnects with exponential backoff while Want is true.
+    /// Auto-reconnects while Want is true. v4: heartbeat PING from the socket thread (gated on a live main thread),
+    /// ForceReconnect (dead-link detection by the caller), Suspend/Resume (app in background), fast backoff in a match.
     public class WsClient
     {
         public enum State { Idle, Connecting, Open, Closed }
         public volatile State state = State.Idle;
-        public string Url { get; private set; }
+        volatile string url;
+        /// Read at every (re)connect attempt, so the caller can add parameters for the next reconnect (e.g. &match=).
+        public string Url { get => url; set => url = value; }
         public bool Want { get; private set; }
         public string LastError = "";
         public long BytesRecv, BytesSent, MsgsRecv, MsgsSent;
@@ -40,24 +43,45 @@ namespace Mottainai.Net
         public event Action Opened;
         public event Action<string> ClosedEvt;
 
+        /// In a match: reconnect at once, then 250, 500, 1000, 2000 ms (max) and a 5 s connect timeout.
+        public volatile bool Fast;
+        /// Built on the socket thread every HeartbeatMs while the main thread is alive (PING with a socket-thread timestamp).
+        public Func<byte[]> HeartbeatFrame;
+        public int HeartbeatMs = 500;
+        /// No heartbeat when the main thread has not polled for this long (frozen app = the server should see it as gone).
+        public double MainStallMs = 2000;
+        static readonly int[] FastBackoff = { 0, 250, 500, 1000, 2000 };
+
         readonly ConcurrentQueue<Inbound> inbox = new ConcurrentQueue<Inbound>();
         public volatile bool NoDelay;
         readonly ConcurrentQueue<byte[]> outbox = new ConcurrentQueue<byte[]>();
         readonly SemaphoreSlim outSignal = new SemaphoreSlim(0);
+        readonly SemaphoreSlim resumeSignal = new SemaphoreSlim(0);
         readonly ConcurrentQueue<Action> mainActions = new ConcurrentQueue<Action>();
         CancellationTokenSource cts;
         int generation;
+        volatile ClientWebSocket current;
+        volatile bool suspended;
+        volatile string forceCause;
+        long lastRecvBits, mainAliveBits;
 
         public bool IsOpen => state == State.Open;
+        public bool Suspended => suspended;
+        /// Socket-thread time of the last received frame (NetTime.Ms).
+        public double LastRecvMs => BitConverter.Int64BitsToDouble(Interlocked.Read(ref lastRecvBits));
+        double MainAliveMs => BitConverter.Int64BitsToDouble(Interlocked.Read(ref mainAliveBits));
+        static void Stamp(ref long bits) => Interlocked.Exchange(ref bits, BitConverter.DoubleToInt64Bits(NetTime.Ms));
 
         public void Connect(string url)
         {
             Close();
             Url = url;
             Want = true;
+            suspended = false;
             cts = new CancellationTokenSource();
             int gen = ++generation;
             var token = cts.Token;
+            Stamp(ref mainAliveBits);
             Task.Run(() => Loop(gen, token));
         }
 
@@ -67,9 +91,36 @@ namespace Mottainai.Net
             generation++;
             try { cts?.Cancel(); } catch { }
             cts = null;
+            try { current?.Abort(); } catch { }
             while (outbox.TryDequeue(out _)) { }
             while (inbox.TryDequeue(out _)) { }
             state = State.Idle;
+        }
+
+        /// Drop the current socket now (dead link detected by the caller) and reconnect with the fast backoff.
+        public void ForceReconnect(string cause)
+        {
+            if (!Want) return;
+            forceCause = cause;
+            try { current?.Abort(); } catch { }
+        }
+
+        /// App goes to the background: close the socket (the server pauses the match at once) and do not reconnect.
+        public void Suspend()
+        {
+            if (!Want || suspended) return;
+            suspended = true;
+            forceCause = "app paused";
+            try { current?.Abort(); } catch { }
+        }
+
+        /// App back in the foreground: reconnect immediately.
+        public void Resume()
+        {
+            if (!suspended) return;
+            suspended = false;
+            Stamp(ref mainAliveBits);
+            resumeSignal.Release();
         }
 
         public void Send(byte[] data)
@@ -82,6 +133,7 @@ namespace Mottainai.Net
         /// Call from the main thread each frame; invokes handler for every received frame (with its socket-thread receive time).
         public void Poll(Action<byte[], double> handler)
         {
+            Stamp(ref mainAliveBits);
             while (mainActions.TryDequeue(out var a)) a();
             while (inbox.TryDequeue(out var m)) handler(m.data, m.recvMs);
         }
@@ -92,32 +144,45 @@ namespace Mottainai.Net
 
         async Task Loop(int gen, CancellationToken ct)
         {
-            int backoffMs = 250;
+            int attempt = 0;
             while (!ct.IsCancellationRequested && gen == generation)
             {
-                using (var ws = new ClientWebSocket())
+                while (suspended && !ct.IsCancellationRequested && gen == generation)
                 {
+                    try { await resumeSignal.WaitAsync(250, ct).ConfigureAwait(false); } catch { break; }
+                }
+                if (ct.IsCancellationRequested || gen != generation) break;
+                using (var ws = new ClientWebSocket())
+                using (var conn = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                {
+                    current = ws;
+                    forceCause = null;
                     ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
                     state = State.Connecting;
                     try
                     {
                         using (var to = CancellationTokenSource.CreateLinkedTokenSource(ct))
                         {
-                            to.CancelAfter(8000);
+                            to.CancelAfter(Fast ? 5000 : 8000);
                             await ws.ConnectAsync(new Uri(Url), to.Token).ConfigureAwait(false);
                         }
+                        if (suspended) throw new OperationCanceledException("app paused");
                         NoDelay = DisableNagle(ws);
+                        Stamp(ref lastRecvBits);
                         state = State.Open;
-                        backoffMs = 250;
+                        attempt = 0;
                         mainActions.Enqueue(() => Opened?.Invoke());
-                        var sendTask = SendLoop(ws, ct);
-                        await RecvLoop(ws, ct).ConfigureAwait(false);
-                        outSignal.Release();
+                        var sendTask = SendLoop(ws, conn.Token);
+                        var beatTask = Heartbeat(ws, conn.Token);
+                        try { await RecvLoop(ws, conn.Token).ConfigureAwait(false); }
+                        finally { conn.Cancel(); outSignal.Release(); }
                         try { await sendTask.ConfigureAwait(false); } catch { }
-                        LastError = ws.CloseStatusDescription ?? "closed";
+                        try { await beatTask.ConfigureAwait(false); } catch { }
+                        LastError = forceCause ?? ws.CloseStatusDescription ?? "closed";
                     }
-                    catch (Exception e) { LastError = e.InnerException?.Message ?? e.Message; }
+                    catch (Exception e) { LastError = forceCause ?? e.InnerException?.Message ?? e.Message; }
                     try { if (ws.State == WebSocketState.Open) await ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None).ConfigureAwait(false); } catch { }
+                    current = null;
                 }
                 if (ct.IsCancellationRequested || gen != generation) break;
                 state = State.Closed;
@@ -125,8 +190,19 @@ namespace Mottainai.Net
                 mainActions.Enqueue(() => ClosedEvt?.Invoke(err));
                 while (outbox.TryDequeue(out _)) { }
                 Reconnects++;
-                try { await Task.Delay(backoffMs, ct).ConfigureAwait(false); } catch { break; }
-                backoffMs = Math.Min(backoffMs * 2, 4000);
+                int delay = Fast ? FastBackoff[Math.Min(attempt, FastBackoff.Length - 1)] : Math.Min(250 << Math.Min(attempt, 4), 4000);
+                attempt++;
+                if (delay > 0 && !suspended) { try { await Task.Delay(delay, ct).ConfigureAwait(false); } catch { break; } }
+            }
+        }
+
+        async Task Heartbeat(ClientWebSocket ws, CancellationToken ct)
+        {
+            while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            {
+                var f = HeartbeatFrame;
+                if (f != null && NetTime.Ms - MainAliveMs < MainStallMs) Send(f());
+                await Task.Delay(HeartbeatMs, ct).ConfigureAwait(false);
             }
         }
 
@@ -149,7 +225,9 @@ namespace Mottainai.Net
                 {
                     var m = new byte[len];
                     Buffer.BlockCopy(buf, 0, m, 0, len);
-                    inbox.Enqueue(new Inbound { data = m, recvMs = NetTime.Ms });
+                    double t = NetTime.Ms;
+                    inbox.Enqueue(new Inbound { data = m, recvMs = t });
+                    Interlocked.Exchange(ref lastRecvBits, BitConverter.DoubleToInt64Bits(t));
                     Interlocked.Add(ref BytesRecv, len);
                     Interlocked.Increment(ref MsgsRecv);
                 }

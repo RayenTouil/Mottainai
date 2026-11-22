@@ -648,6 +648,7 @@ namespace Mottainai.Client
                 sb.Append($"Edge <b>{content.EdgeColo}</b>   Room <b>{net.RoomColo}</b>   (Cloudflare, wss)\n");
                 sb.Append($"RTT avg <b>{s.RttAvg:F1}</b>  p95 <b>{s.RttP95:F1}</b>  jitter {s.Jitter:F1} ms\n");
                 sb.Append($"Snapshots <b>{s.SnapshotRate:F0}</b>/s (server {net.SnapshotHz} Hz)  tick #{s.ServerTick}\n");
+                sb.Append($"Reconnects <b>{s.ReconnectCount}</b>   last <b>{s.LastReconnectMs:F0} ms</b> ({s.LastReconnectCause})   pauses {pauseCount}\n");
                 sb.Append(world != null && world.PredictionLeadMs > 0 ? $"Raft prediction ON  lead {world.PredictionLeadMs:F0} ms\n" : "Raft prediction idle\n");
                 sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps   msgs {s.Pps:F0}/s\n");
                 sb.Append($"Jitter buffer <b>{(world != null ? world.InterpMs : 0):F0} ms</b>  (snapshot jitter p95 {(world != null ? world.JitterMs : 0):F0} ms, late {(world != null ? world.LatePct : 0):F0}%)  TCP_NODELAY {(s.NoDelay ? "on" : "off")}\n");

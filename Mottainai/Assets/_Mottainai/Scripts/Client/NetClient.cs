@@ -18,6 +18,7 @@ namespace Mottainai.Client
         public uint ServerTick;
         public float InterpMs, SnapJitterMs, PredLeadMs, LatePct;
         public bool NoDelay;
+        public int ReconnectCount; public float LastReconnectMs; public string LastReconnectCause = "-";
         long lastRecv, lastSent, lastMsgs;
         float window;
         int snapshots;
@@ -80,6 +81,8 @@ namespace Mottainai.Client
         public event Action<List<MatchEvent>> OnEvents;
         public event Action<ResultsData> OnResults;
         public event Action<string> OnDisconnected;
+        public event Action<PauseInfo> OnPause;
+        public event Action<int> OnResume;
 
         public string token, playerName, roomCode = "", baseUrl;
         public string RoomColo = "?";
@@ -94,14 +97,21 @@ namespace Mottainai.Client
         readonly SnapshotFrame frame = new SnapshotFrame();
         readonly List<MatchEvent> evBuffer = new List<MatchEvent>(64);
         readonly ByteWriter w = new ByteWriter();
-        float pingTimer, statsTimer, backlogMaxMs;
+        float statsTimer, backlogMaxMs;
+        string baseWsUrl;
+        double downSince, stallCooldown;
+        string downCause;
+        /// No snapshot or PONG for this long during a match = dead link: reconnect without waiting for TCP.
+        public const double StallMs = 1000;
         Action<byte[], double> dispatch;
         public double NowMs => NetTime.Ms;
         public double Now => NetTime.Ms * 0.001;
 
         public NetClient()
         {
-            ws.ClosedEvt += reason => { Welcomed = false; OnDisconnected?.Invoke(reason); };
+            ws.ClosedEvt += reason => { Welcomed = false; if (downSince == 0) { downSince = NetTime.Ms; downCause = reason; } OnDisconnected?.Invoke(reason); };
+            // PING from the socket thread every 500 ms (gated on a live main thread); the server drops silent sockets after 1.5 s
+            ws.HeartbeatFrame = () => new ByteWriter().Begin(Msg.Ping).F64(NetTime.Ms).ToArray();
         }
 
         public static string WsUrl(string httpBase, string code, string token, string name, Role role)
@@ -115,7 +125,9 @@ namespace Mottainai.Client
         {
             baseUrl = httpBase; roomCode = code.ToUpperInvariant(); token = tok; playerName = name;
             Welcomed = false;
-            ws.Connect(WsUrl(httpBase, roomCode, tok, name, wantRole));
+            downSince = 0;
+            baseWsUrl = WsUrl(httpBase, roomCode, tok, name, wantRole);
+            ws.Connect(baseWsUrl);
         }
 
         public void Disconnect()
@@ -139,7 +151,14 @@ namespace Mottainai.Client
                         ClientId = wi.playerId; RoomColo = wi.roomColo; roomCode = wi.roomCode; TickRate = wi.tickRate; SnapshotHz = wi.snapshotHz;
                         ProtocolMismatch = wi.protocolVersion != Msg.ProtocolVersion;
                         Welcomed = true;
-                        pingTimer = 0f;
+                        if (downSince > 0)
+                        {
+                            stats.ReconnectCount++;
+                            stats.LastReconnectMs = (float)(NetTime.Ms - downSince);
+                            stats.LastReconnectCause = downCause ?? "?";
+                            Debug.Log($"[NET] reconnected in {stats.LastReconnectMs:F0} ms (cause: {stats.LastReconnectCause})");
+                            downSince = 0;
+                        }
                         OnWelcome?.Invoke(wi);
                         break;
                     }
@@ -156,6 +175,7 @@ namespace Mottainai.Client
                     {
                         var ms = Codec.ReadMatchStart(ref r, roomCode);
                         MyTeam = ms.team; Seed = ms.seed; TickRate = ms.tickRate;
+                        ws.Url = baseWsUrl + "&match=" + (uint)ms.seed; // a reconnect tells the room which match we think we are in
                         OnMatchStart?.Invoke(ms);
                         break;
                     }
@@ -171,7 +191,9 @@ namespace Mottainai.Client
                         Codec.ReadEvents(ref r, evBuffer);
                         OnEvents?.Invoke(evBuffer);
                         break;
-                    case Msg.Results: OnResults?.Invoke(Codec.ReadResults(ref r)); break;
+                    case Msg.Results: ws.Url = baseWsUrl; OnResults?.Invoke(Codec.ReadResults(ref r)); break;
+                    case Msg.Pause: OnPause?.Invoke(Codec.ReadPause(ref r)); break;
+                    case Msg.Resume: OnResume?.Invoke(r.U16()); break;
                 }
             }
             catch (Exception e) { Debug.LogWarning($"[Net] bad frame 0x{m[0]:X2}: {e.Message}"); }
@@ -184,12 +206,18 @@ namespace Mottainai.Client
             ws.Poll(dispatch ??= Dispatch);
             stats.NoDelay = ws.NoDelay;
             stats.Update(dt, ws);
+            ws.Fast = inMatch;
             if (!Ready) return;
-            pingTimer -= dt;
-            if (pingTimer <= 0f)
+            // dead link: snapshots (60 Hz) and PONGs (2 Hz) stopped -> reconnect now instead of waiting for TCP / keep-alive (15 s)
+            double now = NetTime.Ms, silent = now - ws.LastRecvMs;
+            if (inMatch && silent > StallMs && now > stallCooldown)
             {
-                pingTimer = 0.5f;
-                ws.Send(w.Begin(Msg.Ping).F64(NowMs).ToArray());
+                stallCooldown = now + 1500;
+                downSince = ws.LastRecvMs; downCause = $"no data {silent / 1000:F1} s";
+                Debug.Log("[NET] " + downCause + " -> reconnect");
+                Welcomed = false;
+                ws.ForceReconnect(downCause);
+                return;
             }
             statsTimer -= dt;
             if (statsTimer <= 0f)
@@ -221,5 +249,16 @@ namespace Mottainai.Client
         /// v3: voluntary leave (bot takes the role immediately).
         public void SendLeave() => ws.Send(w.Begin(Msg.Leave).ToArray());
         public void StartMatch() => ws.Send(w.Begin(Msg.Start).ToArray());
+        /// v3: host skips the reconnect wait (bots take the missing roles).
+        public void ContinueWithBot() => ws.Send(w.Begin(Msg.ContinueBot).ToArray());
+
+        /// App to background: close the socket so the room pauses at once; foreground: reconnect immediately.
+        public void Suspend() { if (WantConnected) ws.Suspend(); }
+        public void Resume()
+        {
+            if (!WantConnected) return;
+            if (ws.Suspended) { downSince = NetTime.Ms; downCause = "app resumed"; ws.Resume(); }
+            else if (!ws.IsOpen || NetTime.Ms - ws.LastRecvMs > StallMs) { downSince = NetTime.Ms; downCause = "focus regained, link dead"; Welcomed = false; ws.ForceReconnect(downCause); }
+        }
     }
 }

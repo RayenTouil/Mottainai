@@ -40,7 +40,7 @@ class C {
   start() { this.send(0x03); }
   role(r: number) { this.send(0x01, r); }
   me() { return this.lobby?.players.find(p => p.id === this.id); }
-  open() { return new Promise<void>((res, rej) => { this.ws.onopen = () => res(); this.ws.onerror = () => rej(new Error("ws " + this.name)); }); }
+  open() { return new Promise<void>((res, rej) => { this.ws.onopen = () => { setInterval(() => { if (this.ws.readyState !== 1) return; const b = new ArrayBuffer(9); const d = new DataView(b); d.setUint8(0, 0x20); d.setFloat64(1, performance.now(), true); this.ws.send(b); }, 500); res(); }; this.ws.onerror = () => rej(new Error("ws " + this.name)); }); }
 }
 
 async function main() {
@@ -76,7 +76,7 @@ async function main() {
   b.ws.close(); c.ws.close();
   await rematch();
   console.log(failures ? `${failures} FAILED` : "ALL PASS");
-  process.exit(failures ? 1 : 0);
+  process.exit(failures ? 1 : 0); // pings keep the sockets alive (server drops silent sockets after 1.5 s)
 }
 
 /// Rematch: a solo host plays a whole match (bots crash or time out), then must READY again before START works.
