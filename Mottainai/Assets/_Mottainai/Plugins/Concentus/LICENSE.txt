@@ -1,0 +1,1 @@
+Concentus 1.1.7 (NuGet) - pure C# Opus port. Opus license (BSD-3): https://opus-codec.org/license/

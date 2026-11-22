@@ -1,0 +1,10 @@
+{
+  "reconnectGraceS": 30,
+  "deadAfterMs": 1500,
+  "resumeCountdownMs": 3000,
+  "pauseBroadcastMs": 1000,
+  "voiceEnabled": true,
+  "voiceMaxMsgPerS": 60,
+  "voiceMaxBytes": 400,
+  "voiceTalkingHoldMs": 300
+}

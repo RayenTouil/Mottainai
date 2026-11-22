@@ -66,7 +66,7 @@ namespace Mottainai.Client
             hudCanvas.GetComponent<GraphicRaycaster>().enabled = false;
             netCanvas = UIKit.Canvas("UI_NetHud", 30);
             netCanvas.GetComponent<GraphicRaycaster>().enabled = false;
-            BuildLogin(); BuildDownload(); BuildMenu(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud();
+            BuildLogin(); BuildDownload(); BuildMenu(); BuildLobby(); BuildResults(); BuildLab(); BuildHud(); BuildNetHud(); BuildV4(); BuildTeamUi();
         }
 
         GameObject Panel(UiScreen s, Color bg)
@@ -243,14 +243,28 @@ namespace Mottainai.Client
                 roleButtons[i].image.color = mine ? UIKit.Accent : holder == null ? UIKit.Panel : UIKit.Muted;
             }
             var me = lobby.players.Find(x => x.clientId == net.ClientId);
-            readyButton.image.color = me != null && me.ready ? UIKit.Accent : UIKit.Muted;
-            UIKit.Label(readyButton).text = me != null && me.ready ? "READY!" : "READY?";
+            bool ready = me != null && me.ready, isHost = lobby.hostId != 0 && lobby.hostId == net.ClientId;
+            int humans = 0, readyN = 0;
+            foreach (var pl in lobby.players) if (pl.connected) { humans++; if (pl.ready) readyN++; }
+            bool inMatch = lobby.phase == MatchPhase.Running || lobby.phase == MatchPhase.Countdown;
+            // READY state comes only from the server LOBBY; the pill face shows it (green = ready, blue = not yet)
+            var face = readyButton.transform.Find("Face")?.GetComponent<Image>();
+            if (face != null) face.color = ready ? UIKit.Accent : UIKit.Accent2;
+            UIKit.Label(readyButton).text = ready ? "READY!  (tap to cancel)" : "TAP WHEN READY";
+            readyButton.interactable = !inMatch;
+            foreach (var rb in roleButtons) rb.interactable = !ready && !inMatch;
+            startButton.gameObject.SetActive(isHost);
+            startButton.interactable = isHost && !inMatch && humans > 0 && readyN == humans;
             sb.Clear();
             sb.Append("Crew: ");
             foreach (var pl in lobby.players) if (pl.connected) sb.Append(pl.name).Append("   ");
-            sb.Append("\n<size=26>Tap a role to take it. Empty roles are played by bots. Anyone can press START.</size>");
+            var host = lobby.players.Find(x => x.clientId == lobby.hostId);
+            sb.Append($"\n<size=26>Empty roles are played by bots.  {readyN}/{humans} ready.  ");
+            sb.Append(isHost ? "You are the host: START when everyone is ready." : $"Waiting for host {(host != null ? host.name : "")}...");
+            sb.Append("</size>");
             lobbyPlayers.text = sb.ToString();
-            UIKit.Label(startButton).text = lobby.phase == MatchPhase.Running || lobby.phase == MatchPhase.Countdown ? "IN MATCH..." : "START";
+            UIKit.Label(startButton).text = inMatch ? "IN MATCH..." : $"START  {readyN}/{humans}";
+            RefreshTeamBanner();
         }
 
         void BuildResults()
@@ -280,13 +294,14 @@ namespace Mottainai.Client
             var row = UIKit.Rect("Buttons", p.transform);
             UIKit.Place(row, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(1500, 110));
             UIKit.HLayout(row, 24, 0);
-            UIKit.Button(row, "REMATCH", UIKit.Accent, () => net.StartMatch(), 44);
+            UIKit.Button(row, "REMATCH", UIKit.Accent, () => { Show(UiScreen.Lobby); net.SetReady(true); RefreshLobbyUi(); }, 44); // v3: rematch = lobby + READY; host starts
             UIKit.Button(row, "LOBBY", UIKit.Accent2, () => { Show(UiScreen.Lobby); RefreshLobbyUi(); }, 44);
             UIKit.Button(row, "NETWORK LAB", UIKit.Muted, () => Show(UiScreen.Lab), 40);
         }
 
         void FillResults()
         {
+            RefreshResultsTeam();
             var r = results;
             var s = net.stats;
             var ni = NetworkInfo.Provider;
@@ -367,9 +382,12 @@ namespace Mottainai.Client
             StartCoroutine(lab.Run(content, ni.NetworkType, "slice " + ni.SliceStatus));
         }
 
+        RectTransform hudSafe;
+
         void BuildHud()
         {
-            var root = hudCanvas.transform;
+            hudSafe = UIKit.Stretch(UIKit.Rect("Safe", hudCanvas.transform));
+            var root = (Transform)hudSafe;
             // v3 panels: score (top-left) and timer (top-right), ui.panel with a 2 px inner stroke at 15 % white
             var scoreBg = UIKit.Image(root, UIKit.Panel, null, "ScorePanel");
             scoreBg.raycastTarget = false;
@@ -379,8 +397,9 @@ namespace Mottainai.Client
             timerBg.raycastTarget = false;
             UIKit.Place(timerBg.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-22, -14), new Vector2(300, 96));
             var to = timerBg.gameObject.AddComponent<Outline>(); to.effectColor = new Color(1, 1, 1, 0.15f); to.effectDistance = new Vector2(2, -2);
-            scoreText = UIKit.Text(root, "0", 64, Color.white, TextAlignmentOptions.TopLeft);
-            UIKit.Place(scoreText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -24), new Vector2(600, 90));
+            scoreText = UIKit.Text(root, "0", 84, Color.white, TextAlignmentOptions.TopLeft);
+            UIKit.Place(scoreText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -16), new Vector2(600, 100));
+            scoreText.outlineWidth = 0.2f;
             scoreText.fontStyle = FontStyles.Bold;
             comboText = UIKit.Text(root, "", 34, new Color(1f, 0.85f, 0.3f), TextAlignmentOptions.TopLeft);
             UIKit.Place(comboText.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -110), new Vector2(600, 50));
@@ -421,7 +440,7 @@ namespace Mottainai.Client
 
             var hp = UIKit.Image(root, new Color(0, 0, 0, 0.45f));
             hp.raycastTarget = false;
-            UIKit.Place(hp.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1500, 90));
+            UIKit.Place(hp.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 170), new Vector2(1500, 90));
             hintPanel = hp.gameObject;
             hintText = UIKit.Text(hp.transform, "", 40, Color.white);
             UIKit.Stretch(hintText.rectTransform, 20, 5, 20, 5);
@@ -561,7 +580,7 @@ namespace Mottainai.Client
             }
             else if (screen == UiScreen.Game)
             {
-                scoreText.text = $"<size=30>SCORE</size>  {hudScore}";
+                scoreText.text = $"<size=34>TEAM</size>  {hudScore}";
                 comboText.text = hudCombo ? "COMBO READY x1.5" : "";
                 if (world != null)
                 {
@@ -631,6 +650,7 @@ namespace Mottainai.Client
                 sb.Append($"Edge <b>{content.EdgeColo}</b>   Room <b>{net.RoomColo}</b>   (Cloudflare, wss)\n");
                 sb.Append($"RTT avg <b>{s.RttAvg:F1}</b>  p95 <b>{s.RttP95:F1}</b>  jitter {s.Jitter:F1} ms\n");
                 sb.Append($"Snapshots <b>{s.SnapshotRate:F0}</b>/s (server {net.SnapshotHz} Hz)  tick #{s.ServerTick}\n");
+                sb.Append($"Reconnects <b>{s.ReconnectCount}</b>   last <b>{s.LastReconnectMs:F0} ms</b> ({s.LastReconnectCause})   pauses {pauseCount}\n");
                 sb.Append(world != null && world.PredictionLeadMs > 0 ? $"Raft prediction ON  lead {world.PredictionLeadMs:F0} ms\n" : "Raft prediction idle\n");
                 sb.Append($"Down <b>{s.DownKbps:F0}</b> kbps   Up {s.UpKbps:F0} kbps   msgs {s.Pps:F0}/s\n");
                 sb.Append($"Jitter buffer <b>{(world != null ? world.InterpMs : 0):F0} ms</b>  (snapshot jitter p95 {(world != null ? world.JitterMs : 0):F0} ms, late {(world != null ? world.LatePct : 0):F0}%)  TCP_NODELAY {(s.NoDelay ? "on" : "off")}\n");

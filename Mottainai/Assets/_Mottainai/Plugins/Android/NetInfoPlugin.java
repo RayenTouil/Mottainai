@@ -13,6 +13,7 @@ import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.telephony.PhoneStateListener;
+import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyDisplayInfo;
 import android.telephony.TelephonyManager;
@@ -28,7 +29,10 @@ public class NetInfoPlugin {
     private static final int CAP_PRIORITIZE_LATENCY = 34;
 
     private final Context ctx;
-    private final TelephonyManager tm;
+    private volatile TelephonyManager tm;
+    private final TelephonyManager tmDefault;
+    private boolean sliceRetried = false;
+    public volatile int netChanges = 0;
     private final ConnectivityManager cm;
     private volatile int overrideType = 0;
     private volatile String sliceStatus = "unsupported";
@@ -38,8 +42,35 @@ public class NetInfoPlugin {
 
     public NetInfoPlugin(Context context) {
         ctx = context.getApplicationContext();
-        tm = (TelephonyManager) ctx.getSystemService(Context.TELEPHONY_SERVICE);
+        tmDefault = (TelephonyManager) ctx.getSystemService(Context.TELEPHONY_SERVICE);
+        tm = dataTm();
         cm = (ConnectivityManager) ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
+        // network changes (Wi-Fi <-> 5G, handover): re-read the data SIM, retry the latency slice once
+        try {
+            cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                @Override public void onAvailable(Network n) { onNetChange(); }
+                @Override public void onCapabilitiesChanged(Network n, NetworkCapabilities c) { netChanges++; }
+            });
+        } catch (Throwable t) { lastError = "netcb: " + t; }
+    }
+
+    /** Dual-SIM: network type of the SIM that carries data, not the default (voice) SIM. */
+    private TelephonyManager dataTm() {
+        try {
+            int sub = SubscriptionManager.getDefaultDataSubscriptionId();
+            if (sub != SubscriptionManager.INVALID_SUBSCRIPTION_ID && tmDefault != null) return tmDefault.createForSubscriptionId(sub);
+        } catch (Throwable t) { lastError = "sub: " + t; }
+        return tmDefault;
+    }
+
+    private void onNetChange() {
+        netChanges++;
+        TelephonyManager n = dataTm();
+        if (n != tm) { tm = n; listening = false; }
+        if (!sliceRetried && Build.VERSION.SDK_INT >= 33 && !"ON".equals(sliceStatus)) {
+            sliceRetried = true;
+            new Handler(Looper.getMainLooper()).post(() -> { sliceCallback = null; requestLatencySlice(); });
+        }
     }
 
     private boolean hasPhonePermission() {

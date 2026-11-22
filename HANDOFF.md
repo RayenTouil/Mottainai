@@ -8,11 +8,15 @@ Deployed URL: https://mottainai.mottainai-server.workers.dev  (`npx wrangler log
 - Backups: tags backup/before-merge-{main,artv3,dev}; branches art/v3, dev, wip/* kept.
 - Pitch: final deck Pitch/MOTTAINAI_Final.pptx + .pdf + FINAL_GUIDE.md (rebuild: header of Pitch/build_final.js); first draft MOTTAINAI_Pitch.* kept.
 ## In progress
+- v4 E+F: voice (own NODELAY socket, Opus, loopback about 177 ms on phone), 5G fixes; automated suites PASS; see Docs/v4/TEST_PLAN.md.
+- v4 Phase D done: TeamsDO (teams, leaderboard, server-authoritative scores, once per match), lobby banner + invites, save crew on results, TEAM + LEADERBOARD screens (tools/teamtest.ts PASS on mottainai-v4).
+- v4 Phase C done: pause/resume on disconnect, 1.5 s dead-socket rule, 30 s grace, Continue with bot, abort when all gone, DO-restart notice (server/tools/reconnect.ts T1-T9 PASS on mottainai-v4; phone: airplane + screen-off PASS). Report: Docs/v4/reconnect.md. Pending: 3-phone guided tests (same doc).
+- v4 Phase A+B (feature/v4, server mottainai-v4): onboarding cards, collect/avoid pop-up, legend bar, safe-area score, pause/LEAVE; host + READY/START rules (tools/lobbytest.ts 18/18).
 - I1 (5G SA, Wi-Fi OFF, 3 full matches in a row) never formally run. A4 (teammate readability) open.
-- Voice chat task (feature/voice) paused: audit not delivered yet.
 ## Exact next step
-- I1 on 5G SA with the current APK; then resume voice task from main.
+- Run the manual rows of Docs/v4/TEST_PLAN.md on 3 phones. Merge feature/v4 -> main ONLY after the team confirms: `git checkout main && git merge feature/v4`, set server_config.json baseUrl back to https://mottainai.mottainai-server.workers.dev, `deploy_server.bat` (adds TeamsDO migration v2), `build_android.bat`, `install_phone.bat`.
 ## Resume commands
 - `git pull --rebase --autostash` ; close editor -> `build_android.bat` -> `install_phone.bat`
 - `bash tools/compile_check.sh` (works with editor open) ; phone autoplay: `bash tools/phone_art_test.sh <name>`
+- v4 server tests: `cd server && node tools/reconnect.ts` (T1-T9, 45 s) ; `node tools/lobbytest.ts` ; phone: `bash tools/phone_reconnect_test.sh airplane|lock|wifi2data`
 - Windows check: BuildTools.BuildWindows, then `Builds/Win/Mottainai.exe -autoplay -room AV3X -shots <abs dir> -quitafter 27`

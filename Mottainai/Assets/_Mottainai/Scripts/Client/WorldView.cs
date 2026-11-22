@@ -50,6 +50,10 @@ namespace Mottainai.Client
         public float LatePct { get; private set; }
         int lateFrames, allFrames;
         public double RenderTick { get; private set; }
+        /// Server PAUSE/RESUME countdown: render the latest (frozen) state, no prediction, no extrapolation.
+        public bool NetPaused { get; private set; }
+        bool resyncPending;
+        public void SetNetPaused() { NetPaused = true; resyncPending = true; }
 
         public RaftView raftView;
         public Camera cam;
@@ -144,11 +148,20 @@ namespace Mottainai.Client
             offCount = 0; offHead = 0; clockInit = false;
             LatestTick = 0;
             srvTick = 0; lastPredTick = 0; havePred = false; srvRunning = false; localStrokes.Clear(); predErr = Vector3.zero; predErrH = 0f;
+            NetPaused = false; resyncPending = false;
         }
 
         // ---------------- snapshot intake ----------------
         public void OnSnapshot(SnapshotFrame f)
         {
+            if (resyncPending)
+            {
+                // first snapshot after a pause: the server tick resumed where it froze but local time moved on ->
+                // rebuild the clock line from this snapshot (entity sample ticks stay continuous: no jump, no ghosts)
+                resyncPending = false; NetPaused = false;
+                offCount = 0; offHead = 0; offSinceSort = 0; clockInit = false;
+                localStrokes.Clear(); predErr = Vector3.zero; predErrH = 0f;
+            }
             double nowTicks = Time.unscaledTimeAsDouble * TickRate;
             if (f.tick > LatestTick) LatestTick = f.tick;
             if (f.hasRaft && Time.unscaledDeltaTime < 0.1f) // ignore frame hitches (loading) in the jitter estimate
@@ -299,11 +312,12 @@ namespace Mottainai.Client
             float target = Mathf.Min(Mathf.Max(2f * interval, interval + jitterTicks) + 0.25f, 0.25f * TickRate);
             delayTicks = Mathf.Lerp(delayTicks, target, Mathf.Min(1f, Time.unscaledDeltaTime * (target > delayTicks ? 4f : 0.8f)));
             RenderTick = nowTicks + smoothOffset - delayTicks;
-            lateFrames += RenderTick > LatestTick ? 1 : 0; allFrames++;
+            if (NetPaused) RenderTick = LatestTick; // hold the frozen server state
+            else { lateFrames += RenderTick > LatestTick ? 1 : 0; allFrames++; }
             if (allFrames >= 120) { LatePct = 100f * lateFrames / allFrames; lateFrames = allFrames = 0; }
 
             UpdateRaft();
-            if (PredictOwnRaft && havePred && srvRunning) ApplyPrediction();
+            if (PredictOwnRaft && havePred && srvRunning && !NetPaused) ApplyPrediction();
             else PredictionLeadMs = 0f;
             for (int k = active.Count - 1; k >= 0; k--)
             {

@@ -33,7 +33,7 @@ namespace Mottainai.Client
         void Update()
         {
             float k = Mathf.Min(1f, Time.unscaledDeltaTime * 1.5f);
-            music.volume = Mathf.Lerp(music.volume, musicTarget, k);
+            music.volume = Mathf.Lerp(music.volume, musicTarget * VoiceDuck.Gain, k);
             river.volume = Mathf.Lerp(river.volume, riverTarget, k);
         }
 

@@ -89,3 +89,27 @@
 - pitch: speakers Yassine (1-2), Wajdi (3-5), Rayen (demo, 7-8), Med Amine (9-12); demo ends by steering into a rock to reach results at ~40 s.
 - pitch final: Pitch/MOTTAINAI_Final.pptx merges the Nov 2 application deck (B, French, solo-runner concept) with MOTTAINAI_Pitch (A); code wins on every contradiction (co-op raft, 7 bins, 1 hit, shield 6 s); runner ideas (sorting center, eco-tips, worlds) moved to Next/Later.
 - pitch final: palette #073B43/#19B8B0/#63CDE0/#72C78A/#E9F7F2 + sun/coral accents; Fredoka titles + Calibri body (repo Nunito Sans TTFs have non-standard family names); fade transitions added by XML post-process; 10 slides + hidden backup, 4:10 planned.
+- v4: wrangler env v4 = separate Worker mottainai-v4 (own DOs); deploy_server.bat v4; PROTOCOL_VERSION 3 (stub, no new messages yet).
+- v4/A: icons = real VisualFactory objects rendered once to 128 px RenderTextures (transparent rings/shadows hidden); glyphs ✓✗★ missing in Fredoka -> "+", "X", "!".
+- v4/A: "?" + pause buttons left of the timer; HUD and v4 overlay follow Screen.safeArea (likely cause of the unseen score on notched phones); score label "TEAM" at 84 px.
+- v4/A: countdown strip = existing role hint panel (moved above the legend bar); collect/avoid pop-up opens on MATCH_START, closes on GO.
+- v4/A: LEAVE 0x04 = drop() + remove player (no reconnect slot); Android Back / Esc opens the pause overlay.
+- v4/B: host = first connected human (join order), sticky while connected; sent as trailing u8 in LOBBY. START/REMATCH = host + lobby + all connected humans READY, else NOTICE. Players inside the 60 s reconnect window are not waited for.
+- v4/B: READY ignored outside the lobby; reset on match start and when RESULTS are sent. ROLE refused while READY.
+- v4/C: root cause of "GAME OVER while my friend was disconnected" = silent mobile disconnects never fire webSocketClose: the player stayed "connected", no bot, the sim ran on with an idle paddler (reproduced: crash after 33 s, tools/reconnect.ts T0). Client side: ClientWebSocket keep-alive 15 s and OnApplicationPause only reconnected if the socket looked closed.
+- v4/C: server dead-socket rule 1.5 s without any message (PING every 500 ms) -> close + disconnect; settings in server/src/room_config.json (reconnectGraceS 30, deadAfterMs 1500, resumeCountdownMs 3000).
+- v4/C: pause = room.ts stops calling sim.step (sim.ts untouched); room tick keeps counting; no snapshots while paused, one fresh snapshot to a returning player; inputs ignored while paused and during the 3-2-1.
+- v4/C: client PING moved to the socket thread, gated on a live main thread (< 2 s): loading hitches do not cause false drops, a frozen app still disappears.
+- v4/C: client closes its socket on OnApplicationPause(true) (teammates pause at once instead of after 1.5 s) and reconnects immediately on resume; focus regained only reconnects an OPEN but silent socket (Android sends resume + focus back to back).
+- v4/C: client stall rule 1.0 s without snapshot or PONG in a match -> ForceReconnect; backoff 0/250/500/1000/2000 ms in a match, 5 s connect timeout.
+- v4/C: after a pause the client rebuilds its clock line on the first new snapshot (server tick froze, local time did not); while paused it renders the latest frozen state, no prediction.
+- v4/C: aborted match result kept 30 s for reconnecting players (idle stop no longer wipes it at once).
+- v4/C: `&spectate=1` join (no role) added for automated phone tests: an idle human paddler would crash the raft and hide the reconnect results.
+- v4/D: TeamsDO = one global SQLite DO, RPC from index.ts and RoomDO; tables players/teams/members/matches/pending; members.token PRIMARY KEY = one team per player; matches.id PRIMARY KEY = counted once.
+- v4/D: matchId = room-seed-startMs; participants = every human who held a role during the match (incl. mid-match joiners), spectators excluded; a team match needs all of them in one team.
+- v4/D: names 3-16 unicode letters/digits/spaces, trimmed, inner spaces collapsed; uniqueness on a lowercased nameKey (SQLite NOCASE is ASCII only). Join codes 6 chars without 0/O/1/I.
+- v4/D: the last member leaving deletes the team (spec: 1-3 members) and its match rows; the name becomes free again.
+- v4/D: join checks "full" before leaving the old team (a failed invite never kicks a player out of their team).
+- v4/D: host already in a team -> lobby button "INVITE TO TEAM <name>" (TEAM_CREATE with empty name) instead of a forced new team.
+- v4/D: leaderboard order total, best, oldest team; rank = position in that order. Tokens never leave the server.
+- v4/B: client REMATCH = back to lobby + READY (the host still presses START); START shown to the host only, enabled at N/N ready.

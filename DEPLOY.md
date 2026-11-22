@@ -5,7 +5,8 @@
 2. `deploy_server.bat` → generates the 36 MB Content Pack, deploys, writes the URL into `Mottainai/Assets/_Mottainai/Resources/server_config.json`.
    URL: **https://mottainai.mottainai-server.workers.dev**
 3. Live logs: `cd server && npx wrangler tail`
-4. Checks: `node server/tools/smoke.ts` (WELCOME + RTT) · `node server/tools/fakeclient.ts` (full 2:00 match) · `cd server && npm run simcheck` (20 bot matches offline).
+4. v4 test server: `deploy_server.bat v4` (Worker mottainai-v4). Room settings (reconnect grace, dead-socket timeout): `server/src/room_config.json`. Tests: `node tools/reconnect.ts`, `node tools/lobbytest.ts`.
+5. Checks: `node server/tools/smoke.ts` (WELCOME + RTT) · `node server/tools/fakeclient.ts` (full 2:00 match) · `cd server && npm run simcheck` (20 bot matches offline).
 
 ## App
 1. Close the Unity editor → `build_android.bat` → `Builds\Mottainai.apk`.

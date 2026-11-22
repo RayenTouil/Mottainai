@@ -15,7 +15,7 @@ const str = (dv: DataView, o: number) => { const n = dv.getUint8(o); return [dec
 ws.onmessage = (ev: MessageEvent) => {
   const dv = new DataView(ev.data as ArrayBuffer); bytes += dv.byteLength;
   switch (dv.getUint8(0)) {
-    case 0x80: { const [code, o] = str(dv, 4); const [colo] = str(dv, o); console.log(`WELCOME v${dv.getUint16(1, true)} player ${dv.getUint8(3)} room ${code} roomColo ${colo}`); send(msg(1, d => d.setUint8(0, 0x03))); break; }
+    case 0x80: { const [code, o] = str(dv, 4); const [colo] = str(dv, o); console.log(`WELCOME v${dv.getUint16(1, true)} player ${dv.getUint8(3)} room ${code} roomColo ${colo}`); send(msg(2, d => { d.setUint8(0, 0x02); d.setUint8(1, 1); })); send(msg(1, d => d.setUint8(0, 0x03))); // v3: READY then START break; }
     case 0x82: console.log(`MATCH_START seed ${dv.getUint32(1, true)} role ${dv.getUint8(5)} duration ${dv.getUint16(7, true)} s`); started = performance.now(); break;
     case 0x83: {
       snaps++;
