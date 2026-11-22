@@ -1,12 +1,6 @@
 <div align="center">
 
-<img src="docs/media/mottainai_banner.gif" alt="MOTTAINAI: Paddle, Collect, Recycle" width="100%">
-
-# MOTTAINAI
-
-### もったいない · *What a waste!*
-
-**Paddle · Collect · Recycle**
+<img src="docs/media/mottainai_logo.svg" alt="MOTTAINAI · もったいない · What a waste! · Paddle · Collect · Recycle" width="100%">
 
 ![3rd place](https://img.shields.io/badge/🥉_3rd_place-Green_Hackathon_2026-cd7f32)
 ![Unity 6](https://img.shields.io/badge/Unity-6-000000?logo=unity)
@@ -52,6 +46,9 @@ The generation that will inherit it is **7–12 years old**, the age when habits
 *Mottainai* (もったいない) is a Japanese word for the regret of wasting something precious: **"What a waste!"** That word became our game.
 
 > **A real-time co-op mobile game: 3 players share 1 raft to clean a polluted river.**
+
+![Concept art: three kids on a yellow raft cleaning a polluted river](docs/presentation/assets/img/concept.jpg)
+<sub>Concept art (target look)</sub>
 
 ## 🎮 Gameplay
 
@@ -132,7 +129,7 @@ Phones only send gestures; the server decides everything (Cloudflare Worker + Du
 
 ## 🎬 Demo
 
-[![Demo](docs/media/demo_preview.gif)](docs/media/MOTTAINAI_Demo.mp4)
+[![Demo: two phones, one raft](docs/media/demo_preview_hd.webp)](docs/media/MOTTAINAI_Demo.mp4)
 
 <sub>Two real phones, one raft: Rayen (right paddler) and Yassine (left paddler) join room BCFJ, then paddle together down the river.</sub>
 
@@ -140,6 +137,16 @@ Phones only send gestures; the server decides everything (Cloudflare Worker + Du
 
 🎤 **Pitch presentation:** [rayentouil.github.io/Mottainai/presentation](https://rayentouil.github.io/Mottainai/presentation/) · source: [`docs/presentation/index.html`](docs/presentation/index.html)
 <sub>Keys: Enter to start · Space / → next · F fullscreen · P presenter view · ? help</sub>
+
+### 📸 Screenshots
+
+| 🫧 Shield: 6 s of immunity | 🔥 Combo ×1.5, waste in its bin colour |
+|:-:|:-:|
+| ![Shield power-up on the river](docs/media/screenshots/shield.jpg) | ![Combo +23 while collecting waste](docs/media/screenshots/combo.jpg) |
+| **🦈 Dodge sharks, rocks & icebergs** | **🧑‍🤝‍🧑 Pick a role, bots fill empty seats** |
+| ![Shark on the river, team score and waste bar](docs/media/screenshots/shark.jpg) | ![Lobby with the three roles](docs/media/screenshots/lobby.jpg) |
+| **🏁 Results: waste per bin, accuracy, kg cleaned** | **📶 Connection lost? The match waits for you** |
+| ![Results screen](docs/media/screenshots/results.jpg) | ![Waiting for players, continue with bot](docs/media/screenshots/reconnect.jpg) |
 
 ## ▶️ Run it
 
@@ -195,7 +202,7 @@ SUP'COM engineering students.
 ## 🙏 Credits
 
 - **3D models** from [Poly Pizza](https://poly.pizza): [Quaternius](https://quaternius.com) (CC0); *Soda Can* by jeremy, *Elm tree* and *Palm tree* by Poly by Google, *Pine Tree* by Danni Bittman, *Iceberg 1* by S. Paul Michael ([CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/)). Full list: [`CREDITS.md`](Mottainai/Assets/_Mottainai/Resources/Models/CREDITS.md).
-- **Fonts:** [Fredoka](https://fonts.google.com/specimen/Fredoka), [Nunito Sans](https://fonts.google.com/specimen/Nunito+Sans) ([SIL OFL](docs/presentation/assets/fonts/OFL.txt)).
+- **Fonts:** [Fredoka](https://fonts.google.com/specimen/Fredoka), [Nunito Sans](https://fonts.google.com/specimen/Nunito+Sans), [M PLUS Rounded 1c](https://fonts.google.com/specimen/M+PLUS+Rounded+1c) (もったいない in the logo) ([SIL OFL](docs/presentation/assets/fonts/OFL.txt)).
 - **Data:** WWF, *Stop the Flood of Plastic* (2019) · OECD, *Global Plastics Outlook* (2022) · Newzoo, *Global Games Market Report* (2024).
 
 ---
