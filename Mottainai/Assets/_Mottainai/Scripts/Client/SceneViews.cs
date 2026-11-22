@@ -41,7 +41,7 @@ namespace Mottainai.Client
                 VisualFactory.Part(lifeRing, VisualFactory.Cube, VisualFactory.Lit(Color.white), Quaternion.Euler(0, a, 0) * new Vector3(0.2f, 0f, 0f), new Vector3(0.05f, 0.15f, 0.15f), new Vector3(0, a, 0), "stripe");
             }
             // blob shadow 2.8 x 1.8 m (#0B3A4A @ 35%), 0.01 m above water, follows the raft bob
-            VisualFactory.Part(t, VisualFactory.Quad, ArtV3.BlobMaterial(), new Vector3(0, 0.01f, 0), new Vector3(2.6f, 3.2f, 1f), new Vector3(90f, 0f, 0f), "blobShadow");
+            VisualFactory.Part(t, VisualFactory.Quad, ArtV3.BlobMaterial(), new Vector3(0, 0.13f, 0), new Vector3(2.6f, 3.2f, 1f), new Vector3(90f, 0f, 0f), "blobShadow");
 
             crew[1] = Crew(t, new Vector3(-0.5f, 0.12f, 0.15f), ArtV3.CrewBlue, ArtV3.CapBlue, false, out leftPaddle, -1);
             crew[2] = Crew(t, new Vector3(0.5f, 0.12f, 0.15f), ArtV3.CrewYellow, ArtV3.CapCoral, true, out rightPaddle, 1);

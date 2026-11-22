@@ -29,7 +29,7 @@ namespace Mottainai.Client
             }
             if (ring != null)
             {
-                ring.localPosition = new Vector3(0f, 0.02f + bob, 0f);
+                ring.localPosition = new Vector3(0f, 0.14f + bob, 0f); // above the 0.12 m wave crests
                 float p = 1f + 0.04f + 0.04f * Mathf.Sin(t * pulseHz * 6.2832f);
                 ring.localScale = ringScale * p;
             }

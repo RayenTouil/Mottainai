@@ -76,7 +76,7 @@ Shader "Mottainai/Water"
 
                 // caustics (tiling 6), flowing along +v
                 float flow = -t * _Flow;
-                float2 cuv = float2(u, v) * 6.0;
+                float2 cuv = float2(u, v) * 2.0; // ~3 m cells
                 float c = SAMPLE_TEXTURE2D(_Caustics, sampler_Caustics, cuv + float2(0.03 * t, 0.05 * t + flow)).r;
                 if (_Tier > 0.5) c *= SAMPLE_TEXTURE2D(_Caustics, sampler_Caustics, cuv + float2(-0.04 * t + 0.37, 0.02 * t + flow + 0.21)).r * 1.6;
                 col += _CausticColor.rgb * c * 0.25;

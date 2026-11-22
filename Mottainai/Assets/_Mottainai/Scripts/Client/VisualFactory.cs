@@ -334,7 +334,7 @@ namespace Mottainai.Client
             float k = WasteCatalog.Radius[(int)t] * 1.5f * 1.6f;
             var ring = new GameObject("ring").transform;
             ring.SetParent(root, false);
-            ring.localPosition = new Vector3(0, 0.02f, 0);
+            ring.localPosition = new Vector3(0, 0.14f, 0);
             ring.localScale = Vector3.one * 0.75f * k;
             Part(ring, ArtV3.Ring(0.6f, 32), Transparent(new Color(c.r, c.g, c.b, 0.35f * 0.6f)), new Vector3(0, -0.004f, 0), Vector3.one * 1.45f, default, "glow");
             if (t == WasteType.Organic || t == WasteType.Metal)
@@ -351,7 +351,7 @@ namespace Mottainai.Client
         {
             float r = ObstacleCatalog.Radius[(int)t], hl = ObstacleCatalog.HalfLen[(int)t];
             if (t == ObstacleType.BigRock || t == ObstacleType.Iceberg || t == ObstacleType.Wreck) // v3 blob shadow, 1.2x footprint
-                Part(root, Quad, ArtV3.BlobMaterial(), new Vector3(0, 0.01f, 0), new Vector3((r + hl) * 2.4f, r * 2.4f, 1f), new Vector3(90f, 90f, 0f), "blobShadow");
+                Part(root, Quad, ArtV3.BlobMaterial(), new Vector3(0, 0.13f, 0), new Vector3((r + hl) * 2.4f, r * 2.4f, 1f), new Vector3(90f, 90f, 0f), "blobShadow");
             if (t == ObstacleType.Shark && Model("Obstacles/shark", root, 2.4f, new Vector3(0, -0.05f, 0), Vector3.zero, "body", true, true) != null)
             {
                 var sharkFin = Part(root, Cone, Lit(new Color(0.35f, 0.4f, 0.48f)), new Vector3(0, 0.25f, 0), new Vector3(0.12f, 0.75f, 0.6f), default, "fin");

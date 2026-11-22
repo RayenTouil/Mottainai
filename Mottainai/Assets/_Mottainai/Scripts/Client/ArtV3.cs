@@ -100,7 +100,7 @@ namespace Mottainai.Client
         public static Texture2D Caustics()
         {
             if (caustics != null) return caustics;
-            const int S = 512, N = 8; // 8x8 jittered cells
+            const int S = 512, N = 4; // 4x4 jittered cells (low frequency)
             var rng = new System.Random(7);
             var pts = new Vector2[N * N];
             for (int i = 0; i < pts.Length; i++) pts[i] = new Vector2((i % N + (float)rng.NextDouble()) / N, (i / N + (float)rng.NextDouble()) / N);
@@ -121,7 +121,7 @@ namespace Mottainai.Client
                             if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
                         }
                     float e = (Mathf.Sqrt(f2) - Mathf.Sqrt(f1)) * N; // 0 on cell edges
-                    float line = Mathf.Pow(Mathf.Clamp01(1f - e / 0.22f), 2.2f);
+                    float line = Mathf.Pow(Mathf.Clamp01(1f - e / 0.35f), 1.6f);
                     px[y * S + x] = (byte)(line * 255f);
                 }
             caustics = new Texture2D(S, S, TextureFormat.R8, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, name = "Caustics" };
