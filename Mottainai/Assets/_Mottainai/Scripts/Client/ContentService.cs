@@ -163,7 +163,7 @@ namespace Mottainai.Client
                 var bytes = File.ReadAllBytes(path);
                 if (bytes.Length != size * size * 4) return null;
                 var tex = new Texture2D(size, size, TextureFormat.RGBA32, true, linear) { wrapMode = TextureWrapMode.Repeat, anisoLevel = 2 };
-                tex.LoadRawTextureData(bytes);
+                tex.SetPixelData(bytes, 0); // pack holds mip 0 only (LoadRawTextureData expects the full mip chain)
                 tex.Apply(true, true);
                 return tex;
             }

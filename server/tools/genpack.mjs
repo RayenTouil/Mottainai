@@ -34,14 +34,18 @@ function normalMap(size, seed, strength) {
   return data;
 }
 
+// brown inflatable tube (ART_DIRECTION): alternating rubber panels, light seams, soft grain
 function skin(size) {
   const data = Buffer.alloc(size * size * 4);
+  const panel = size / 8, seam = 5;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const stripe = Math.floor((x + Math.floor(y / 4)) / 96) % 2 === 0;
+    const k = Math.floor(x / panel), inSeam = x % panel < seam;
     let h = (Math.imul(x, 2654435761) ^ Math.imul(y, 40503)) >>> 0; h ^= h >>> 15;
-    const n = (h & 15) - 8, o = (y * size + x) * 4;
-    data[o] = Math.min(255, Math.max(0, (stripe ? 235 : 255) + n)); data[o + 1] = Math.min(255, Math.max(0, (stripe ? 90 : 210) + n));
-    data[o + 2] = Math.min(255, Math.max(0, (stripe ? 40 : 60) + n)); data[o + 3] = 255;
+    const n = ((h & 7) - 4) + Math.round(6 * Math.sin(y / size * Math.PI * 2));
+    const base = inSeam ? [150, 112, 82] : k % 2 === 0 ? [96, 60, 40] : [108, 70, 47];
+    const o = (y * size + x) * 4;
+    for (let c = 0; c < 3; c++) data[o + c] = Math.min(255, Math.max(0, base[c] + n));
+    data[o + 3] = 255;
   }
   return data;
 }

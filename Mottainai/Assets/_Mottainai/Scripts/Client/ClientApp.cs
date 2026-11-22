@@ -316,6 +316,7 @@ namespace Mottainai.Client
                         lastSyncTime = Time.time;
                         Big(syncStreak > 1 ? $"SYNC x{syncStreak}!" : "SYNC!", Color.Lerp(new Color(0.4f, 0.9f, 1f), new Color(1f, 0.85f, 0.3f), Mathf.Clamp01((syncStreak - 1) / 4f)), 0.7f);
                         world.SyncKick();
+                        raft.HopAll();
                         world.Splash(raft.PaddleTip(true), true);
                         world.Splash(raft.PaddleTip(false), true);
                         sfx.Play(Sfx.Id.Sync);
@@ -334,6 +335,7 @@ namespace Mottainai.Client
                         bool combo = (e.extra & 0x80) != 0;
                         var pos = world.EntityPosition(e.entity, new Vector3(e.x, 0.2f, e.z));
                         world.Collect(e.entity);
+                        if (type != WasteType.Toxic) raft.Hop(Role.Collector);
                         Color c = WasteCatalog.Colors[(int)type];
                         world.fx.Burst(pos, c, type == WasteType.Valuable ? 26 : 12, 2f);
                         if (type == WasteType.Toxic) { Popup(pos, $"TOXIC -{Mathf.Abs(GameTuning.Current.wasteScores[(int)WasteType.Toxic])}", c, 1.1f); sfx.Play(Sfx.Id.Toxic); }
@@ -352,6 +354,7 @@ namespace Mottainai.Client
                         world.Splash(world.RaftPos, true);
                         Big("CRASH!", new Color(1f, 0.4f, 0.3f), 1.5f);
                         world.HitShake();
+                        raft.Flinch();
                         sfx.Play(Sfx.Id.Hit);
                         NetworkInfo.Provider.Vibrate(120);
                         break;

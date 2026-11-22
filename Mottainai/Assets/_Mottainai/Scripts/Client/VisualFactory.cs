@@ -60,14 +60,19 @@ namespace Mottainai.Client
 
         static int Key(Color c) => ((int)(c.r * 255) << 24) ^ ((int)(c.g * 255) << 16) ^ ((int)(c.b * 255) << 8) ^ (int)(c.a * 255);
 
-        public static Material Lit(Color c, float emission = 0f)
+        public static Material Lit(Color c, float emission = 0f) => Lit(c, emission, 0f);
+
+        public static Material Gloss(Color c, float gloss = 1f) => Lit(c, 0f, gloss);
+
+        public static Material Lit(Color c, float emission, float gloss)
         {
-            int k = Key(c) ^ (int)(emission * 1000) * 7919;
+            int k = Key(c) ^ (int)(emission * 1000) * 7919 ^ (int)(gloss * 100) * 104729;
             if (litCache.TryGetValue(k, out var m)) return m;
             toon ??= Shader.Find("Mottainai/Toon") ?? Shader.Find("Universal Render Pipeline/Simple Lit");
             m = new Material(toon) { enableInstancing = true, name = "Toon_" + k };
             m.SetColor("_BaseColor", c);
             if (m.HasProperty("_Emission")) m.SetFloat("_Emission", emission);
+            if (m.HasProperty("_Gloss")) m.SetFloat("_Gloss", gloss);
             litCache[k] = m;
             return m;
         }

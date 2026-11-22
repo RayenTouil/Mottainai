@@ -5,6 +5,7 @@ Shader "Mottainai/Toon"
         _BaseColor ("Color", Color) = (1,1,1,1)
         _BaseMap ("Texture", 2D) = "white" {}
         _Emission ("Emission", Range(0, 2)) = 0
+        _Gloss ("Toon gloss", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -26,6 +27,7 @@ Shader "Mottainai/Toon"
                 float4 _BaseColor;
                 float4 _BaseMap_ST;
                 float _Emission;
+                float _Gloss;
             CBUFFER_END
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
@@ -57,6 +59,9 @@ Shader "Mottainai/Toon"
                 half4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv);
                 float3 c = _BaseColor.rgb * tex.rgb;
                 float3 col = c * (toon * l.color + SampleSH(n) * 0.35) + rim + c * _Emission;
+                // crisp toy-plastic highlight (inflatable raft, bottles, cans)
+                float3 hv = normalize(l.direction + v);
+                col += smoothstep(0.5, 0.56, pow(saturate(dot(n, hv)), 28)) * _Gloss * 0.55 * l.color;
                 col = MixFog(col, i.fog);
                 return half4(col, 1);
             }

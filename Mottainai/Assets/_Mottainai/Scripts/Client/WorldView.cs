@@ -94,6 +94,7 @@ namespace Mottainai.Client
             raftView = RaftView.Create(transform, content);
             fx = new GameObject("Fx").AddComponent<FxSystem>();
             fx.transform.SetParent(transform, false);
+            raftView.fx = fx;
         }
 
         public void ResetWorld()

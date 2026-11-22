@@ -26,18 +26,21 @@ namespace Mottainai.Client
         void Build(ContentService content)
         {
             var t = transform;
+            var tk = DesignTokens.Current;
+            // brown inflatable ring raft (thick glossy rubber tube), rope line, floor, small recycling badge on the stern
             if (VisualFactory.Model("Raft/raft", t, 3.4f, new Vector3(0, 0.22f, 0), Vector3.zero, "hull", false, true) == null)
             {
-                hullRenderer = VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.27f, 1.38f), VisualFactory.Lit(new Color(1f, 0.55f, 0.2f)), new Vector3(0, 0.24f, 0), Vector3.one, default, "hull").GetComponent<MeshRenderer>();
+                hullRenderer = VisualFactory.Part(t, ProceduralMeshes.Torus(0.98f, 0.34f, 1.32f, 44, 16), VisualFactory.Gloss(new Color(0.42f, 0.27f, 0.18f), 0.9f), new Vector3(0, 0.27f, 0), Vector3.one, default, "hull").GetComponent<MeshRenderer>();
                 ApplyContent(content);
-                VisualFactory.Part(t, ProceduralMeshes.Torus(0.95f, 0.06f, 1.38f, 40, 6), VisualFactory.Lit(new Color(0.95f, 0.95f, 0.9f)), new Vector3(0, 0.52f, 0), Vector3.one, default, "rope");
-                VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.2f, 0.3f, 0.42f)), new Vector3(0, 0.1f, 0), new Vector3(1.95f, 0.05f, 2.65f), default, "floor");
+                VisualFactory.Part(t, ProceduralMeshes.Torus(0.98f, 0.045f, 1.32f, 44, 6), VisualFactory.Lit(new Color(0.93f, 0.88f, 0.74f)), new Vector3(0, 0.6f, 0), Vector3.one, default, "rope");
+                VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.3f, 0.2f, 0.14f)), new Vector3(0, 0.12f, 0), new Vector3(1.9f, 0.05f, 2.6f), default, "floor");
             }
-            VisualFactory.Part(t, VisualFactory.Cube, VisualFactory.Lit(new Color(1f, 0.85f, 0.2f), 0.4f), new Vector3(0, 0.5f, 1.58f), new Vector3(0.5f, 0.12f, 0.12f), default, "bow");
+            VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(tk.primary, 0.15f), new Vector3(0, 0.33f, -1.64f), new Vector3(0.36f, 0.015f, 0.36f), new Vector3(90f, 0f, 0f), "badge");
+            VisualFactory.Part(t, VisualFactory.Triangle, VisualFactory.Lit(Color.white, 0.3f), new Vector3(0, 0.27f, -1.665f), Vector3.one * 0.2f, new Vector3(0f, 180f, 0f), "badgeIcon");
 
-            crew[1] = Crew(t, new Vector3(-0.72f, 0.35f, -0.35f), new Color(0.2f, 0.6f, 1f), out leftPaddle, -1);
-            crew[2] = Crew(t, new Vector3(0.72f, 0.35f, -0.35f), new Color(0.95f, 0.3f, 0.45f), out rightPaddle, 1);
-            crew[3] = Crew(t, new Vector3(0f, 0.35f, 0.85f), new Color(0.3f, 0.8f, 0.35f), out collectorArm, 0);
+            crew[1] = Crew(t, new Vector3(-0.7f, 0.33f, -0.38f), tk.capLeft, out leftPaddle, -1);
+            crew[2] = Crew(t, new Vector3(0.7f, 0.33f, -0.38f), tk.capRight, out rightPaddle, 1);
+            crew[3] = Crew(t, new Vector3(0f, 0.33f, 0.8f), tk.capCollector, out collectorArm, 0);
             for (int i = 1; i <= 3; i++) crewBase[i] = crew[i].localPosition;
 
             highlight = VisualFactory.Part(t, VisualFactory.Cylinder, VisualFactory.Lit(new Color(1f, 0.85f, 0.2f), 1f), Vector3.zero, new Vector3(0.5f, 0.02f, 0.5f), default, "you").transform;
@@ -84,34 +87,46 @@ namespace Mottainai.Client
             skinApplied = true;
         }
 
-        Transform Crew(Transform parent, Vector3 pos, Color c, out Transform tool, int side)
+        /// Toy crew member: rounded cylinder body, orange life vest with straps, round head, role-colored cap + brim, dot eyes.
+        Transform Crew(Transform parent, Vector3 pos, Color cap, out Transform tool, int side)
         {
+            var tk = DesignTokens.Current;
             var root = new GameObject("crew").transform;
             root.SetParent(parent, false);
             root.localPosition = pos;
-            VisualFactory.Part(root, VisualFactory.Capsule, VisualFactory.Lit(c), new Vector3(0, 0.3f, 0), new Vector3(0.42f, 0.32f, 0.42f));
-            VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(new Color(1f, 0.82f, 0.65f)), new Vector3(0, 0.78f, 0), Vector3.one * 0.34f);
-            VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(c * 0.85f + Color.white * 0.15f, 0.1f), new Vector3(0, 0.88f, -0.02f), new Vector3(0.37f, 0.22f, 0.37f), default, "helmet");
-            VisualFactory.Part(root, VisualFactory.Cylinder, VisualFactory.Lit(new Color(1f, 0.45f, 0.1f)), new Vector3(0, 0.36f, 0), new Vector3(0.47f, 0.17f, 0.47f), default, "vest");
-            VisualFactory.Part(root, VisualFactory.Cube, VisualFactory.Lit(new Color(0.95f, 0.95f, 0.9f), 0.3f), new Vector3(0, 0.36f, 0.22f), new Vector3(0.12f, 0.2f, 0.04f), default, "reflector");
-            VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(Color.black), new Vector3(0.07f, 0.82f, 0.15f), Vector3.one * 0.05f);
-            VisualFactory.Part(root, VisualFactory.Sphere, VisualFactory.Lit(Color.black), new Vector3(-0.07f, 0.82f, 0.15f), Vector3.one * 0.05f);
+            var shirt = VisualFactory.Lit(Color.Lerp(cap, Color.white, 0.18f));
+            var skin = VisualFactory.Lit(new Color(1f, 0.83f, 0.66f));
+            var capM = VisualFactory.Gloss(cap, 0.5f);
+            var strap = VisualFactory.Lit(new Color(0.96f, 0.95f, 0.9f));
+            var dark = VisualFactory.Lit(new Color(0.12f, 0.1f, 0.1f));
+            VisualFactory.Part(root, VisualFactory.Capsule, shirt, new Vector3(0, 0.33f, 0), new Vector3(0.44f, 0.33f, 0.44f), default, "body");
+            VisualFactory.Part(root, VisualFactory.Cylinder, VisualFactory.Gloss(tk.vest, 0.35f), new Vector3(0, 0.41f, 0), new Vector3(0.5f, 0.18f, 0.5f), default, "vest");
+            for (int sx = -1; sx <= 1; sx += 2)
+                for (int sz = -1; sz <= 1; sz += 2)
+                    VisualFactory.Part(root, VisualFactory.Cube, strap, new Vector3(sx * 0.1f, 0.42f, sz * 0.24f), new Vector3(0.05f, 0.3f, 0.03f), default, "strap");
+            VisualFactory.Part(root, VisualFactory.Sphere, skin, new Vector3(0, 0.83f, 0), Vector3.one * 0.36f, default, "head");
+            VisualFactory.Part(root, VisualFactory.Sphere, capM, new Vector3(0, 0.91f, -0.01f), new Vector3(0.385f, 0.25f, 0.385f), default, "cap");
+            VisualFactory.Part(root, VisualFactory.Cylinder, capM, new Vector3(0, 0.9f, 0.17f), new Vector3(0.27f, 0.012f, 0.22f), default, "brim");
+            VisualFactory.Part(root, VisualFactory.Sphere, dark, new Vector3(0.075f, 0.84f, 0.165f), Vector3.one * 0.05f, default, "eye");
+            VisualFactory.Part(root, VisualFactory.Sphere, dark, new Vector3(-0.075f, 0.84f, 0.165f), Vector3.one * 0.05f, default, "eye");
             tool = new GameObject("tool").transform;
             tool.SetParent(root, false);
-            tool.localPosition = new Vector3(side * 0.25f, 0.45f, 0);
+            tool.localPosition = new Vector3(side * 0.25f, 0.47f, 0.05f);
             if (side != 0)
             {
-                // CC0 paddle (blade down, see ModelImportRules) over the same span as the primitive shaft + blade
-                if (VisualFactory.Model("Raft/paddle", tool, 1.34f, new Vector3(side * 0.4f, -0.3f, 0), new Vector3(0, 0, side * 40f), "paddle") == null)
-                {
-                    VisualFactory.Part(tool, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.6f, 0.4f, 0.2f)), new Vector3(side * 0.35f, -0.25f, 0), new Vector3(0.06f, 0.6f, 0.06f), new Vector3(0, 0, side * 40f));
-                    VisualFactory.Part(tool, VisualFactory.Cube, VisualFactory.Lit(new Color(0.95f, 0.9f, 0.2f)), new Vector3(side * 0.72f, -0.68f, 0), new Vector3(0.05f, 0.35f, 0.22f), new Vector3(0, 0, side * 40f));
-                }
+                // wooden shaft, dark blade, hands on the grip
+                VisualFactory.Part(tool, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.76f, 0.54f, 0.32f)), new Vector3(side * 0.36f, -0.26f, 0), new Vector3(0.055f, 0.62f, 0.055f), new Vector3(0, 0, side * 40f), "shaft");
+                VisualFactory.Part(tool, VisualFactory.Capsule, VisualFactory.Gloss(new Color(0.27f, 0.18f, 0.12f), 0.3f), new Vector3(side * 0.76f, -0.72f, 0), new Vector3(0.07f, 0.26f, 0.22f), new Vector3(0, 0, side * 40f), "blade");
+                VisualFactory.Part(tool, VisualFactory.Sphere, skin, new Vector3(side * 0.06f, 0.04f, 0), Vector3.one * 0.12f, default, "hand");
+                VisualFactory.Part(tool, VisualFactory.Sphere, skin, new Vector3(side * 0.42f, -0.32f, 0), Vector3.one * 0.11f, default, "hand");
             }
             else
             {
-                VisualFactory.Part(tool, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.6f, 0.4f, 0.2f)), new Vector3(0, 0.2f, 0.25f), new Vector3(0.05f, 0.45f, 0.05f), new Vector3(60, 0, 0));
-                VisualFactory.Part(tool, VisualFactory.Sphere, VisualFactory.Transparent(new Color(1f, 1f, 1f, 0.5f)), new Vector3(0, 0.45f, 0.62f), new Vector3(0.4f, 0.1f, 0.4f));
+                // landing net: pole, yellow hoop, translucent mesh
+                VisualFactory.Part(tool, VisualFactory.Cylinder, VisualFactory.Lit(new Color(0.76f, 0.54f, 0.32f)), new Vector3(0, 0.2f, 0.25f), new Vector3(0.05f, 0.45f, 0.05f), new Vector3(60, 0, 0), "pole");
+                VisualFactory.Part(tool, ProceduralMeshes.Torus(0.21f, 0.025f, 1f, 24, 6), VisualFactory.Lit(tk.reward), new Vector3(0, 0.45f, 0.64f), Vector3.one, default, "hoop");
+                VisualFactory.Part(tool, VisualFactory.Sphere, VisualFactory.Transparent(new Color(1f, 1f, 1f, 0.45f)), new Vector3(0, 0.43f, 0.64f), new Vector3(0.4f, 0.1f, 0.4f), default, "mesh");
+                VisualFactory.Part(tool, VisualFactory.Sphere, skin, new Vector3(0, 0.02f, 0.05f), Vector3.one * 0.12f, default, "hand");
             }
             return root;
         }
@@ -166,6 +181,17 @@ namespace Mottainai.Client
         /// Whole crew jumps for joy (end of match).
         public void Cheer() => cheerT = 2.6f;
 
+        const float HopTime = 0.42f, FlinchTime = 0.6f;
+        readonly float[] hopT = new float[4];
+        float flinchT, trailAt;
+        public FxSystem fx;
+
+        /// Small cheer hop (catch, sync).
+        public void Hop(Role r) { int i = (int)r; if (i >= 1 && i <= 3) hopT[i] = HopTime; }
+        public void HopAll() { for (int i = 1; i <= 3; i++) hopT[i] = HopTime * (0.85f + 0.1f * i); }
+        /// Crew ducks and squashes (obstacle hit / near miss).
+        public void Flinch() => flinchT = FlinchTime;
+
         void Update()
         {
             float dt = Time.deltaTime;
@@ -178,9 +204,14 @@ namespace Mottainai.Client
                 float ph = i * 1.7f;
                 float jump = cheerT > 0f ? Mathf.Abs(Mathf.Sin((idleT + ph) * 7f)) * 0.35f * Mathf.Clamp01(cheerT) : 0f;
                 float lean = i == 1 && leftAnim >= 0f ? StrokeCurve(leftAnim) : i == 2 && rightAnim >= 0f ? StrokeCurve(rightAnim) : i == 3 && armAnim >= 0f ? StrokeCurve(armAnim) * 0.6f : 0f;
-                c.localPosition = crewBase[i] + Vector3.up * (Mathf.Sin(idleT * 2.2f + ph) * 0.025f + jump);
-                c.localRotation = Quaternion.Euler(Mathf.Sin(idleT * 1.6f + ph) * 3f + lean * 18f, 0f, Mathf.Sin(idleT * 1.3f + ph) * 4f);
+                float hop = hopT[i] > 0f ? Mathf.Sin((1f - hopT[i] / HopTime) * Mathf.PI) * 0.24f : 0f;
+                hopT[i] = Mathf.Max(0f, hopT[i] - dt);
+                float fl = flinchT > 0f ? Mathf.Sin((1f - flinchT / FlinchTime) * Mathf.PI) : 0f;
+                c.localPosition = crewBase[i] + Vector3.up * (Mathf.Sin(idleT * 2.2f + ph) * 0.025f + jump + hop);
+                c.localRotation = Quaternion.Euler(Mathf.Sin(idleT * 1.6f + ph) * 3f + lean * 18f - fl * 24f, 0f, Mathf.Sin(idleT * 1.3f + ph) * 4f + hop * 30f * (i == 2 ? -1f : 1f));
+                c.localScale = new Vector3(1f + fl * 0.12f, 1f - fl * 0.16f + hop * 0.3f, 1f + fl * 0.12f);
             }
+            flinchT = Mathf.Max(0f, flinchT - dt);
             if (magnetOn)
             {
                 magnetRing.localRotation = Quaternion.Euler(0f, idleT * 120f, 0f);
@@ -203,6 +234,12 @@ namespace Mottainai.Client
         {
             if (t < 0f) return;
             t += Time.deltaTime;
+            // water trail while the blade pulls through the water
+            if (fx != null && t > 0.04f && t < 0.34f && Time.time >= trailAt)
+            {
+                trailAt = Time.time + 0.035f;
+                fx.Burst(PaddleTip(paddle == leftPaddle) + Vector3.up * 0.05f, new Color(0.9f, 0.97f, 1f), 1, 0.9f, 0.07f, 1.3f);
+            }
             float a = StrokeCurve(t) * 55f * (back ? -1f : 1f) * dir;
             paddle.localRotation = Quaternion.Euler(a, 0, 0);
             if (t > 0.5f) { t = -1f; paddle.localRotation = Quaternion.identity; }
