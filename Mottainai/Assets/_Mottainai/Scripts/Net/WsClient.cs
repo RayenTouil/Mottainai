@@ -1,12 +1,31 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Mottainai.Net
 {
+    /// Monotonic, thread-safe millisecond clock shared by the socket threads and the main thread.
+    public static class NetTime
+    {
+        static readonly double k = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        public static double Ms => System.Diagnostics.Stopwatch.GetTimestamp() * k;
+    }
+
+    sealed class RefEq : IEqualityComparer<object>
+    {
+        public static readonly RefEq I = new RefEq();
+        public new bool Equals(object a, object b) => ReferenceEquals(a, b);
+        public int GetHashCode(object o) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(o);
+    }
+
+    public struct Inbound { public byte[] data; public double recvMs; }
+
     /// ClientWebSocket on background tasks: receive loop -> lock-free queue -> main thread (Poll).
     /// Auto-reconnects with exponential backoff while Want is true.
     public class WsClient
@@ -21,7 +40,8 @@ namespace Mottainai.Net
         public event Action Opened;
         public event Action<string> ClosedEvt;
 
-        readonly ConcurrentQueue<byte[]> inbox = new ConcurrentQueue<byte[]>();
+        readonly ConcurrentQueue<Inbound> inbox = new ConcurrentQueue<Inbound>();
+        public volatile bool NoDelay;
         readonly ConcurrentQueue<byte[]> outbox = new ConcurrentQueue<byte[]>();
         readonly SemaphoreSlim outSignal = new SemaphoreSlim(0);
         readonly ConcurrentQueue<Action> mainActions = new ConcurrentQueue<Action>();
@@ -59,14 +79,16 @@ namespace Mottainai.Net
             outSignal.Release();
         }
 
-        /// Call from the main thread each frame; invokes handler for every received frame.
-        public void Poll(Action<byte[]> handler)
+        /// Call from the main thread each frame; invokes handler for every received frame (with its socket-thread receive time).
+        public void Poll(Action<byte[], double> handler)
         {
             while (mainActions.TryDequeue(out var a)) a();
-            while (inbox.TryDequeue(out var m)) handler(m);
+            while (inbox.TryDequeue(out var m)) handler(m.data, m.recvMs);
         }
 
         public int Backlog => inbox.Count;
+        /// Age of the oldest undelivered frame (main-thread starvation), ms.
+        public double OldestAgeMs => inbox.TryPeek(out var m) ? NetTime.Ms - m.recvMs : 0.0;
 
         async Task Loop(int gen, CancellationToken ct)
         {
@@ -84,6 +106,7 @@ namespace Mottainai.Net
                             to.CancelAfter(8000);
                             await ws.ConnectAsync(new Uri(Url), to.Token).ConfigureAwait(false);
                         }
+                        NoDelay = DisableNagle(ws);
                         state = State.Open;
                         backoffMs = 250;
                         mainActions.Enqueue(() => Opened?.Invoke());
@@ -126,12 +149,48 @@ namespace Mottainai.Net
                 {
                     var m = new byte[len];
                     Buffer.BlockCopy(buf, 0, m, 0, len);
-                    inbox.Enqueue(m);
+                    inbox.Enqueue(new Inbound { data = m, recvMs = NetTime.Ms });
                     Interlocked.Add(ref BytesRecv, len);
                     Interlocked.Increment(ref MsgsRecv);
                 }
                 len = 0;
             }
+        }
+
+        /// Mono's ClientWebSocket leaves Nagle on (measured NoDelay=False): small event frames (strokes) could wait
+        /// for the ACK of the previous frame (up to one RTT). Find the TCP socket under the stream chain and set TCP_NODELAY.
+        static bool DisableNagle(ClientWebSocket ws)
+        {
+            try
+            {
+                var s = FindSocket(ws, 0, new HashSet<object>(RefEq.I));
+                if (s == null) { Debug.Log("[Ws] TCP socket not found, Nagle unchanged"); return false; }
+                s.NoDelay = true;
+                Debug.Log("[Ws] TCP_NODELAY=" + s.NoDelay);
+                return s.NoDelay;
+            }
+            catch (Exception e) { Debug.Log("[Ws] NoDelay failed: " + e.Message); return false; }
+        }
+
+        static Socket FindSocket(object o, int depth, HashSet<object> seen)
+        {
+            if (o == null || depth > 7 || o is string || !seen.Add(o)) return null;
+            if (o is Socket s) return s;
+            var t = o.GetType();
+            if (t.IsPrimitive || t.IsArray || t.IsEnum || o is Delegate || o is Task || o is SemaphoreSlim || o is CancellationTokenSource) return null;
+            string ns = t.Namespace ?? "";
+            if (depth > 0 && !(ns.StartsWith("System.Net") || ns.StartsWith("Mono.") || ns.StartsWith("System.IO") || o is System.IO.Stream)) return null;
+            for (var tt = t; tt != null && tt != typeof(object); tt = tt.BaseType)
+                foreach (var f in tt.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly))
+                {
+                    var ft = f.FieldType;
+                    if (ft.IsPrimitive || ft.IsEnum || ft == typeof(string) || ft.IsArray) continue;
+                    object v;
+                    try { v = f.GetValue(o); } catch { continue; }
+                    var r = FindSocket(v, depth + 1, seen);
+                    if (r != null) return r;
+                }
+            return null;
         }
 
         async Task SendLoop(ClientWebSocket ws, CancellationToken ct)

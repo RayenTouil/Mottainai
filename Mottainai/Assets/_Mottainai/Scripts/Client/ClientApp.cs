@@ -150,7 +150,7 @@ namespace Mottainai.Client
                 {
                     logT = 0;
                     var s = net.stats;
-                    Debug.Log($"[AUTOPLAY] screen={screen} tick={s.ServerTick} score={hudScore} left={hudTimeLeft:F0}s snaps={s.SnapshotRate:F0}/s down={s.DownKbps:F0}kbps up={s.UpKbps:F0}kbps msgs={s.Pps:F0}/s rtt={s.RttAvg:F1}/{s.RttP95:F1}ms interp={s.InterpMs:F0}ms raft={(world != null ? world.RaftPos.ToString() : "-")}");
+                    Debug.Log($"[AUTOPLAY] screen={screen} tick={s.ServerTick} score={hudScore} left={hudTimeLeft:F0}s snaps={s.SnapshotRate:F0}/s down={s.DownKbps:F0}kbps up={s.UpKbps:F0}kbps msgs={s.Pps:F0}/s rtt={s.RttAvg:F1}/{s.RttP95:F1}ms jit={s.Jitter:F1}ms buf={s.InterpMs:F0}ms snapJit={s.SnapJitterMs:F0}ms late={s.LatePct:F0}% lead={s.PredLeadMs:F0}ms nodelay={s.NoDelay} fps={s.Fps:F0} raft={(world != null ? world.RaftPos.ToString() : "-")}");
                 }
                 yield return null;
             }
@@ -298,6 +298,7 @@ namespace Mottainai.Client
                     case EvType.Countdown: Big(e.value.ToString(), Color.white, 0.9f); sfx.Play(Sfx.Id.Beep); break;
                     case EvType.Go: Big("PADDLE!", new Color(0.5f, 1f, 0.6f), 1f); sfx.Play(Sfx.Id.Go); break;
                     case EvType.Stroke:
+                        if (e.role == myRole) world.AckLocalStroke(); // prediction: this stroke is now in the server state
                         bool mine = e.role == myRole && Time.time - lastLocalStroke < 0.6f;
                         if (!mine)
                         {
@@ -438,7 +439,12 @@ namespace Mottainai.Client
         {
             float dt = Time.unscaledDeltaTime;
             bool inMatch = screen == UiScreen.Game;
-            if (world != null) { net.stats.InterpMs = world.InterpMs; world.RttMs = net.stats.RttAvg; world.SnapshotHz = net.SnapshotHz; }
+            if (world != null)
+            {
+                var st = net.stats;
+                st.InterpMs = world.InterpMs; st.SnapJitterMs = world.JitterMs; st.PredLeadMs = world.PredictionLeadMs; st.LatePct = world.LatePct;
+                world.RttMs = st.RttAvg; world.RttMinMs = st.RttMin; world.SnapshotHz = net.SnapshotHz;
+            }
             net.Tick(dt, inMatch);
             NetworkInfo.Provider.Refresh();
 

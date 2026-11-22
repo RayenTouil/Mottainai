@@ -79,14 +79,22 @@ namespace Mottainai.Client
         {
             asset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             if (asset != null) originalScale = asset.renderScale;
-            if (asset != null) { originalMsaa = asset.msaaSampleCount; if (SystemInfo.systemMemorySize >= 6000 && !Application.isEditor) asset.msaaSampleCount = 4; }
+            if (asset != null) { originalMsaa = asset.msaaSampleCount; asset.msaaSampleCount = Mathf.Min(asset.msaaSampleCount, 2); } // spec: MSAA <= 2x
         }
+
+        float paceLow;
 
         void Update()
         {
             float dt = Time.unscaledDeltaTime;
             if (dt <= 0f) return;
             fps = Mathf.Lerp(fps, 1f / dt, 0.05f);
+            // frame pacing: an unsustained 90/120 Hz target alternates 8/16 ms frames (visible judder) -> lock 60
+            if (Application.targetFrameRate > 60)
+            {
+                paceLow = fps < Application.targetFrameRate * 0.85f ? paceLow + dt : 0f;
+                if (paceLow > 2f) { Application.targetFrameRate = 60; Debug.Log("[Perf] high refresh not sustained -> 60 FPS lock"); }
+            }
             if (dropped || asset == null) return;
             low = fps < 45f ? low + dt : 0f;
             if (low > 3f)

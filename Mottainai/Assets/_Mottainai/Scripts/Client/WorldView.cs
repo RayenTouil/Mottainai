@@ -47,6 +47,8 @@ namespace Mottainai.Client
         float delayTicks = 2f, jitterTicks;
         public float InterpMs => delayTicks / TickRate * 1000f;
         public float JitterMs => jitterTicks / TickRate * 1000f;
+        public float LatePct { get; private set; }
+        int lateFrames, allFrames;
         public double RenderTick { get; private set; }
 
         public RaftView raftView;
@@ -293,9 +295,13 @@ namespace Mottainai.Client
             double nowTicks = Time.unscaledTimeAsDouble * TickRate;
             double diff = baseOffset - smoothOffset;
             smoothOffset = System.Math.Abs(diff) > 12 ? baseOffset : smoothOffset + diff * Mathf.Min(1f, Time.unscaledDeltaTime * 2f);
-            float target = Mathf.Max(2f * TickRate / Mathf.Max(1, SnapshotHz), jitterTicks) + 0.35f;
-            delayTicks = Mathf.Lerp(delayTicks, target, Mathf.Min(1f, Time.unscaledDeltaTime * 1.5f));
+            // buffer = one snapshot interval + p95 lateness (>= 2 intervals); starved frames extrapolate instead of freezing
+            float interval = (float)TickRate / Mathf.Max(1, SnapshotHz);
+            float target = Mathf.Min(Mathf.Max(2f * interval, interval + jitterTicks) + 0.25f, 0.25f * TickRate);
+            delayTicks = Mathf.Lerp(delayTicks, target, Mathf.Min(1f, Time.unscaledDeltaTime * (target > delayTicks ? 4f : 0.8f)));
             RenderTick = nowTicks + smoothOffset - delayTicks;
+            lateFrames += RenderTick > LatestTick ? 1 : 0; allFrames++;
+            if (allFrames >= 120) { LatePct = 100f * lateFrames / allFrames; lateFrames = allFrames = 0; }
 
             UpdateRaft();
             if (PredictOwnRaft && havePred && srvRunning) ApplyPrediction();
@@ -327,14 +333,14 @@ namespace Mottainai.Client
         // ---------------- own-raft prediction (hides RTT for paddlers) ----------------
         public bool PredictOwnRaft = true;
         public int Seed;
-        public float RttMs;
+        public float RttMs, RttMinMs;
         public float PredictionLeadMs { get; private set; }
         uint srvTick;
         float srv, srvZ, srvH, srvVx, srvVz, srvYaw;
         double srvRecv;
         bool havePred, srvRunning;
         readonly RaftSim pred = new RaftSim();
-        struct LocalStroke { public double t; public bool left, back; public float power, boost; }
+        struct LocalStroke { public double t; public bool left, back; public float power, boost; public uint ackTick; }
         float magnetUntil, turboUntil;
 
         /// Power-up timers (local clock) for raft effects + Turbo-aware prediction.
@@ -352,18 +358,37 @@ namespace Mottainai.Client
             if (localStrokes.Count > 12) localStrokes.RemoveAt(0);
         }
 
+        /// Server echoed one of our strokes (EVENTS arrive in order with snapshots): every snapshot after LatestTick contains it.
+        public void AckLocalStroke()
+        {
+            for (int i = 0; i < localStrokes.Count; i++)
+            {
+                if (localStrokes[i].ackTick != 0) continue;
+                var s = localStrokes[i];
+                s.ackTick = System.Math.Max(1u, LatestTick);
+                localStrokes[i] = s;
+                return;
+            }
+        }
+
         void ApplyPrediction()
         {
             var t = GameTuning.Current;
             double now = Time.unscaledTimeAsDouble;
-            float oneWay = Mathf.Clamp(RttMs * 0.0005f, 0f, 0.15f);
-            float lead = Mathf.Clamp((float)(now - srvRecv) + oneWay, 0f, 0.25f);
+            // Server "now" on the tick timeline: best-arrival clock line + min one-way delay. A late snapshot no longer
+            // shifts the time base (old code used its arrival time), so network jitter does not wobble the raft.
+            double serverNowTicks = now * TickRate + smoothOffset + Mathf.Clamp(RttMinMs * 0.0005f, 0f, 0.15f) * TickRate;
+            float lead = Mathf.Clamp((float)((serverNowTicks - srvTick) / TickRate), 0f, 0.6f);
             PredictionLeadMs = lead * 1000f;
             pred.SetFromServer(srv, srvZ, srvH, srvVx, srvVz, srvYaw, Seed, t);
             pred.maxSpeedBonus = TurboOn ? t.turboMaxSpeedBonus : 0f;
             double t0 = now - lead; // local-clock time matching the server state
-            double ackBefore = srvRecv - 2f * oneWay; // strokes older than this are already in the server state
-            for (int i = localStrokes.Count - 1; i >= 0; i--) if (localStrokes[i].t < now - 1.0) localStrokes.RemoveAt(i);
+            double rejectAfter = 0.25 + Mathf.Clamp(RttMs, 20f, 400f) * 0.002; // never echoed -> rejected by the server
+            for (int i = localStrokes.Count - 1; i >= 0; i--)
+            {
+                var s = localStrokes[i];
+                if ((s.ackTick != 0 && srvTick > s.ackTick) || (s.ackTick == 0 && now - s.t > rejectAfter) || now - s.t > 1.5) localStrokes.RemoveAt(i);
+            }
             const float step = 1f / 60f;
             double simT = t0;
             int next = 0;
@@ -374,7 +399,7 @@ namespace Mottainai.Client
                 {
                     var s = localStrokes[next];
                     if (s.t > simT + dt) break;
-                    if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t, s.boost);
+                    pred.Stroke(s.left, s.power, s.back, (float)s.t, t, s.boost);
                 }
                 pred.Step(dt, Seed, t);
                 simT += dt;
@@ -382,7 +407,7 @@ namespace Mottainai.Client
             for (; next < localStrokes.Count; next++)
             {
                 var s = localStrokes[next];
-                if (s.t >= ackBefore) pred.Stroke(s.left, s.power, s.back, (float)s.t, t, s.boost);
+                pred.Stroke(s.left, s.power, s.back, (float)s.t, t, s.boost);
             }
             var p = new Vector3(pred.x, 0f, pred.z);
             float dtf = Time.unscaledDeltaTime;
@@ -474,6 +499,20 @@ namespace Mottainai.Client
                 b = smp;
             }
             if (!found) a = b = s.s[(s.head - s.count + Ring * 2) % Ring];
+            if (found && b.tick == a.tick && s.count > 1 && rt > a.tick)
+            {
+                // starved (late snapshot): extrapolate from the two newest samples, max 6 ticks, instead of freezing
+                var pr = s.s[(s.head - 2 + Ring * 2) % Ring];
+                if (a.tick > pr.tick)
+                {
+                    float k = Mathf.Min(6f, (float)(rt - a.tick)) / (a.tick - pr.tick);
+                    float dx = a.x - pr.x, dz = a.z - pr.z, dyaw = Mathf.DeltaAngle(pr.yaw, a.yaw);
+                    if (dx * dx + dz * dz > 0.25f) k = 0f; // discontinuity (state change): hold
+                    p = new Vector3(a.x + dx * k, a.y, a.z + dz * k);
+                    yaw = Mathf.Abs(dyaw) < 20f ? a.yaw + dyaw * k : a.yaw;
+                    return;
+                }
+            }
             float t = b.tick > a.tick ? Mathf.Clamp01((float)((rt - a.tick) / (b.tick - a.tick))) : 0f;
             p = new Vector3(Mathf.Lerp(a.x, b.x, t), Mathf.Lerp(a.y, b.y, t), Mathf.Lerp(a.z, b.z, t));
             yaw = Mathf.LerpAngle(a.yaw, b.yaw, t);

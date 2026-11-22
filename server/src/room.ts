@@ -6,6 +6,9 @@ const TICK_HZ = 60;
 const IDLE_STOP_MS = 30_000;
 const RECONNECT_MS = 60_000;
 const BOT = 0xff;
+const INPUT_GRACE_S = 0.12; // input arriving this early (network jitter) waits for its cooldown instead of being dropped
+
+interface Deferred { at: number; arrived: number; role: number; net: boolean; power: number; back: boolean; target: number; dx: number; dz: number; rewind: number; }
 
 interface Player {
   id: number; token: string; name: string; role: number; ready: boolean;
@@ -27,6 +30,7 @@ export class RoomDO extends DurableObject {
   lastSnapTick = -99;
   snapshotHz = 60;
   resultsSent = false;
+  deferred: Deferred[] = [];
   w = new Writer(8192);
 
   constructor(ctx: DurableObjectState, env: any) {
@@ -127,6 +131,7 @@ export class RoomDO extends DurableObject {
     for (const r of [Role.Left, Role.Right, Role.Collector]) sim.teams[0].bot[r] = this.roleOwner(r) === BOT;
     this.sim = sim;
     this.resultsSent = false;
+    this.deferred.length = 0;
     for (const p of this.players) { p.ready = false; if (p.ws) this.sendMatchStart(p); }
     this.broadcastLobby();
   }
@@ -180,7 +185,12 @@ export class RoomDO extends DurableObject {
         case C2S.BACKPADDLE: {
           r.u8(); // side: the player's role is authoritative
           const power = r.u8() / 255;
-          if (this.sim && (p.role === Role.Left || p.role === Role.Right)) this.sim.humanStroke(this.sim.teams[0], p.role, power, id === C2S.BACKPADDLE);
+          if (this.sim && (p.role === Role.Left || p.role === Role.Right)) {
+            const team = this.sim.teams[0], wait = team.strokeReady[p.role] - this.sim.time;
+            if (wait > 0 && wait <= INPUT_GRACE_S && this.sim.phase === Phase.Running)
+              this.deferred.push({ at: team.strokeReady[p.role], arrived: this.sim.time, role: p.role, net: false, power, back: id === C2S.BACKPADDLE, target: 0, dx: 0, dz: 0, rewind: 0 });
+            else this.sim.humanStroke(team, p.role, power, id === C2S.BACKPADDLE);
+          }
           this.flushEvents();
           break;
         }
@@ -188,7 +198,10 @@ export class RoomDO extends DurableObject {
           const target = r.u16(), dx = r.i16() / 1000, dz = r.i16() / 1000;
           if (this.sim && p.role === Role.Collector) {
             const rewind = clamp(p.rttMs / 2, 0, TUNING.lagCompCapMs) / 1000; // lag compensation: RTT/2, cap 150 ms
-            this.sim.applyThrow(this.sim.teams[0], target === NO_ENTITY ? NO_ENTITY : target, dx, dz, rewind);
+            const team = this.sim.teams[0], wait = team.netReadyAt - this.sim.time;
+            if (wait > 0 && wait <= INPUT_GRACE_S && this.sim.phase === Phase.Running)
+              this.deferred.push({ at: team.netReadyAt, arrived: this.sim.time, role: Role.Collector, net: true, power: 0, back: false, target, dx, dz, rewind });
+            else this.sim.applyThrow(team, target === NO_ENTITY ? NO_ENTITY : target, dx, dz, rewind);
           }
           this.flushEvents();
           break;
@@ -243,6 +256,7 @@ export class RoomDO extends DurableObject {
     this.tick++;
     const sim = this.sim;
     if (!sim) return;
+    if (this.deferred.length) this.applyDeferred(sim);
     if (sim.phase !== Phase.Finished) sim.step(1 / TICK_HZ);
     this.flushEvents();
     if (sim.phase === Phase.Finished) {
@@ -256,6 +270,19 @@ export class RoomDO extends DurableObject {
     if (!sendSnapshot || this.tick - this.lastSnapTick < TICK_HZ / this.snapshotHz) return;
     this.lastSnapTick = this.tick;
     this.broadcast(this.buildSnapshot(sim));
+  }
+
+  applyDeferred(sim: MatchSim) {
+    const team = sim.teams[0];
+    const keep: Deferred[] = [];
+    for (const d of this.deferred) {
+      if (d.at > sim.time + 1e-6) { keep.push(d); continue; }
+      if (sim.phase !== Phase.Running) continue;
+      // lag comp grows by the time the input waited (still capped)
+      if (d.net) sim.applyThrow(team, d.target, d.dx, d.dz, Math.min(d.rewind + (sim.time - d.arrived), TUNING.lagCompCapMs / 1000));
+      else sim.humanStroke(team, d.role, d.power, d.back);
+    }
+    this.deferred = keep;
   }
 
   /** Broadcast pending sim events now (also called right after input so teammates see strokes ~half a tick sooner). */

@@ -89,14 +89,14 @@ namespace Mottainai.Client
             double lastSend = -1;
             while (Time.realtimeSinceStartup - t0 < 40f && room.Count < 100)
             {
-                ws.Poll(m =>
+                ws.Poll((m, recvMs) =>
                 {
                     if (m.Length == 0) return;
                     var br = new ByteReader(m, 1, m.Length - 1);
                     if (m[0] == Msg.Welcome) { r.roomColo = Codec.ReadWelcome(ref br).roomColo; welcomed = true; }
-                    else if (m[0] == Msg.Pong) { room.Add((float)(clock.Elapsed.TotalMilliseconds - br.F64())); lastSend = -1; }
+                    else if (m[0] == Msg.Pong) { room.Add((float)(recvMs - br.F64())); lastSend = -1; }
                 });
-                double now = clock.Elapsed.TotalMilliseconds;
+                double now = NetTime.Ms;
                 if (welcomed && sent < 100 && (lastSend < 0 || now - lastSend > 1000))
                 {
                     ws.Send(wr.Begin(Msg.Ping).F64(now).ToArray());
