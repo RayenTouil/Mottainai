@@ -65,7 +65,7 @@ namespace Mottainai.Client
         }
     }
 
-    /// CPU-rasterized water effects map (global _MottainaiFx, R = obstacle foam, G = waste dirt, B = raft wake)
+    /// CPU-rasterized water effects map (global _MottainaiFx, R = obstacle foam, G = waste dirt, B = raft wake, A = blob shadows)
     /// covering a window around the raft. One texture fetch per water pixel instead of dozens of loop iterations.
     public class WaterFxMap
     {
@@ -117,6 +117,23 @@ namespace Mottainai.Client
                     float dx = x0 + (ix + 0.5f) * TX - cx;
                     float d = Mathf.Sqrt(dx * dx + dz * dz);
                     Put(ix, iz, ch, (1f - d * inv) * strength);
+                }
+            }
+        }
+
+        /// Soft blob shadow (channel A), ellipse rx x rz.
+        public void Shadow(float cx, float cz, float rx, float rz, float strength)
+        {
+            Bounds(cx, cz, Mathf.Max(rx, rz), out int ix0, out int ix1, out int iz0, out int iz1);
+            float ix = 1f / Mathf.Max(0.01f, rx), iz = 1f / Mathf.Max(0.01f, rz);
+            for (int z = iz0; z <= iz1; z++)
+            {
+                float dz = (z0 + (z + 0.5f) * TZ - cz) * iz;
+                for (int x = ix0; x <= ix1; x++)
+                {
+                    float dx = (x0 + (x + 0.5f) * TX - cx) * ix;
+                    float d = 1f - Mathf.Sqrt(dx * dx + dz * dz);
+                    Put(x, z, 3, d * d * (3f - 2f * d) * strength);
                 }
             }
         }

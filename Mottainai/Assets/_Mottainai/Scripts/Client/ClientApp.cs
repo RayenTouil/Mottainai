@@ -83,6 +83,8 @@ namespace Mottainai.Client
                 if (cli[i] == "-name" && i + 1 < cli.Length) playerName = cli[i + 1];
                 if (cli[i] == "-shots" && i + 1 < cli.Length) shotsDir = cli[i + 1];
                 if (cli[i] == "-quitafter" && i + 1 < cli.Length) float.TryParse(cli[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
+                if (cli[i] == "-room" && i + 1 < cli.Length) autoRoom = cli[i + 1];
+                if (cli[i] == "-role" && i + 1 < cli.Length && int.TryParse(cli[i + 1], out int ar)) preferredRole = (Role)ar;
             }
 
             world = WorldView.Create(null); // live river behind the menus (attract mode)
@@ -93,7 +95,7 @@ namespace Mottainai.Client
 
         // ---------------- smoke test: -autoplay -connect <ip> ----------------
         bool autoplay;
-        string shotsDir;
+        string shotsDir, autoRoom = "DEMO";
         float quitAfter;
         int shotIndex;
 
@@ -126,7 +128,9 @@ namespace Mottainai.Client
             while (screen != UiScreen.Menu && Time.realtimeSinceStartup - t0 < 90f) yield return null;
             if (screen != UiScreen.Menu) { Debug.LogError("[AUTOPLAY] FAIL: never reached menu. " + loginStatus.text); Application.Quit(2); yield break; }
             Debug.Log($"[AUTOPLAY] menu; content {content.BytesTotal / 1048576f:F1} MB at {content.Mbps:F1} MB/s cached={content.FromCache}");
-            JoinRoom("DEMO");
+            yield return new WaitForSecondsRealtime(1.5f);
+            Shot("menu");
+            JoinRoom(autoRoom);
             while (screen != UiScreen.Lobby || lobby == null) yield return null;
             yield return new WaitForSecondsRealtime(0.8f);
             Shot("lobby");

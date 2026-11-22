@@ -40,6 +40,7 @@ Shader "Mottainai/Water"
             // globals (set from C#)
             float4 _MottainaiFxRect;                         // x0, z0, 1/spanX, 1/spanZ of the effects map
             float4 _MottainaiSkyHorizon, _MottainaiSkyZenith; // sky gradient for reflections
+            float4 _MottainaiSunDir;                          // visual sun (top-right) for glints
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings { float4 positionCS : SV_POSITION; float3 positionWS : TEXCOORD0; float3 waveN : TEXCOORD1; float fog : TEXCOORD2; };
@@ -101,6 +102,7 @@ Shader "Mottainai/Water"
                 float inside = step(0.0, fxuv.x) * step(fxuv.x, 1.0) * step(0.0, fxuv.y) * step(fxuv.y, 1.0);
                 float4 fx = SAMPLE_TEXTURE2D(_MottainaiFx, sampler_MottainaiFx, fxuv) * inside;
                 col = lerp(col, _DirtColor.rgb, fx.g * 0.65);
+                col = lerp(col, _Deep.rgb * 0.7, fx.a * 0.42); // blob shadows
 
                 // lighter, greener shallows near the banks
                 float edge = saturate((abs(i.positionWS.x) - (_HalfWidth - 3.5)) / 3.5);
@@ -119,7 +121,7 @@ Shader "Mottainai/Water"
 
                 // sun glints + specular
                 float sparkle = SAMPLE_TEXTURE2D(_MottainaiNoise, sampler_MottainaiNoise, uv * 0.35 + t * 0.05).b;
-                col += pow(saturate(dot(rdir, l.direction)), 250) * step(0.78, sparkle) * 1.4;
+                col += pow(saturate(dot(rdir, _MottainaiSunDir.xyz)), 60) * step(0.8, sparkle) * 1.6;
                 float3 h = normalize(l.direction + v);
                 col += pow(saturate(dot(n, h)), 96) * 1.2 * l.color;
                 col = MixFog(col, i.fog);

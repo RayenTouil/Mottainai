@@ -80,53 +80,12 @@ namespace Mottainai.Client
             }
             cam.transform.SetParent(transform, false);
             camT = cam.transform;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.62f, 0.84f, 0.95f);
             cam.fieldOfView = 55f;
             cam.nearClipPlane = 0.3f;
-            cam.farClipPlane = 140f;
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = cam.backgroundColor;
-            RenderSettings.fogStartDistance = 55f;
-            RenderSettings.fogEndDistance = 125f;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.55f, 0.6f, 0.65f);
-
-            var lightGo = new GameObject("Sun");
-            lightGo.transform.SetParent(transform, false);
-            lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-            var l = lightGo.AddComponent<Light>();
-            l.type = LightType.Directional;
-            l.intensity = 1.15f;
-            l.color = new Color(1f, 0.97f, 0.9f);
-            l.shadows = LightShadows.None;
-
-            // hemispheric ambient (sky blue from above, warm bounce from below) for softer cartoon shading
-            var sh = new UnityEngine.Rendering.SphericalHarmonicsL2();
-            sh.AddAmbientLight(new Color(0.42f, 0.47f, 0.52f));
-            sh.AddDirectionalLight(Vector3.up, new Color(0.35f, 0.5f, 0.7f), 0.9f);
-            sh.AddDirectionalLight(Vector3.down, new Color(0.35f, 0.4f, 0.25f), 0.5f);
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Custom;
-            RenderSettings.ambientProbe = sh;
-
-            NoiseTexture.Ensure();
-            var horizon = new Color(0.72f, 0.88f, 0.98f);
-            var zenith = new Color(0.22f, 0.52f, 0.9f);
-            Shader.SetGlobalVector("_MottainaiSkyHorizon", horizon);
-            Shader.SetGlobalVector("_MottainaiSkyZenith", zenith);
-            cam.backgroundColor = horizon;
-            RenderSettings.fogColor = horizon;
-            var skyShader = Shader.Find("Mottainai/Sky");
-            if (skyShader != null)
-            {
-                var skyMat = new Material(skyShader);
-                skyMat.SetVector("_SunDir", -lightGo.transform.forward);
-                skyMat.SetColor("_Horizon", horizon);
-                skyMat.SetColor("_Zenith", zenith);
-                sky = VisualFactory.Part(transform, VisualFactory.Sphere, skyMat, Vector3.zero, Vector3.one * 250f, default, "SkyDome").transform;
-            }
+            SceneLook.Apply(transform, cam, out sky, out skyMat);
             postFx = PostFx.Create(transform, cam);
+            Quality.Changed += ApplyQuality;
+            ApplyQuality();
             highlight = VisualFactory.Part(transform, VisualFactory.Cylinder, VisualFactory.Transparent(new Color(1f, 0.95f, 0.3f, 0.55f), 1.5f), Vector3.zero, new Vector3(1.4f, 0.02f, 1.4f), default, "AimHighlight").transform;
             highlight.gameObject.SetActive(false);
 
@@ -460,12 +419,21 @@ namespace Mottainai.Client
                 if (kind == EntityKind.Obstacle)
                 {
                     bool shark = sub == (byte)ObstacleType.Shark;
-                                        float r = ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] * 0.7f;
+                    float r = ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] * 0.7f;
                     fxMap.Ring(p.x, p.z, shark && s.flags != 2 ? 0.35f : r, shark ? (s.flags == 2 ? 0.85f : 0.45f) : 1f);
+                    if (!shark || s.flags == 2)
+                        fxMap.Shadow(p.x + ShadowOff.x * r, p.z + ShadowOff.y * r, ObstacleCatalog.Radius[sub] + ObstacleCatalog.HalfLen[sub] + 0.4f, ObstacleCatalog.Radius[sub] + 0.5f, 0.8f);
                 }
                 else if (kind == EntityKind.Waste)
+                {
                     fxMap.Disc(p.x, p.z, sub == (byte)WasteType.Toxic ? 4.5f : 3f, 1f, 1);
+                    fxMap.Shadow(p.x + ShadowOff.x * 0.3f, p.z + ShadowOff.y * 0.3f, 0.5f, 0.45f, 0.6f);
+                }
             }
+            // raft blob shadow, offset away from the key light
+            var fw = new Vector2(Mathf.Sin(RaftHeading), Mathf.Cos(RaftHeading));
+            float rs = 0.65f;
+            fxMap.Shadow(RaftPos.x + ShadowOff.x * rs, RaftPos.z + ShadowOff.y * rs, 1.55f + Mathf.Abs(fw.x) * 0.4f, 1.55f + Mathf.Abs(fw.y) * 0.4f, 0.95f);
             // wake: chronological segments from the oldest trail point up to the current stern
             Vector2 prev = default;
             float prevAge = 0f, prevS = 0f;
@@ -484,6 +452,7 @@ namespace Mottainai.Client
         }
 
         static float WakeWidth(float age) => 0.75f + age * 2.2f;
+        static readonly Vector2 ShadowOff = new Vector2(-SceneLook.ToLight.x, -SceneLook.ToLight.z) / SceneLook.ToLight.y;
 
         static void Interp(Slot s, double rt, out Vector3 p, out float yaw)
         {
@@ -561,9 +530,10 @@ namespace Mottainai.Client
         {
             float h = RaftHeading * 0.35f;
             var fwd = new Vector3(Mathf.Sin(h), 0f, Mathf.Cos(h));
-            var targetPos = RaftPos - fwd * 9f + Vector3.up * 6.3f;
+            // raft ~32 deg below the camera (lower-center third), horizon ~20% from the top (reference framing)
+            var targetPos = RaftPos - fwd * CamBack + Vector3.up * CamUp;
             camT.position = Vector3.SmoothDamp(camT.position, targetPos, ref camVel, 0.18f);
-            var look = RaftPos + fwd * 5f + Vector3.up * 0.5f;
+            var look = RaftPos + fwd * CamAhead + Vector3.up * 0.9f;
             camT.rotation = Quaternion.Slerp(camT.rotation, Quaternion.LookRotation(look - camT.position), Mathf.Min(1f, Time.deltaTime * 8f));
             // speed-reactive FOV + punch on sync boost, roll with yaw
             float dt = Mathf.Max(1e-4f, Time.deltaTime);
@@ -580,9 +550,21 @@ namespace Mottainai.Client
             UpdateWakeSpray(dt);
         }
 
+        const float CamBack = 8.5f, CamUp = 5.6f, CamAhead = 7f;
         Vector3 lastRaftPos;
         float smoothSpeed, fovKick, shake, sprayTimer, attractT;
         Transform sky, highlight;
+        Material skyMat;
+
+        void ApplyQuality()
+        {
+            bool hi = Quality.High;
+            if (skyMat != null) skyMat.SetFloat("_Rays", hi ? 1f : 0f);
+            Shader.SetGlobalFloat("_MottainaiHigh", hi ? 1f : 0f);
+            postFx.SetEnabled(hi);
+        }
+
+        void OnDestroy() => Quality.Changed -= ApplyQuality;
         public PostFx postFx;
         bool attract = true;
         /// Menu fly-over mode. Entering it clears the previous match (entities, flyers, prediction).
@@ -666,8 +648,8 @@ namespace Mottainai.Client
         {
             lastRaftPos = RaftPos;
             smoothSpeed = 0f;
-            camT.position = RaftPos + new Vector3(0, 6.3f, -9f);
-            camT.rotation = Quaternion.LookRotation(RaftPos + new Vector3(0, 0.5f, 5f) - camT.position);
+            camT.position = RaftPos + new Vector3(0, CamUp, -CamBack);
+            camT.rotation = Quaternion.LookRotation(RaftPos + new Vector3(0, 0.9f, CamAhead) - camT.position);
         }
 
         /// Screen-space generous picking of floating waste for the collector.
