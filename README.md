@@ -188,14 +188,14 @@ More details: [`DEPLOY.md`](DEPLOY.md) and [`PROTOCOL.md`](PROTOCOL.md).
 
 **How we'll prove impact:** sorting accuracy per bin · quiz before vs after · sync rate.
 
-## 👥 Team "5le9a Deyra"
+## 👥 Team "5le9a_Deyra"
 
 SUP'COM engineering students.
 
 | Member | Role |
 |---|---|
-| **Rayen TOUIL** | Pitch deck & presentation, 3D asset integration, main codebase |
 | **Yassine AFFES** | Lead developer (server & networking), coder, second pitcher |
+| **Rayen TOUIL** | Pitch deck & presentation, 3D asset integration, main codebase |
 | **Med Amine CHAKROUN** | Coach |
 | **Wajdi ZENTANI** | Pitcher & the team's saver |
 
