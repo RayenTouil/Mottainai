@@ -250,9 +250,6 @@ namespace Mottainai.Client
     {
         Transform waterT, bankL, bankR, sandL, sandR;
         Material mat;
-        readonly List<Transform> trees = new List<Transform>();
-        const int TreeCount = 36;
-        const float TreeSpacing = 8f;
 
         public static WaterView Create(Transform parent, ContentService content)
         {
@@ -283,29 +280,16 @@ namespace Mottainai.Client
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             waterT = wgo.transform;
 
-            var grass = VisualFactory.Lit(new Color(0.42f, 0.7f, 0.32f));
-            var sand = VisualFactory.Lit(new Color(0.88f, 0.8f, 0.6f));
+            // park ground: grass patches, winding footpath, flowers, earth bank walls (Mottainai/Ground)
+            var groundShader = Shader.Find("Mottainai/Ground");
+            var grass = groundShader != null ? new Material(groundShader) : VisualFactory.Lit(new Color(0.47f, 0.76f, 0.33f));
+            if (groundShader != null) grass.SetFloat("_PathX", hw + 5.5f);
+            var sand = VisualFactory.Lit(new Color(0.6f, 0.47f, 0.34f));
             bankL = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(-hw - 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
             bankR = VisualFactory.Part(transform, VisualFactory.Cube, grass, new Vector3(hw + 36f, 0.4f, 0), new Vector3(70f, 1.2f, 190f)).transform;
             sandL = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(-hw - 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
             sandR = VisualFactory.Part(transform, VisualFactory.Cube, sand, new Vector3(hw + 0.6f, 0.1f, 0), new Vector3(1.6f, 0.5f, 170f)).transform;
 
-            var trunk = VisualFactory.Lit(new Color(0.45f, 0.3f, 0.18f));
-            var leaf = new[] { VisualFactory.Lit(new Color(0.2f, 0.55f, 0.25f)), VisualFactory.Lit(new Color(0.3f, 0.65f, 0.2f)), VisualFactory.Lit(new Color(0.15f, 0.45f, 0.3f)) };
-            for (int i = 0; i < TreeCount; i++)
-            {
-                var tr = new GameObject("tree").transform;
-                tr.SetParent(transform, false);
-                VisualFactory.Part(tr, VisualFactory.Cylinder, trunk, new Vector3(0, 1.2f, 0), new Vector3(0.35f, 1.2f, 0.35f));
-                if (i % 3 == 0) VisualFactory.Part(tr, ProceduralMeshes.Pine(i % 4), leaf[i % 3], Vector3.zero, Vector3.one, new Vector3(0, i * 37, 0));
-                else
-                {
-                    VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5), leaf[i % 3], new Vector3(0, 3f, 0), new Vector3(2.8f, 2.4f, 2.8f), new Vector3(0, i * 53, 0));
-                    VisualFactory.Part(tr, ProceduralMeshes.Blob(i % 5 + 5), leaf[(i + 1) % 3], new Vector3(0.7f, 2.4f, 0.4f), new Vector3(1.6f, 1.4f, 1.6f));
-                }
-                if (i % 4 == 1) VisualFactory.Part(tr, ProceduralMeshes.Rock(i % 6 + 20), VisualFactory.Lit(new Color(0.55f, 0.53f, 0.5f)), new Vector3(1.6f, 0.1f, 0.8f), new Vector3(1.2f, 0.8f, 1.1f));
-                trees.Add(tr);
-            }
         }
 
         bool mapsApplied;
@@ -362,22 +346,6 @@ namespace Mottainai.Client
             bankR.localPosition = new Vector3(hw + 36f + push, 0.4f, z + 40f);
             sandL.localPosition = new Vector3(-hw - 0.6f - push, 0.1f, z + 40f);
             sandR.localPosition = new Vector3(hw + 0.6f + push, 0.1f, z + 40f);
-            float seaZ = GameTuning.Current.courseLength - 45f;
-            int baseCell = Mathf.FloorToInt((raft.z - 20f) / TreeSpacing);
-            for (int c = baseCell; c < baseCell + TreeCount; c++)
-            {
-                int idx = ((c % TreeCount) + TreeCount) % TreeCount;
-                uint h = (uint)(c * 2654435761u);
-                float side = (c & 1) == 0 ? -1f : 1f;
-                float off = 2.8f + (h % 1000) / 1000f * 6f;
-                float s = 0.8f + ((h >> 10) % 100) / 100f * 0.6f;
-                var tr = trees[idx];
-                float tz = c * TreeSpacing + ((h >> 20) % 100) / 100f * 4f;
-                bool land = tz < seaZ;
-                if (tr.gameObject.activeSelf != land) tr.gameObject.SetActive(land);
-                tr.localPosition = new Vector3(side * (hw + off), 0.9f, tz);
-                tr.localScale = Vector3.one * s;
-            }
         }
     }
 

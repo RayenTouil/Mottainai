@@ -6,6 +6,7 @@ Shader "Mottainai/Toon"
         _BaseMap ("Texture", 2D) = "white" {}
         _Emission ("Emission", Range(0, 2)) = 0
         _Gloss ("Toon gloss", Range(0, 1)) = 0
+        _FogMul ("Fog amount", Range(0, 1)) = 1
     }
     SubShader
     {
@@ -28,6 +29,7 @@ Shader "Mottainai/Toon"
                 float4 _BaseMap_ST;
                 float _Emission;
                 float _Gloss;
+                float _FogMul;
             CBUFFER_END
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
@@ -62,7 +64,7 @@ Shader "Mottainai/Toon"
                 // crisp toy-plastic highlight (inflatable raft, bottles, cans)
                 float3 hv = normalize(l.direction + v);
                 col += smoothstep(0.5, 0.56, pow(saturate(dot(n, hv)), 28)) * _Gloss * 0.55 * l.color;
-                col = MixFog(col, i.fog);
+                col = lerp(col, MixFog(col, i.fog), _FogMul); // distant backdrop props use less fog
                 return half4(col, 1);
             }
             ENDHLSL

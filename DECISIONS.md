@@ -60,3 +60,12 @@
 - P1 models: raft model replaces torus hull/rope/floor (Content Pack raft skin only applies to the torus hull); paddle auto-oriented blade-down at import.
 - P1 models: glTFast 6.21.0 added for metal_can.glb (only GLB-only model). bear_trap.fbx imported but unmapped (no ObstacleType for it; needs server sim + protocol change).
 - I1 test plan: 1 phone on this PC -> 1 human + 2 bots (LEFT PADDLER, then COLLECTOR); pass = 3 full matches in a row on 5G SA.
+- NET: DO loop uses drift-free setTimeout chain aimed at ideal tick times (setInterval drifted 0.3 ms/tick: 0-16 ms sawtooth + 2-snapshot bursts). Measured server send jitter p95 14.7 -> 0.7 ms (tools/jitter.ts).
+- NET: events flushed immediately after STROKE/NET input (teammates see strokes ~half a tick sooner); inputs arriving <=120 ms before their cooldown are deferred, not dropped.
+- NET: client sets TCP_NODELAY via reflection (Mono ClientWebSocket measured NoDelay=False); RTT stamped on the socket thread; raft prediction timebase = server tick clock (best-arrival line + RTTmin/2), strokes acked by their EVENTS echo; jitter buffer = max(2 intervals, interval + p95 lateness); starved entities extrapolate up to 6 ticks; 120 Hz target drops to 60 if not sustained; MSAA capped at 2x.
+- BUILD: tools/build_copy.sh builds from a robocopy mirror (.bc/) so APKs/Windows players can be built while the editor is open.
+- ART: camera framing changed to the reference (raft ~32 deg below camera, horizon ~20% from top); visual sun top-right decoupled from key light (upper-right behind camera) so the toy crew stays front-lit.
+- ART: Quality High/Low (PlayerPrefs qualityHigh; default High on >=5.5 GB / 8-core phones): Low disables post, sky rays, water caustics.
+- ART: blob shadows drawn into the water FX map alpha (no extra draw calls); ripple rings/bow wave/splash rings in the FX map foam channel.
+- ART: imported Elm/Palm GLB textures downscaled 2048 -> 1024 (budget), Nature pack rejected (66k tris). Rocks: 30% render as red/white buoys (visual only).
+- FIX: content-pack textures never loaded (LoadRawTextureData requires full mip chain) -> SetPixelData mip 0 + Apply.

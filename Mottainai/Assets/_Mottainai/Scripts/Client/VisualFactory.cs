@@ -320,6 +320,17 @@ namespace Mottainai.Client
             Part(root, Cylinder, Transparent(new Color(c.r, c.g, c.b, 0.45f)), new Vector3(0, -0.02f, 0), new Vector3(1.0f, 0.01f, 1.0f), default, "ring");
         }
 
+        /// Red-and-white river buoy (ART_DIRECTION §3: visual variant of Rock).
+        static void Buoy(Transform root)
+        {
+            var red = Gloss(new Color(0.9f, 0.18f, 0.16f), 0.6f); var white = Gloss(new Color(0.97f, 0.96f, 0.94f), 0.6f);
+            Part(root, Sphere, red, new Vector3(0, 0.15f, 0), new Vector3(1.3f, 0.7f, 1.3f));
+            Part(root, Cylinder, white, new Vector3(0, 0.6f, 0), new Vector3(0.8f, 0.28f, 0.8f));
+            Part(root, Cylinder, red, new Vector3(0, 1.05f, 0), new Vector3(0.62f, 0.2f, 0.62f));
+            Part(root, Cone, white, new Vector3(0, 1.25f, 0), new Vector3(0.55f, 0.55f, 0.55f));
+            Part(root, Sphere, Lit(new Color(1f, 0.9f, 0.4f), 1.2f), new Vector3(0, 1.85f, 0), Vector3.one * 0.18f);
+        }
+
         static void BuildObstacle(Transform root, ObstacleType t)
         {
             float r = ObstacleCatalog.Radius[(int)t], hl = ObstacleCatalog.HalfLen[(int)t];
@@ -335,9 +346,12 @@ namespace Mottainai.Client
             {
                 case ObstacleType.Rock:
                 {
+                    if (Random.value < 0.3f) { Buoy(root); break; } // visual variant, same collider
                     int v = Random.Range(0, 4);
-                    Part(root, ProceduralMeshes.Rock(v), Lit(new Color(0.52f, 0.5f, 0.5f)), new Vector3(0, 0.05f, 0), new Vector3(2.1f * r, 1.5f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
-                    Part(root, ProceduralMeshes.Rock(v + 4), Lit(new Color(0.45f, 0.44f, 0.46f)), new Vector3(0.55f * r, 0f, -0.3f * r), new Vector3(0.9f * r, 0.7f * r, 0.9f * r));
+                    Part(root, ProceduralMeshes.Rock(v), Lit(new Color(0.6f, 0.57f, 0.53f)), new Vector3(0, 0.05f, 0), new Vector3(2.1f * r, 1.5f * r, 2f * r), new Vector3(0, Random.Range(0, 360), 0));
+                    Part(root, ProceduralMeshes.Rock(v + 4), Lit(new Color(0.52f, 0.5f, 0.48f)), new Vector3(0.55f * r, 0f, -0.3f * r), new Vector3(0.9f * r, 0.7f * r, 0.9f * r));
+                    Part(root, ProceduralMeshes.Blob(v + 2), Lit(new Color(0.42f, 0.7f, 0.3f)), new Vector3(0.05f, 0.95f * r, 0f), new Vector3(1.3f * r, 0.32f * r, 1.2f * r)); // grassy cap
+                    Part(root, ProceduralMeshes.Blob(v + 6), Lit(new Color(0.52f, 0.78f, 0.34f)), new Vector3(-0.3f * r, 1.05f * r, 0.25f * r), new Vector3(0.6f * r, 0.3f * r, 0.6f * r));
                     break;
                 }
                 case ObstacleType.BigRock:
@@ -361,7 +375,10 @@ namespace Mottainai.Client
                     Part(root, Cube, Lit(new Color(0.85f, 0.85f, 0.75f)), new Vector3(0.6f, 1.6f, 0), new Vector3(0.05f, 0.8f, 0.7f), new Vector3(0, 0, 12));
                     break;
                 case ObstacleType.Log:
-                    Part(root, Cylinder, Lit(new Color(0.5f, 0.32f, 0.16f)), new Vector3(0, 0.05f, 0), new Vector3(2f * r, hl + r, 2f * r), new Vector3(0, 0, 90));
+                    Part(root, Cylinder, Lit(new Color(0.55f, 0.36f, 0.19f)), new Vector3(0, 0.05f, 0), new Vector3(2f * r, hl + r, 2f * r), new Vector3(0, 0, 90));
+                    Part(root, Cylinder, Lit(new Color(0.9f, 0.75f, 0.52f)), new Vector3(hl + r + 0.01f, 0.05f, 0), new Vector3(1.85f * r, 0.02f, 1.85f * r), new Vector3(0, 0, 90)); // cut ends
+                    Part(root, Cylinder, Lit(new Color(0.9f, 0.75f, 0.52f)), new Vector3(-hl - r - 0.01f, 0.05f, 0), new Vector3(1.85f * r, 0.02f, 1.85f * r), new Vector3(0, 0, 90));
+                    Part(root, Cylinder, Lit(new Color(0.48f, 0.31f, 0.16f)), new Vector3(0.4f, 0.35f, 0.1f), new Vector3(0.16f, 0.35f, 0.16f), new Vector3(20f, 0, -30f)); // branch stub
                     break;
                 case ObstacleType.Shark:
                     var body = new GameObject("body").transform;
