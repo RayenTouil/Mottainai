@@ -25,6 +25,29 @@ namespace Mottainai.Client
         public static readonly Color UiWarn = Hex("#FF7A1A"), NetBadge = Hex("#00C2A8");
 
         static Mesh gem;
+        static Material blob;
+
+        /// Unlit radial-gradient blob shadow (#0B3A4A @ 35%), 128 px.
+        public static Material BlobMaterial()
+        {
+            if (blob != null) return blob;
+            const int S = 128;
+            var px = new Color32[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float dx = (x + 0.5f) / S * 2f - 1f, dy = (y + 0.5f) / S * 2f - 1f;
+                    float a = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy));
+                    px[y * S + x] = new Color32(255, 255, 255, (byte)(Mathf.SmoothStep(0f, 1f, a) * 255f));
+                }
+            var tex = new Texture2D(S, S, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "BlobShadow" };
+            tex.SetPixels32(px); tex.Apply(false, true);
+            blob = new Material(Shader.Find("Mottainai/Transparent")) { name = "BlobShadow", renderQueue = 2990 };
+            blob.SetColor("_BaseColor", new Color(0x0B / 255f, 0x3A / 255f, 0x4A / 255f, 0.35f));
+            blob.SetTexture("_MainTex", tex);
+            blob.SetFloat("_UseTex", 1f);
+            return blob;
+        }
         static readonly System.Collections.Generic.Dictionary<int, Mesh> rings = new System.Collections.Generic.Dictionary<int, Mesh>();
 
         /// Flat annulus in XZ facing up, outer radius 1, inner radius = innerRatio (32 segments).

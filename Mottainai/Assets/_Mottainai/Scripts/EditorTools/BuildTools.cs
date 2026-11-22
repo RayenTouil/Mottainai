@@ -212,6 +212,13 @@ namespace Mottainai.EditorTools
             Build(BuildTarget.Android, BuildTargetGroup.Android, Arg("-out", "../Builds/Mottainai.apk"), opts, 0, null);
         }
 
+        [MenuItem("Mottainai/Build/Windows (visual check)")]
+        public static void BuildWindows()
+        {
+            SetupProject();
+            Build(BuildTarget.StandaloneWindows64, BuildTargetGroup.Standalone, "../Builds/Win/Mottainai.exe", BuildOptions.None, 0, null);
+        }
+
         [MenuItem("Mottainai/Build/Android APK + Run on Phone")]
         public static void BuildAndroidRun()
         {

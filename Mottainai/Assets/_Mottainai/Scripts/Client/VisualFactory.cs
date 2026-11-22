@@ -350,6 +350,8 @@ namespace Mottainai.Client
         static void BuildObstacle(Transform root, ObstacleType t)
         {
             float r = ObstacleCatalog.Radius[(int)t], hl = ObstacleCatalog.HalfLen[(int)t];
+            if (t == ObstacleType.BigRock || t == ObstacleType.Iceberg || t == ObstacleType.Wreck) // v3 blob shadow, 1.2x footprint
+                Part(root, Quad, ArtV3.BlobMaterial(), new Vector3(0, 0.01f, 0), new Vector3((r + hl) * 2.4f, r * 2.4f, 1f), new Vector3(90f, 90f, 0f), "blobShadow");
             if (t == ObstacleType.Shark && Model("Obstacles/shark", root, 2.4f, new Vector3(0, -0.05f, 0), Vector3.zero, "body", true, true) != null)
             {
                 var sharkFin = Part(root, Cone, Lit(new Color(0.35f, 0.4f, 0.48f)), new Vector3(0, 0.25f, 0), new Vector3(0.12f, 0.75f, 0.6f), default, "fin");
